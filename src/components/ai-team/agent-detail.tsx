@@ -179,6 +179,29 @@ export function AgentDetail({ id }: { id: string }) {
               </button>
             )}
           </div>
+
+          {/* FAQs */}
+          {agent.knowledge.faqs.length > 0 && (
+            <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-ink font-bold">FAQs</p>
+                <span className="text-ink-muted text-xs">{agent.knowledge.faqs.length} added</span>
+              </div>
+              <p className="text-ink-muted mt-0.5 text-xs">The questions your agent answers, with the wording it uses.</p>
+              <div className="mt-3 space-y-2.5">
+                {agent.knowledge.faqs.map((f, i) => (
+                  <div key={i} className="rounded-xl border border-black/[0.06] bg-black/[0.015] p-3">
+                    <p className="text-ink text-sm font-semibold">{f.q}</p>
+                    {f.a.trim() ? (
+                      <p className="text-ink-muted mt-1 text-sm leading-snug">{f.a}</p>
+                    ) : (
+                      <p className="mt-1 text-xs text-amber-600">No answer added yet.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           </div>
           )}
         </div>
