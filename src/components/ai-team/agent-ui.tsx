@@ -44,9 +44,19 @@ export function AgentOrb({
         className="absolute inset-0 rounded-full blur-xl"
         style={{ background: `radial-gradient(circle at 50% 45%, ${a}55, transparent 70%)` }}
       />
-      {/* sphere with a static two-colour base gradient */}
+      {/* sonar rings when active (e.g. the hero and builder preview orbs) */}
+      {speaking && (
+        <>
+          <span className="agent-ripple-ring" style={{ animationDelay: "0s" }} />
+          <span className="agent-ripple-ring" style={{ animationDelay: "1.5s" }} />
+        </>
+      )}
+      {/* sphere with a static two-colour base gradient; breathes when active */}
       <span
-        className="relative grid size-full place-items-center overflow-hidden rounded-full shadow-lg ring-1 ring-white/25"
+        className={cn(
+          "relative grid size-full place-items-center overflow-hidden rounded-full shadow-lg ring-1 ring-white/25",
+          speaking && "agent-breathe"
+        )}
         style={orbStyle}
       >
         {/* drifting aurora blobs */}
@@ -56,17 +66,7 @@ export function AgentOrb({
         {/* static glossy top highlight */}
         <span className="absolute rounded-full bg-white/20 blur-md" style={{ top: "10%", left: "18%", width: "38%", height: "30%" }} />
 
-        {speaking ? (
-          <span className="relative z-10 flex items-end gap-1" style={{ height: size * 0.22 }}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <span
-                key={i}
-                className="w-1 rounded-full bg-white/95"
-                style={{ height: "30%", animation: `agent-eq 700ms ease-in-out ${i * 90}ms infinite` }}
-              />
-            ))}
-          </span>
-        ) : Icon ? (
+        {!speaking && Icon ? (
           <Icon
             className="relative z-10 text-white drop-shadow"
             style={{ width: size * 0.42, height: size * 0.42 }}

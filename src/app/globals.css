@@ -377,11 +377,49 @@
   }
 }
 
+/* Active "voice" orb: a gentle breathe plus soft sonar rings that emanate
+   outward. Reads as a listening/speaking AI without chunky equalizer bars. */
+.agent-breathe {
+  animation: agent-breathe 4s ease-in-out infinite;
+}
+.agent-ripple-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  animation: agent-ripple 3s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+
+@keyframes agent-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.045);
+  }
+}
+@keyframes agent-ripple {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
 /* Reduced motion: keep the gradient, drop the movement. */
 @media (prefers-reduced-motion: reduce) {
   .agent-blob-a,
   .agent-blob-b,
-  .agent-sheen {
+  .agent-sheen,
+  .agent-breathe,
+  .agent-ripple-ring {
     animation: none;
   }
 }

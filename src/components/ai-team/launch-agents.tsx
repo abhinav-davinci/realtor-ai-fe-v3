@@ -80,7 +80,7 @@ export function LaunchAgents() {
           </div>
           {/* Orb, framed in its own space so the glow is not clipped */}
           <div className="relative hidden shrink-0 pr-2 lg:grid lg:place-items-center">
-            <AgentOrb colors={["#ef8e2b", "#2f6bed"]} size={104} speaking />
+            <AgentOrb colors={["#8b5cf6", "#22d3ee"]} size={108} speaking />
           </div>
         </div>
 
