@@ -47,6 +47,15 @@ This repo has real backend connected APIs. Design work must never break that flo
 - For a new flow that the backend does not serve yet, keep it client-side (localStorage, like `src/lib/agents.ts` and `src/lib/bulk-upload.ts`) and clearly note what a developer needs to wire up.
 - If a design needs new data, describe the shape it expects. Do not invent or change API calls to make a visual work.
 
+## 5. Motion and animation
+
+Before building any microanimation, transition, or interaction, **use the `emil-design-eng` skill** (installed in Claude Code). It encodes Emil Kowalski's rules, protocols, and best practices for motion, and following it is what makes animation feel professional and crisp instead of arbitrary.
+
+- Always load and follow that skill when adding or changing any animation, transition, hover or press state, enter or exit, drag, or scroll-linked effect. Do not hand-roll motion from memory.
+- Animate only what helps the user understand a change (what moved, where it came from, where it went). Motion has a purpose or it is removed.
+- Keep it fast and calm. Short durations, natural easing, no bounce unless the skill calls for it. Respect `prefers-reduced-motion`.
+- Reuse the motion tokens and keyframes already in `globals.css` (`shimmer`, `float`, `twinkle`, `fade-in-up`, `agent-orb-spin`, and so on) before inventing new ones, so timing and feel stay consistent.
+
 ## Definition of done for a screen
 
 Before a screen is considered ready:
@@ -56,4 +65,5 @@ Before a screen is considered ready:
 3. Every state is handled (loading, empty, error included).
 4. Keyboard and focus work, labels are present, contrast is fine.
 5. Responsive from mobile to desktop.
-6. No backend contract was changed. Any new data is mocked behind the flag or stored client-side, with a note for developers.
+6. Any motion was built with the `emil-design-eng` skill and respects reduced motion.
+7. No backend contract was changed. Any new data is mocked behind the flag or stored client-side, with a note for developers.
