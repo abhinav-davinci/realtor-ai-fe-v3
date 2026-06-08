@@ -6,6 +6,19 @@ import { readiness as computeReadiness, type Channel, type KnowledgeState } from
 
 /* --------------------------------- orb ------------------------------------ */
 
+// Conversational waveform: a gentle bell of bar heights with organic per-bar
+// timing (varied durations + phases). Slow and softly eased so it rises and
+// settles like calm speech instead of marching in unison.
+const WAVE = [
+  { h: 0.5, d: 2.1, delay: 0 },
+  { h: 0.72, d: 1.9, delay: 0.28 },
+  { h: 0.9, d: 2.5, delay: 0.1 },
+  { h: 1, d: 2, delay: 0.4 },
+  { h: 0.9, d: 2.4, delay: 0 },
+  { h: 0.72, d: 1.95, delay: 0.32 },
+  { h: 0.5, d: 2.2, delay: 0.16 },
+];
+
 /**
  * Animated agent "orb". The gradient itself comes alive: blurred colour blobs
  * in the agent's palette drift and scale (transform/opacity only, on the GPU)
@@ -44,13 +57,6 @@ export function AgentOrb({
         className="absolute inset-0 rounded-full blur-xl"
         style={{ background: `radial-gradient(circle at 50% 45%, ${a}55, transparent 70%)` }}
       />
-      {/* sonar rings when active (e.g. the hero and builder preview orbs) */}
-      {speaking && (
-        <>
-          <span className="agent-ripple-ring" style={{ animationDelay: "0s" }} />
-          <span className="agent-ripple-ring" style={{ animationDelay: "1.5s" }} />
-        </>
-      )}
       {/* sphere with a static two-colour base gradient; breathes when active */}
       <span
         className={cn(
@@ -66,7 +72,27 @@ export function AgentOrb({
         {/* static glossy top highlight */}
         <span className="absolute rounded-full bg-white/20 blur-md" style={{ top: "10%", left: "18%", width: "38%", height: "30%" }} />
 
-        {!speaking && Icon ? (
+        {speaking ? (
+          <span
+            className="relative z-10 flex items-center"
+            style={{ height: size * 0.34, gap: Math.max(2, Math.round(size * 0.028)) }}
+          >
+            {WAVE.map((bar, i) => (
+              <span
+                key={i}
+                className="agent-wave-bar"
+                style={
+                  {
+                    width: Math.max(2, Math.round(size * 0.028)),
+                    height: `${bar.h * 100}%`,
+                    "--wave-dur": `${bar.d}s`,
+                    "--wave-delay": `${bar.delay}s`,
+                  } as React.CSSProperties
+                }
+              />
+            ))}
+          </span>
+        ) : Icon ? (
           <Icon
             className="relative z-10 text-white drop-shadow"
             style={{ width: size * 0.42, height: size * 0.42 }}

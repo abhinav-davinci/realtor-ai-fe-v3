@@ -54,7 +54,7 @@ Before building any microanimation, transition, or interaction, **use the `emil-
 - Always load and follow that skill when adding or changing any animation, transition, hover or press state, enter or exit, drag, or scroll-linked effect. Do not hand-roll motion from memory.
 - Animate only what helps the user understand a change (what moved, where it came from, where it went). Motion has a purpose or it is removed.
 - Keep it fast and calm. Short durations, natural easing, no bounce unless the skill calls for it. Respect `prefers-reduced-motion`.
-- Reuse the motion tokens and keyframes already in `globals.css` (`shimmer`, `float`, `twinkle`, `fade-in-up`, `agent-orb-spin`, and so on) before inventing new ones, so timing and feel stay consistent.
+- Reuse the motion tokens and keyframes already in `globals.css` (`shimmer`, `float`, `twinkle`, `fade-in-up`, `agent-breathe`, `agent-wave`, and so on) before inventing new ones, so timing and feel stay consistent.
 
 ## Definition of done for a screen
 

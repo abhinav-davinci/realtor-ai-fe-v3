@@ -308,23 +308,6 @@
   }
 }
 
-/* AI Team — agent orb rotation + speaking equalizer */
-@keyframes agent-orb-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes agent-eq {
-  0%,
-  100% {
-    transform: scaleY(0.4);
-  }
-  50% {
-    transform: scaleY(1.6);
-  }
-}
-
 /* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
    gradient feels alive and futuristic. Transform/opacity only (GPU, off the
    main thread). Slow ease-in-out for organic morphing. */
@@ -377,17 +360,19 @@
   }
 }
 
-/* Active "voice" orb: a gentle breathe plus soft sonar rings that emanate
-   outward. Reads as a listening/speaking AI without chunky equalizer bars. */
+/* Active "voice" orb: a gentle breathe plus a conversational waveform. The
+   thin rounded bars grow from their centre with organic per-bar timing, so it
+   ripples and flows like speech. transform only, on the GPU. */
 .agent-breathe {
   animation: agent-breathe 4s ease-in-out infinite;
 }
-.agent-ripple-ring {
-  position: absolute;
-  inset: 0;
+.agent-wave-bar {
   border-radius: 9999px;
-  border: 1px solid rgb(255 255 255 / 0.35);
-  animation: agent-ripple 3s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 0 5px rgb(255 255 255 / 0.45);
+  transform-origin: center;
+  /* slow, gentle sinusoidal ease so each bar rises and settles softly */
+  animation: agent-wave var(--wave-dur, 2.1s) cubic-bezier(0.37, 0, 0.63, 1) var(--wave-delay, 0s) infinite;
 }
 
 @keyframes agent-breathe {
@@ -399,17 +384,13 @@
     transform: scale(1.045);
   }
 }
-@keyframes agent-ripple {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.5;
-  }
-  70% {
-    opacity: 0;
-  }
+@keyframes agent-wave {
+  0%,
   100% {
-    transform: scale(1.65);
-    opacity: 0;
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
   }
 }
 
@@ -419,7 +400,7 @@
   .agent-blob-b,
   .agent-sheen,
   .agent-breathe,
-  .agent-ripple-ring {
+  .agent-wave-bar {
     animation: none;
   }
 }
