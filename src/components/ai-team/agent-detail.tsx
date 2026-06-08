@@ -353,7 +353,7 @@ function EmbedCard({ agentName }: { agentName: string }) {
         <span className="bg-brand-green/10 text-brand-green grid size-9 place-items-center rounded-lg"><MessageSquare className="size-4.5" /></span>
         <div className="min-w-0 flex-1">
           <p className="text-ink text-sm font-semibold">Website chat widget</p>
-          <p className="text-ink-muted text-xs">Paste before &lt;/body&gt; on your site.</p>
+          <p className="text-ink-muted text-xs">Paste before &lt;/body&gt;, or send it to your web person.</p>
         </div>
         <ChannelBadge channel="chat" />
       </div>

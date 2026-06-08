@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Mic,
   Phone,
+  Play,
   Plus,
   Rocket,
   Settings2,
@@ -236,7 +237,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
           </SectionCard>
 
           {/* Voice */}
-          <SectionCard icon={Mic} title="Voice" desc="Pick how your agent sounds. Tap ▶ to hear the opening line.">
+          <SectionCard icon={Mic} title="Voice" desc="Pick how your agent sounds, then press play to hear the opening line.">
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {VOICES.map((v) => {
                 const sel = v.id === voiceId;
@@ -249,7 +250,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
                       setLanguages((cur) => (cur.length ? cur : v.langs.slice(0, 2)));
                     }}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl border p-2.5 text-left transition-colors",
+                      "flex items-center gap-3 rounded-xl border p-2.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
                       sel ? "border-accent-blue bg-accent-blue/[0.05]" : "border-black/12 hover:border-black/25"
                     )}
                   >
@@ -267,7 +268,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
                         className="bg-accent-blue/10 text-accent-blue grid size-7 shrink-0 cursor-pointer place-items-center rounded-full"
                         aria-label="Hear voice"
                       >
-                        {speaking ? <Volume2 className="size-3.5 animate-pulse" /> : <span className="text-[10px] font-bold">▶</span>}
+                        {speaking ? <Volume2 className="size-3.5 animate-pulse" /> : <Play className="size-3 fill-current" />}
                       </span>
                     )}
                   </button>
@@ -438,7 +439,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
             </div>
             {channels.includes("chat") && (
               <div className="mt-3 rounded-xl bg-black/[0.03] p-3.5">
-                <p className="text-ink-muted text-xs font-medium">Add this to your website. No changes to your agent needed:</p>
+                <p className="text-ink-muted text-xs font-medium">Add this to your website, or send it to whoever manages your site:</p>
                 <pre className="text-ink mt-1.5 overflow-x-auto rounded-lg bg-white p-2.5 text-[11px] ring-1 ring-black/[0.06]">
 {`<script src="https://cdn.trythat.ai/widget.js"
   data-agent="${name.toLowerCase()}"></script>`}
@@ -463,13 +464,19 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
             </button>
             {advancedOpen && (
               <div className="space-y-4 border-t border-black/[0.06] p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-ink text-sm font-semibold">Always on (24x7)</p>
-                    <p className="text-ink-muted text-xs">Off = only during business hours; after-hours leads get a callback promise.</p>
-                  </div>
-                  <Switch on={alwaysOn} onToggle={() => setAlwaysOn((v) => !v)} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setAlwaysOn((v) => !v)}
+                  role="switch"
+                  aria-checked={alwaysOn}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+                >
+                  <span>
+                    <span className="text-ink block text-sm font-semibold">Always on (24x7)</span>
+                    <span className="text-ink-muted block text-xs">Off = only during business hours; after-hours leads get a callback promise.</span>
+                  </span>
+                  <Switch on={alwaysOn} />
+                </button>
                 <Field label="Escalate hot leads to" hint="Optional. A human takes over for this number.">
                   <div className="focus-within:border-accent-blue/50 flex h-11 items-center gap-2 rounded-lg border border-black/15 bg-white px-3">
                     <span className="text-ink-muted shrink-0 text-sm">🇮🇳 +91</span>
@@ -629,7 +636,7 @@ function ChipRow({ items, selected, onToggle }: { items: string[]; selected: str
             type="button"
             onClick={() => onToggle(item)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
               sel ? "border-accent-blue bg-accent-blue/[0.08] text-ink" : "text-ink-muted border-black/15 hover:border-black/25"
             )}
           >
@@ -652,7 +659,7 @@ function KnowledgeRow({ label, desc, points, active, onClick }: { label: string;
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors",
+        "flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
         active ? "border-brand-green/40 bg-brand-green/[0.05]" : "border-black/[0.08] hover:border-black/20"
       )}
     >
@@ -675,8 +682,10 @@ function ChannelToggle({ icon: Icon, title, desc, on, onToggle }: { icon: Lucide
     <button
       type="button"
       onClick={onToggle}
+      role="switch"
+      aria-checked={on}
       className={cn(
-        "flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors",
+        "flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
         on ? "border-accent-blue bg-accent-blue/[0.05]" : "border-black/[0.08] hover:border-black/20"
       )}
     >
@@ -687,18 +696,17 @@ function ChannelToggle({ icon: Icon, title, desc, on, onToggle }: { icon: Lucide
         <p className="text-ink text-sm font-semibold">{title}</p>
         <p className="text-ink-muted text-xs leading-snug">{desc}</p>
       </div>
-      <Switch on={on} onToggle={onToggle} />
+      <Switch on={on} />
     </button>
   );
 }
 
-function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+/** Decorative switch visual. The parent button carries role="switch" + aria-checked. */
+function Switch({ on }: { on: boolean }) {
   return (
     <span
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      className={cn("relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors", on ? "bg-accent-blue" : "bg-black/15")}
-      role="switch"
-      aria-checked={on}
+      aria-hidden
+      className={cn("relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors", on ? "bg-accent-blue" : "bg-black/15")}
     >
       <span className={cn("inline-block size-4 transform rounded-full bg-white shadow transition-transform", on ? "translate-x-4" : "translate-x-0.5")} />
     </span>
@@ -717,8 +725,8 @@ function Stepper({ value, onChange }: { value: number; onChange: (n: number) => 
 
 function SpecCheck({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
-    <button type="button" onClick={onChange} className="flex items-start gap-2.5 text-left">
-      <span className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded border transition-colors", checked ? "border-accent-blue bg-accent-blue text-white" : "border-black/25 bg-white")}>
+    <button type="button" onClick={onChange} className="group/spec flex items-start gap-2.5 text-left outline-none">
+      <span className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded border transition-colors group-focus-visible/spec:ring-2 group-focus-visible/spec:ring-accent-blue/40", checked ? "border-accent-blue bg-accent-blue text-white" : "border-black/25 bg-white")}>
         {checked && <Check className="size-3.5" strokeWidth={3} />}
       </span>
       <span className="text-ink-muted text-sm leading-snug">{label}</span>
