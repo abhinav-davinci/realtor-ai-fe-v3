@@ -200,7 +200,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
         <div className="min-w-0 flex-1">
           <p className="text-ink truncate font-bold">{editId ? "Edit" : "Build"} your {t.role}</p>
           <p className="text-ink-muted truncate text-xs">
-            {editId ? "Update anything, then save your changes." : "We filled in sensible defaults. Change only what you want."}
+            {editId ? "Update anything, then save your changes." : "Everything has a default, so you can launch now. Adding knowledge makes it smarter."}
           </p>
         </div>
         <Button
@@ -293,7 +293,10 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
                 <FileText className="size-5" />
               </span>
               <div>
-                <p className="text-ink font-bold">Knowledge base</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-ink font-bold">Knowledge base</p>
+                  <span className="bg-brand-orange/15 text-brand-orange rounded-full px-2 py-0.5 text-[11px] font-semibold">Recommended</span>
+                </div>
                 <p className="text-ink-muted text-sm">
                   This is what makes your agent useful. Each item you add raises the readiness score and helps it give
                   real, specific answers.

@@ -251,7 +251,7 @@ function TestChat({ agent, company }: { agent: AgentConfig; company: string }) {
         <p className="text-ink text-sm font-bold">Test {agent.name} live</p>
         <span className="text-ink-muted ml-auto text-xs">Try a real buyer question</span>
       </div>
-      <div className="h-72 space-y-2.5 overflow-y-auto bg-black/[0.015] p-4">
+      <div className="max-h-72 min-h-[120px] space-y-2.5 overflow-y-auto bg-black/[0.015] p-4">
         {msgs.map((m, i) => (
           <div key={i} className={cn("flex", m.who === "user" ? "justify-end" : "justify-start")}>
             <span className={cn("max-w-[80%] rounded-2xl px-3 py-2 text-sm", m.who === "user" ? "bg-accent-blue rounded-br-sm text-white" : "text-ink rounded-bl-sm bg-white ring-1 ring-black/[0.06]")}>

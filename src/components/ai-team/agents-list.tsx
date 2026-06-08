@@ -52,6 +52,16 @@ export function AgentsList() {
               onDelete={() => remove(a.id)}
             />
           ))}
+          <button
+            type="button"
+            onClick={() => router.push("/ai-team")}
+            className="group hover:border-accent-blue/50 bg-accent-blue/[0.02] hover:bg-accent-blue/[0.05] flex min-h-[150px] flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-accent-blue/20 p-5 text-sm font-semibold text-ink-muted transition-colors"
+          >
+            <span className="bg-accent-blue/10 text-accent-blue grid size-11 place-items-center rounded-full transition-transform group-hover:scale-110">
+              <Plus className="size-5" />
+            </span>
+            Build another agent
+          </button>
         </div>
       )}
     </div>
