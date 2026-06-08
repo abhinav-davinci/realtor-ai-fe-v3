@@ -30,6 +30,10 @@ import {
   type AgentConfig,
 } from "@/lib/agents";
 import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
+import { AgentConversations } from "./agent-conversations";
+import { conversationsFor } from "@/lib/conversations";
+
+type DetailTab = "conversations" | "test" | "setup";
 
 export function AgentDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -39,6 +43,8 @@ export function AgentDetail({ id }: { id: string }) {
   const [agent, setAgent] = useState<AgentConfig | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // A new agent opens on Test (try it now); an existing one opens on its history.
+  const [tab, setTab] = useState<DetailTab>(isNew ? "test" : "conversations");
 
   useEffect(() => {
     setAgent(getAgent(id));
@@ -94,16 +100,31 @@ export function AgentDetail({ id }: { id: string }) {
       {isNew && (
         <div className="bg-brand-green/[0.08] border-brand-green/20 mx-4 mt-4 flex items-center gap-2 rounded-xl border px-4 py-2.5 sm:mx-6 lg:mx-8">
           <span className="bg-brand-green grid size-6 place-items-center rounded-full text-white"><Check className="size-3.5" strokeWidth={3} /></span>
-          <p className="text-ink text-sm font-medium">{agent.name} is live. Try it out below, then share the widget on your website.</p>
+          <p className="text-ink text-sm font-medium">{agent.name} is live. Test it here, then add the widget to your website.</p>
         </div>
       )}
 
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_340px] lg:px-8">
         {/* main */}
-        <div className="min-w-0 space-y-5">
-          {/* live test */}
-          <TestChat agent={agent} company={company} />
+        <div className="min-w-0">
+          {/* tabs */}
+          <div className="mb-5 flex items-center gap-1 border-b border-black/[0.06]">
+            <TabButton active={tab === "conversations"} onClick={() => setTab("conversations")}>
+              Conversations
+              <span className="bg-black/[0.06] text-ink-muted ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold">
+                {conversationsFor(agent.templateId).length}
+              </span>
+            </TabButton>
+            <TabButton active={tab === "test"} onClick={() => setTab("test")}>Test</TabButton>
+            <TabButton active={tab === "setup"} onClick={() => setTab("setup")}>Setup</TabButton>
+          </div>
 
+          {tab === "conversations" && <AgentConversations agent={agent} onTest={() => setTab("test")} />}
+
+          {tab === "test" && <TestChat agent={agent} company={company} />}
+
+          {tab === "setup" && (
+          <div className="space-y-5">
           {/* configuration */}
           <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
             <p className="text-ink font-bold">Configuration</p>
@@ -158,6 +179,8 @@ export function AgentDetail({ id }: { id: string }) {
               </button>
             )}
           </div>
+          </div>
+          )}
         </div>
 
         {/* right rail */}
@@ -193,6 +216,22 @@ export function AgentDetail({ id }: { id: string }) {
         <ConfirmDelete name={agent.name} onCancel={() => setConfirmDelete(false)} onConfirm={remove} />
       )}
     </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "relative inline-flex items-center px-3 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40",
+        active ? "text-ink" : "text-ink-muted hover:text-ink"
+      )}
+    >
+      {children}
+      {active && <span className="bg-accent-blue absolute inset-x-3 -bottom-px h-0.5 rounded-full" />}
+    </button>
   );
 }
 
