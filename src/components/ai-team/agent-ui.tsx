@@ -7,10 +7,12 @@ import { readiness as computeReadiness, type Channel, type KnowledgeState } from
 /* --------------------------------- orb ------------------------------------ */
 
 /**
- * Animated agent "orb". A soft conic-gradient sphere that gently rotates. Shows
- * a speaking waveform when `speaking`, otherwise the agent's role icon when one
- * is passed. The voice/template colors drive the gradient. Using the same orb
- * everywhere (templates, saved agents, detail) keeps one visual language.
+ * Animated agent "orb". The gradient itself comes alive: blurred colour blobs
+ * in the agent's palette drift and scale (transform/opacity only, on the GPU)
+ * behind a still icon, so it reads as futuristic without the icon spinning.
+ * Shows a speaking waveform when `speaking`, otherwise the role icon when one
+ * is passed. Same orb everywhere keeps one visual language. Honours
+ * prefers-reduced-motion (handled in globals.css).
  */
 export function AgentOrb({
   colors,
@@ -26,36 +28,47 @@ export function AgentOrb({
   className?: string;
 }) {
   const [a, b] = colors;
+  const blur = Math.round(size * 0.1) + 2;
+  // Desync each orb from a cheap hash of its first colour, so a grid of orbs
+  // morphs out of sync instead of pulsing in unison.
+  const seed = (parseInt(a.slice(1, 3), 16) || 0) % 100;
+  const orbStyle = {
+    "--orb-delay": `${-((seed / 100) * 7).toFixed(2)}s`,
+    backgroundImage: `radial-gradient(circle at 32% 28%, ${a}, ${b})`,
+  } as React.CSSProperties;
+
   return (
     <div className={cn("relative grid place-items-center", className)} style={{ width: size, height: size }}>
-      {/* glow */}
+      {/* outer glow */}
       <span
         className="absolute inset-0 rounded-full blur-xl"
-        style={{ background: `radial-gradient(circle at 50% 40%, ${a}55, transparent 70%)` }}
+        style={{ background: `radial-gradient(circle at 50% 45%, ${a}55, transparent 70%)` }}
       />
-      {/* sphere */}
+      {/* sphere with a static two-colour base gradient */}
       <span
-        className="relative grid size-full place-items-center overflow-hidden rounded-full shadow-lg ring-1 ring-white/30"
-        style={{
-          backgroundImage: `conic-gradient(from 140deg, ${a}, ${b}, ${a})`,
-          animation: "agent-orb-spin 9s linear infinite",
-        }}
+        className="relative grid size-full place-items-center overflow-hidden rounded-full shadow-lg ring-1 ring-white/25"
+        style={orbStyle}
       >
-        {/* inner highlight */}
-        <span className="absolute inset-[14%] rounded-full bg-white/15 blur-md" style={{ top: "10%", left: "16%", width: "40%", height: "34%" }} />
+        {/* drifting aurora blobs */}
+        <span className="agent-blob agent-blob-a" style={{ inset: "-25%", filter: `blur(${blur}px)`, background: `radial-gradient(circle, ${a} 0%, transparent 68%)` }} />
+        <span className="agent-blob agent-blob-b" style={{ inset: "-20%", filter: `blur(${blur}px)`, background: `radial-gradient(circle, ${b} 0%, transparent 64%)` }} />
+        <span className="agent-blob agent-sheen" style={{ inset: "-10%", filter: `blur(${Math.round(blur * 0.8)}px)`, background: "radial-gradient(circle, rgba(255,255,255,0.85) 0%, transparent 55%)" }} />
+        {/* static glossy top highlight */}
+        <span className="absolute rounded-full bg-white/20 blur-md" style={{ top: "10%", left: "18%", width: "38%", height: "30%" }} />
+
         {speaking ? (
           <span className="relative z-10 flex items-end gap-1" style={{ height: size * 0.22 }}>
             {[0, 1, 2, 3, 4].map((i) => (
               <span
                 key={i}
-                className="w-1 rounded-full bg-white/90"
+                className="w-1 rounded-full bg-white/95"
                 style={{ height: "30%", animation: `agent-eq 700ms ease-in-out ${i * 90}ms infinite` }}
               />
             ))}
           </span>
         ) : Icon ? (
           <Icon
-            className="relative z-10 text-white drop-shadow-sm"
+            className="relative z-10 text-white drop-shadow"
             style={{ width: size * 0.42, height: size * 0.42 }}
             strokeWidth={1.75}
           />

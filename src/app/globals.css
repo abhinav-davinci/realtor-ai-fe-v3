@@ -324,3 +324,64 @@
     transform: scaleY(1.6);
   }
 }
+
+/* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
+   gradient feels alive and futuristic. Transform/opacity only (GPU, off the
+   main thread). Slow ease-in-out for organic morphing. */
+.agent-blob {
+  position: absolute;
+  border-radius: 9999px;
+}
+/* animation-delay is declared after the shorthand so the per-orb --orb-delay
+   desync is not reset to 0. */
+.agent-blob-a {
+  animation: agent-aurora-a 7s ease-in-out infinite;
+  animation-delay: var(--orb-delay, 0s);
+}
+.agent-blob-b {
+  animation: agent-aurora-b 9s ease-in-out infinite;
+  animation-delay: var(--orb-delay, 0s);
+}
+.agent-sheen {
+  animation: agent-sheen 8s ease-in-out infinite;
+  animation-delay: var(--orb-delay, 0s);
+}
+
+@keyframes agent-aurora-a {
+  0%,
+  100% {
+    transform: translate(-15%, -10%) scale(1.15);
+  }
+  50% {
+    transform: translate(12%, 14%) scale(1.4);
+  }
+}
+@keyframes agent-aurora-b {
+  0%,
+  100% {
+    transform: translate(14%, 12%) scale(1.25);
+  }
+  50% {
+    transform: translate(-12%, -14%) scale(1);
+  }
+}
+@keyframes agent-sheen {
+  0%,
+  100% {
+    transform: translate(-18%, -22%) scale(0.85);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(16%, 8%) scale(1.05);
+    opacity: 0.75;
+  }
+}
+
+/* Reduced motion: keep the gradient, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-blob-a,
+  .agent-blob-b,
+  .agent-sheen {
+    animation: none;
+  }
+}
