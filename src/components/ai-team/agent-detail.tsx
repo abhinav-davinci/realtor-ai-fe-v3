@@ -83,7 +83,7 @@ export function AgentDetail({ id }: { id: string }) {
             <p className="text-ink-muted truncate text-xs">{agent.role}</p>
           </div>
         </div>
-        <button type="button" onClick={() => router.push(`/ai-team/build/${agent.templateId}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium sm:inline-flex">
+        <button type="button" onClick={() => router.push(`/ai-team/build/${agent.templateId}?edit=${agent.id}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium sm:inline-flex">
           <Pencil className="size-4" /> Edit
         </button>
         <button type="button" onClick={() => setConfirmDelete(true)} aria-label={`Delete ${agent.name}`} className="text-ink-muted hover:text-red-500 grid size-9 place-items-center rounded-lg hover:bg-red-50">

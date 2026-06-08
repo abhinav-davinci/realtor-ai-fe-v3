@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Building2,
@@ -10,6 +10,7 @@ import {
   FileText,
   Info,
   Languages,
+  Loader2,
   MessageSquare,
   Mic,
   Phone,
@@ -32,6 +33,7 @@ import {
   LEAD_FIELDS,
   TONES,
   VOICES,
+  getAgent,
   readiness,
   saveAgent,
   templateById,
@@ -69,6 +71,9 @@ function speak(text: string, gender: "male" | "female", onEnd: () => void) {
 
 export function AgentBuilder({ templateId }: { templateId: string }) {
   const router = useRouter();
+  // ?edit=<id> loads an existing agent and saves changes to it instead of
+  // creating a new one.
+  const editId = useSearchParams().get("edit");
   const { orgName } = useAuth();
   const company = orgName || "your company";
   const t = useMemo(() => templateById(templateId), [templateId]);
@@ -97,11 +102,35 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [launched, setLaunched] = useState(false);
+  // New builds render immediately; edits wait one tick to load from localStorage.
+  const [ready, setReady] = useState(!editId);
   const fileRef = useRef<HTMLInputElement>(null);
+  const createdAtRef = useRef<number | null>(null);
 
   const voice = voiceById(voiceId);
   const previewGreeting = greeting.replaceAll("{company}", company);
   const rd = readiness({ voiceId, tone, languages, greeting, channels, knowledge });
+
+  // Edit mode: load the saved agent (client-only) and prefill every field.
+  useEffect(() => {
+    if (!editId) return;
+    const a = getAgent(editId);
+    if (a) {
+      setName(a.name);
+      setGreeting(a.greeting);
+      setVoiceId(a.voiceId);
+      setLanguages(a.languages);
+      setTone(a.tone);
+      setCollects(a.collects);
+      setChannels(a.channels);
+      setKnowledge(a.knowledge);
+      setAlwaysOn(a.alwaysOn);
+      setEscalateTo(a.escalateTo);
+      setGuardrails(a.guardrails);
+      createdAtRef.current = a.createdAt;
+    }
+    setReady(true);
+  }, [editId]);
 
   // When channels drop voice, force the chat preview.
   useEffect(() => {
@@ -127,7 +156,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
   function launch() {
     setLaunching(true);
     const agent: AgentConfig = {
-      id: `agent-${Date.now().toString(36)}`,
+      id: editId || `agent-${Date.now().toString(36)}`,
       templateId: t.id,
       name,
       role: t.role,
@@ -141,11 +170,19 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
       collects,
       guardrails,
       knowledge,
-      createdAt: Date.now(),
+      createdAt: createdAtRef.current ?? Date.now(),
     };
     saveAgent(agent);
     setLaunched(true);
-    setTimeout(() => router.push(`/ai-team/agents/${agent.id}?new=1`), 1700);
+    setTimeout(() => router.push(`/ai-team/agents/${agent.id}${editId ? "" : "?new=1"}`), 1700);
+  }
+
+  if (!ready) {
+    return (
+      <div className="grid h-full place-items-center">
+        <Loader2 className="text-accent-blue size-6 animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -161,15 +198,18 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
           <ArrowLeft className="size-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-ink truncate font-bold">Build your {t.role}</p>
-          <p className="text-ink-muted truncate text-xs">We filled in sensible defaults. Change only what you want.</p>
+          <p className="text-ink truncate font-bold">{editId ? "Edit" : "Build"} your {t.role}</p>
+          <p className="text-ink-muted truncate text-xs">
+            {editId ? "Update anything, then save your changes." : "We filled in sensible defaults. Change only what you want."}
+          </p>
         </div>
         <Button
           onClick={launch}
           disabled={launching}
           className="bg-brand-green hover:bg-brand-green-hover hidden h-10 rounded-lg px-4 text-sm font-semibold text-white sm:inline-flex"
         >
-          <Rocket className="size-4" /> Launch Agent
+          {editId ? <Check className="size-4" /> : <Rocket className="size-4" />}
+          {editId ? "Save Changes" : "Launch Agent"}
         </Button>
       </div>
 
@@ -457,7 +497,8 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
             disabled={launching}
             className="bg-brand-green hover:bg-brand-green-hover h-12 w-full rounded-xl text-base font-semibold text-white sm:hidden"
           >
-            <Rocket className="size-5" /> Launch Agent
+            {editId ? <Check className="size-5" /> : <Rocket className="size-5" />}
+            {editId ? "Save Changes" : "Launch Agent"}
           </Button>
         </div>
 
@@ -538,7 +579,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
         />
       )}
 
-      {launched && <LaunchSuccess name={name} />}
+      {launched && <LaunchSuccess name={name} edited={!!editId} />}
     </div>
   );
 }
@@ -804,15 +845,19 @@ function ProjectPicker({ selected, onClose, onSave }: { selected: string[]; onCl
 
 /* ------------------------------ launch success ---------------------------- */
 
-function LaunchSuccess({ name }: { name: string }) {
+function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
       <div className="flex w-full max-w-sm flex-col items-center rounded-2xl bg-white px-6 py-10 text-center shadow-2xl" style={{ animation: "fade-in-up 300ms ease-out both" }}>
         <span className="grid size-16 place-items-center rounded-full bg-green-500 text-white" style={{ animation: "tick-pop 500ms cubic-bezier(0.2,0.8,0.2,1.4) both" }}>
-          <Rocket className="size-8" />
+          {edited ? <Check className="size-8" strokeWidth={3} /> : <Rocket className="size-8" />}
         </span>
-        <h2 className="text-ink mt-5 text-2xl font-bold">{name} is live</h2>
-        <p className="text-ink-muted mt-2 text-sm">Your agent is ready to take calls and answer chats. Opening its dashboard now.</p>
+        <h2 className="text-ink mt-5 text-2xl font-bold">{name} {edited ? "updated" : "is live"}</h2>
+        <p className="text-ink-muted mt-2 text-sm">
+          {edited
+            ? "Your changes are saved. Taking you back to its dashboard."
+            : "Your agent is ready to take calls and answer chats. Opening its dashboard now."}
+        </p>
       </div>
     </div>
   );
