@@ -1,0 +1,136 @@
+"use client";
+
+import { MessageSquare, Phone } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { readiness as computeReadiness, type Channel, type KnowledgeState } from "@/lib/agents";
+
+/* --------------------------------- orb ------------------------------------ */
+
+/**
+ * Animated agent "orb". A soft conic-gradient sphere that gently rotates, with
+ * an optional speaking waveform. The voice/template colors drive the gradient.
+ */
+export function AgentOrb({
+  colors,
+  size = 132,
+  speaking = false,
+  className,
+}: {
+  colors: [string, string];
+  size?: number;
+  speaking?: boolean;
+  className?: string;
+}) {
+  const [a, b] = colors;
+  return (
+    <div className={cn("relative grid place-items-center", className)} style={{ width: size, height: size }}>
+      {/* glow */}
+      <span
+        className="absolute inset-0 rounded-full blur-xl"
+        style={{ background: `radial-gradient(circle at 50% 40%, ${a}55, transparent 70%)` }}
+      />
+      {/* sphere */}
+      <span
+        className="relative grid size-full place-items-center overflow-hidden rounded-full shadow-lg ring-1 ring-white/30"
+        style={{
+          backgroundImage: `conic-gradient(from 140deg, ${a}, ${b}, ${a})`,
+          animation: "agent-orb-spin 9s linear infinite",
+        }}
+      >
+        {/* inner highlight */}
+        <span className="absolute inset-[14%] rounded-full bg-white/15 blur-md" style={{ top: "10%", left: "16%", width: "40%", height: "34%" }} />
+        {/* speaking bars */}
+        {speaking && (
+          <span className="relative z-10 flex items-end gap-1" style={{ height: size * 0.22 }}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={i}
+                className="w-1 rounded-full bg-white/90"
+                style={{ height: "30%", animation: `agent-eq 700ms ease-in-out ${i * 90}ms infinite` }}
+              />
+            ))}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/* ----------------------------- readiness meter ---------------------------- */
+
+const TONE_STYLES = {
+  weak: { ring: "stroke-amber-500", text: "text-amber-600", track: "stroke-amber-100" },
+  ok: { ring: "stroke-accent-blue", text: "text-accent-blue", track: "stroke-accent-blue/15" },
+  strong: { ring: "stroke-brand-green", text: "text-brand-green", track: "stroke-brand-green/15" },
+} as const;
+
+/** Radial readiness gauge, same open-gauge visual language as the Spotlight Score. */
+export function ReadinessMeter({
+  voiceId,
+  tone,
+  languages,
+  greeting,
+  channels,
+  knowledge,
+  size = 96,
+}: {
+  voiceId?: string;
+  tone: string[];
+  languages: string[];
+  greeting: string;
+  channels: Channel[];
+  knowledge: KnowledgeState;
+  size?: number;
+}) {
+  const { score, label, tone: band } = computeReadiness({ voiceId, tone, languages, greeting, channels, knowledge });
+  const s = TONE_STYLES[band];
+  const r = 26;
+  const circ = 2 * Math.PI * r;
+  const GAP = 0.12;
+  const arc = (1 - GAP) * circ;
+  const rotation = -90 + GAP * 180;
+  const progress = (score / 100) * arc;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative grid place-items-center" style={{ width: size, height: size }}>
+        <svg className="size-full" viewBox="0 0 64 64">
+          <g transform={`rotate(${rotation} 32 32)`}>
+            <circle cx="32" cy="32" r={r} fill="none" strokeWidth="5" strokeLinecap="round" className={s.track} strokeDasharray={`${arc} ${circ}`} />
+            <circle
+              cx="32"
+              cy="32"
+              r={r}
+              fill="none"
+              strokeWidth="5"
+              strokeLinecap="round"
+              className={cn(s.ring, "transition-[stroke-dasharray] duration-500 ease-out")}
+              strokeDasharray={`${progress} ${circ}`}
+            />
+          </g>
+        </svg>
+        <div className="absolute flex flex-col items-center">
+          <span className="text-ink text-lg font-bold leading-none">{score}</span>
+          <span className="text-ink-muted text-[9px] font-medium">/ 100</span>
+        </div>
+      </div>
+      <div>
+        <p className="text-ink-muted text-xs font-medium">Agent Readiness</p>
+        <p className={cn("text-sm font-bold", s.text)}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------ channel badge ----------------------------- */
+
+export function ChannelBadge({ channel }: { channel: Channel }) {
+  return channel === "voice" ? (
+    <span className="border-accent-blue/25 bg-accent-blue/[0.07] text-accent-blue inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium">
+      <Phone className="size-3" /> Voice
+    </span>
+  ) : (
+    <span className="border-brand-green/25 bg-brand-green/[0.08] text-brand-green inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium">
+      <MessageSquare className="size-3" /> Web chat
+    </span>
+  );
+}
