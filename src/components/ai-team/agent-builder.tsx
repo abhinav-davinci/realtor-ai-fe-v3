@@ -43,7 +43,7 @@ import {
   type Channel,
   type KnowledgeState,
 } from "@/lib/agents";
-import { AgentOrb, ReadinessMeter } from "./agent-ui";
+import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
 
 /* ----------------------------- speech helper ------------------------------ */
 
@@ -101,6 +101,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
   const [previewMode, setPreviewMode] = useState<"voice" | "chat">("voice");
   const [speaking, setSpeaking] = useState(false);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [launched, setLaunched] = useState(false);
   // New builds render immediately; edits wait one tick to load from localStorage.
@@ -154,7 +155,14 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
     speak(previewGreeting, voice.gender, () => setSpeaking(false));
   }
 
+  // Build mode reviews before going live; edit mode saves directly (already live).
+  function onLaunchClick() {
+    if (editId) launch();
+    else setReviewOpen(true);
+  }
+
   function launch() {
+    setReviewOpen(false);
     setLaunching(true);
     const agent: AgentConfig = {
       id: editId || `agent-${Date.now().toString(36)}`,
@@ -205,7 +213,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
           </p>
         </div>
         <Button
-          onClick={launch}
+          onClick={onLaunchClick}
           disabled={launching}
           className="bg-brand-green hover:bg-brand-green-hover hidden h-10 rounded-lg px-4 text-sm font-semibold text-white sm:inline-flex"
         >
@@ -503,7 +511,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
 
           {/* mobile launch */}
           <Button
-            onClick={launch}
+            onClick={onLaunchClick}
             disabled={launching}
             className="bg-brand-green hover:bg-brand-green-hover h-12 w-full rounded-xl text-base font-semibold text-white sm:hidden"
           >
@@ -586,6 +594,20 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
             setKnowledge((k) => ({ ...k, projects }));
             setProjectPickerOpen(false);
           }}
+        />
+      )}
+
+      {reviewOpen && (
+        <LaunchReview
+          name={name}
+          role={t.role}
+          gradient={t.gradient}
+          icon={t.icon}
+          rd={rd}
+          channels={channels}
+          launching={launching}
+          onLaunch={launch}
+          onCancel={() => setReviewOpen(false)}
         />
       )}
 
@@ -855,6 +877,97 @@ function ProjectPicker({ selected, onClose, onSave }: { selected: string[]; onCl
 }
 
 /* ------------------------------ launch success ---------------------------- */
+
+/* ------------------------------ launch review ---------------------------- */
+
+function LaunchReview({
+  name,
+  role,
+  gradient,
+  icon,
+  rd,
+  channels,
+  launching,
+  onLaunch,
+  onCancel,
+}: {
+  name: string;
+  role: string;
+  gradient: [string, string];
+  icon: LucideIcon;
+  rd: ReturnType<typeof readiness>;
+  channels: Channel[];
+  launching: boolean;
+  onLaunch: () => void;
+  onCancel: () => void;
+}) {
+  const weak = rd.tone === "weak";
+  const barColor = weak ? "bg-amber-500" : rd.tone === "ok" ? "bg-accent-blue" : "bg-brand-green";
+  const textColor = weak ? "text-amber-600" : rd.tone === "ok" ? "text-accent-blue" : "text-brand-green";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" onClick={onCancel}>
+      <div className="modal-pop w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-black/[0.06] px-5 py-4">
+          <AgentOrb colors={gradient} size={46} icon={icon} />
+          <div className="min-w-0">
+            <p className="text-ink text-lg font-bold">Launch {name}?</p>
+            <p className="text-ink-muted text-sm">{role}, ready to go live.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-5 py-4">
+          {/* readiness, used as a gentle gate */}
+          <div className="rounded-xl border border-black/[0.08] p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-ink text-sm font-semibold">Agent readiness</span>
+              <span className={cn("text-sm font-bold", textColor)}>{rd.score} / 100 · {rd.label}</span>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+              <div className={cn("h-full rounded-full", barColor)} style={{ width: `${rd.score}%` }} />
+            </div>
+            {weak && (
+              <p className="text-ink-muted mt-2 text-xs leading-snug">
+                It can go live now. Adding your projects and company profile makes it noticeably sharper.
+              </p>
+            )}
+          </div>
+
+          {/* where it deploys + what happens next */}
+          <div>
+            <p className="text-ink-muted text-xs font-medium">Where it goes live</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {channels.map((c) => (
+                <ChannelBadge key={c} channel={c} />
+              ))}
+            </div>
+            <ul className="mt-2.5 space-y-1.5">
+              {channels.includes("voice") && (
+                <li className="text-ink-muted flex items-start gap-2 text-xs leading-snug">
+                  <Phone className="text-accent-blue mt-0.5 size-3.5 shrink-0" /> We set up a phone number so it can take calls.
+                </li>
+              )}
+              {channels.includes("chat") && (
+                <li className="text-ink-muted flex items-start gap-2 text-xs leading-snug">
+                  <MessageSquare className="text-brand-green mt-0.5 size-3.5 shrink-0" /> A website chat widget becomes available to add to your site.
+                </li>
+              )}
+            </ul>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-black/[0.06] px-5 py-4">
+          <Button variant="outline" onClick={onCancel} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
+            Keep Editing
+          </Button>
+          <Button onClick={onLaunch} disabled={launching} className="bg-brand-green hover:bg-brand-green-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
+            <Rocket className="size-4" /> Launch Agent
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
   return (
