@@ -73,6 +73,27 @@ export const GUARDRAILS = [
   "Hand off to a human for legal or payment disputes",
 ];
 
+/** A single FAQ the agent can answer: the question buyers ask and the answer. */
+export interface FaqItem {
+  q: string;
+  a: string;
+}
+
+/**
+ * Common real-estate questions, with a starter answer to edit. Tapping one adds
+ * it to the agent's FAQs so users don't start from a blank box.
+ */
+export const FAQ_SUGGESTIONS: FaqItem[] = [
+  { q: "Is the project RERA-registered?", a: "Yes, our project is RERA-registered. I can share the registration number and approved plan." },
+  { q: "When is possession?", a: "Possession is expected by [month and year]. Please update this for your project." },
+  { q: "Do you help with home loans?", a: "Yes, we have tie-ups with leading banks for up to 90% financing and can help check your eligibility." },
+  { q: "What amenities are included?", a: "The project includes [clubhouse, gym, pool, landscaped gardens, and 24x7 security]. Please update this list." },
+  { q: "Is there a maintenance charge?", a: "Yes, a monthly maintenance charge applies. Please add the per sq ft rate for your project." },
+  { q: "What configurations are available?", a: "We have [2 and 3BHK] homes. Please update the configurations and sizes for your project." },
+  { q: "What is the price range?", a: "Homes range from [price band]. I share the band, not a final closing price." },
+  { q: "Are there any ongoing offers?", a: "Please add your current offer here, or leave this for the sales team to discuss." },
+];
+
 /* ------------------------------- templates -------------------------------- */
 
 export interface AgentTemplate {
@@ -232,7 +253,7 @@ export interface KnowledgeState {
   companyProfile: boolean;
   projects: string[];
   docs: string[];
-  faqs: number;
+  faqs: FaqItem[];
   website: string;
 }
 
@@ -259,7 +280,13 @@ const STORE_KEY = "tt_agents";
 export function listAgents(): AgentConfig[] {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as AgentConfig[]) : [];
+    if (!raw) return [];
+    const agents = JSON.parse(raw) as AgentConfig[];
+    // Migrate agents saved before FAQs held content (faqs was a count).
+    for (const a of agents) {
+      if (a.knowledge && !Array.isArray(a.knowledge.faqs)) a.knowledge.faqs = [];
+    }
+    return agents;
   } catch {
     return [];
   }
@@ -320,7 +347,9 @@ export function readiness(a: {
   if (a.knowledge.companyProfile) k += 15;
   k += Math.min(a.knowledge.projects.length, 4) * 5; // up to 20
   k += Math.min(a.knowledge.docs.length, 2) * 5; // up to 10
-  k += Math.min(a.knowledge.faqs, 2) * 5; // up to 10
+  // Only FAQs with both a question and an answer count.
+  const completeFaqs = a.knowledge.faqs.filter((f) => f.q.trim() && f.a.trim()).length;
+  k += Math.min(completeFaqs, 2) * 5; // up to 10
   if (a.knowledge.website.trim()) k += 5; // up to 60
 
   const score = Math.min(100, base + k);

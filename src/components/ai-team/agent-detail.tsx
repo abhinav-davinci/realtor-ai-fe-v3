@@ -170,7 +170,7 @@ export function AgentDetail({ id }: { id: string }) {
               <KItem on={agent.knowledge.companyProfile} label={`Company profile: ${company}`} />
               <KItem on={agent.knowledge.projects.length > 0} label={`${agent.knowledge.projects.length} project${agent.knowledge.projects.length === 1 ? "" : "s"} linked`} />
               <KItem on={agent.knowledge.docs.length > 0} label={`${agent.knowledge.docs.length} document${agent.knowledge.docs.length === 1 ? "" : "s"} uploaded`} />
-              <KItem on={agent.knowledge.faqs > 0} label={`${agent.knowledge.faqs} FAQ${agent.knowledge.faqs === 1 ? "" : "s"} added`} />
+              <KItem on={agent.knowledge.faqs.length > 0} label={`${agent.knowledge.faqs.length} FAQ${agent.knowledge.faqs.length === 1 ? "" : "s"} added`} />
               <KItem on={!!agent.knowledge.website} label={agent.knowledge.website ? `Website: ${agent.knowledge.website}` : "Website not linked"} />
             </div>
             {rd.knowledgePoints < 60 && (

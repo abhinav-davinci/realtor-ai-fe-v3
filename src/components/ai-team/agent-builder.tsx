@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { MOCK_LISTINGS } from "@/lib/mock-data";
 import {
+  FAQ_SUGGESTIONS,
   GUARDRAILS,
   LANGUAGES,
   LEAD_FIELDS,
@@ -41,6 +42,7 @@ import {
   voiceById,
   type AgentConfig,
   type Channel,
+  type FaqItem,
   type KnowledgeState,
 } from "@/lib/agents";
 import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
@@ -90,7 +92,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
     companyProfile: false,
     projects: [],
     docs: [],
-    faqs: 0,
+    faqs: [],
     website: "",
   });
   const [alwaysOn, setAlwaysOn] = useState(true);
@@ -101,6 +103,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
   const [previewMode, setPreviewMode] = useState<"voice" | "chat">("voice");
   const [speaking, setSpeaking] = useState(false);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [faqModalOpen, setFaqModalOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [launched, setLaunched] = useState(false);
@@ -389,23 +392,42 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-black/[0.08] p-3.5">
-                  <p className="text-ink text-sm font-semibold">Common FAQs</p>
-                  <p className="text-ink-muted text-xs">Add the questions buyers always ask.</p>
-                  <div className="mt-2.5 flex items-center gap-2">
-                    <Stepper value={knowledge.faqs} onChange={(n) => setKnowledge((k) => ({ ...k, faqs: n }))} />
-                    <span className="text-ink-muted text-xs">{knowledge.faqs} added</span>
+              <div className="rounded-xl border border-black/[0.08] p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-ink text-sm font-semibold">Common FAQs</p>
+                    <p className="text-ink-muted text-xs">The questions buyers always ask, with the answers your agent should give.</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setFaqModalOpen(true)}
+                    className="text-accent-blue border-accent-blue/30 hover:bg-accent-blue/[0.06] inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+                  >
+                    <Plus className="size-3.5" /> {knowledge.faqs.length ? "Manage" : "Add"}
+                  </button>
                 </div>
-                <div className="rounded-xl border border-black/[0.08] p-3.5">
-                  <p className="text-ink text-sm font-semibold">Website</p>
-                  <p className="text-ink-muted text-xs">We&apos;ll learn from your site.</p>
+                {knowledge.faqs.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {knowledge.faqs.map((f, i) => (
+                      <span key={i} className="border-accent-blue/30 bg-accent-blue/[0.06] text-ink inline-flex max-w-[18rem] items-center rounded-full border px-2.5 py-1 text-xs">
+                        <span className="truncate">{f.q || "Untitled question"}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-black/[0.08] p-3.5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-ink text-sm font-semibold">Website</p>
+                    <p className="text-ink-muted text-xs">We&apos;ll learn from your site.</p>
+                  </div>
                   <input
                     value={knowledge.website}
                     onChange={(e) => setKnowledge((k) => ({ ...k, website: e.target.value }))}
                     placeholder="skylinerealty.in"
-                    className="text-ink focus:border-accent-blue/50 mt-2 h-9 w-full rounded-lg border border-black/15 px-3 text-sm outline-none"
+                    className="text-ink focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/15 px-3 text-sm outline-none sm:w-64"
                   />
                 </div>
               </div>
@@ -597,6 +619,17 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
         />
       )}
 
+      {faqModalOpen && (
+        <FaqModal
+          initial={knowledge.faqs}
+          onClose={() => setFaqModalOpen(false)}
+          onSave={(faqs) => {
+            setKnowledge((k) => ({ ...k, faqs }));
+            setFaqModalOpen(false);
+          }}
+        />
+      )}
+
       {reviewOpen && (
         <LaunchReview
           name={name}
@@ -735,16 +768,6 @@ function Switch({ on }: { on: boolean }) {
   );
 }
 
-function Stepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-lg border border-black/12 p-1">
-      <button type="button" onClick={() => onChange(Math.max(0, value - 1))} className="text-ink-muted grid size-6 place-items-center rounded-md hover:bg-black/[0.04]">−</button>
-      <span className="text-ink w-5 text-center text-sm font-semibold">{value}</span>
-      <button type="button" onClick={() => onChange(value + 1)} className="text-ink-muted grid size-6 place-items-center rounded-md hover:bg-black/[0.04]">+</button>
-    </span>
-  );
-}
-
 function SpecCheck({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <button type="button" onClick={onChange} className="group/spec flex items-start gap-2.5 text-left outline-none">
@@ -876,7 +899,102 @@ function ProjectPicker({ selected, onClose, onSave }: { selected: string[]; onCl
   );
 }
 
-/* ------------------------------ launch success ---------------------------- */
+/* -------------------------------- FAQ modal ------------------------------- */
+
+function FaqModal({ initial, onClose, onSave }: { initial: FaqItem[]; onClose: () => void; onSave: (faqs: FaqItem[]) => void }) {
+  const [list, setList] = useState<FaqItem[]>(initial);
+  const used = new Set(list.map((f) => f.q.trim().toLowerCase()));
+  const remaining = FAQ_SUGGESTIONS.filter((s) => !used.has(s.q.trim().toLowerCase()));
+
+  const add = (item: FaqItem) => setList((l) => [...l, { ...item }]);
+  const update = (i: number, field: "q" | "a", val: string) => setList((l) => l.map((f, j) => (j === i ? { ...f, [field]: val } : f)));
+  const remove = (i: number) => setList((l) => l.filter((_, j) => j !== i));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="modal-pop flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-5 py-4">
+          <div>
+            <p className="text-ink font-bold">Common FAQs</p>
+            <p className="text-ink-muted text-xs">Pick a question buyers always ask, or add your own. Each one needs an answer your agent can give.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-ink-muted hover:bg-black/[0.05] grid size-8 shrink-0 place-items-center rounded-full">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          {remaining.length > 0 && (
+            <div>
+              <p className="text-ink-muted text-xs font-medium">Add a common question</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {remaining.map((s) => (
+                  <button
+                    key={s.q}
+                    type="button"
+                    onClick={() => add(s)}
+                    className="text-ink-muted hover:border-accent-blue/40 hover:text-ink inline-flex items-center gap-1 rounded-full border border-black/15 px-2.5 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+                  >
+                    <Plus className="size-3" /> {s.q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {list.length > 0 ? (
+            <div className="space-y-2.5">
+              <p className="text-ink-muted text-xs font-medium">Your FAQs ({list.length})</p>
+              {list.map((f, i) => (
+                <div key={i} className="rounded-xl border border-black/[0.08] p-3">
+                  <div className="flex items-start gap-2">
+                    <input
+                      value={f.q}
+                      onChange={(e) => update(i, "q", e.target.value)}
+                      placeholder="Question"
+                      className="text-ink focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/15 px-3 text-sm font-medium outline-none"
+                    />
+                    <button type="button" onClick={() => remove(i)} aria-label="Remove FAQ" className="text-ink-muted hover:text-red-500 grid size-9 shrink-0 place-items-center rounded-lg hover:bg-red-50">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <textarea
+                    value={f.a}
+                    onChange={(e) => update(i, "a", e.target.value)}
+                    rows={2}
+                    placeholder="The answer your agent should give"
+                    className="text-ink focus:border-accent-blue/50 mt-2 w-full resize-none rounded-lg border border-black/15 px-3 py-2 text-sm outline-none"
+                  />
+                  {f.q.trim() && !f.a.trim() && (
+                    <p className="mt-1 text-[11px] text-amber-600">Add an answer so the agent can use this.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-ink-muted rounded-xl border border-dashed border-black/15 p-4 text-center text-sm">
+              No FAQs yet. Tap a suggestion above, or add your own below.
+            </p>
+          )}
+
+          <button type="button" onClick={() => add({ q: "", a: "" })} className="text-accent-blue inline-flex items-center gap-1.5 text-sm font-semibold outline-none">
+            <Plus className="size-4" /> Add your own question
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-black/[0.06] px-5 py-3">
+          <span className="text-ink-muted hidden text-xs sm:inline">Only questions with an answer help your agent.</span>
+          <div className="flex flex-1 justify-end gap-2">
+            <Button variant="outline" onClick={onClose} className="text-ink h-9 rounded-lg border-black/15 px-4 text-sm">Cancel</Button>
+            <Button onClick={() => onSave(list.filter((f) => f.q.trim()))} className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-4 text-sm font-semibold text-white">
+              Save
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ------------------------------ launch review ---------------------------- */
 
