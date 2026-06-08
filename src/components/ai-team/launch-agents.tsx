@@ -59,7 +59,7 @@ export function LaunchAgents() {
   const shown = agents.slice(0, 3);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-12 sm:px-6 lg:px-8">
+    <div className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-16 sm:px-6 lg:px-8">
       {/* Hero */}
       <div
         className="relative shrink-0 overflow-hidden rounded-2xl bg-gradient-to-r from-[#16243f] via-[#1d3a6b] to-[#2f6bed] px-6 py-5 text-white"
@@ -120,7 +120,7 @@ export function LaunchAgents() {
       )}
 
       {/* Template gallery */}
-      <section id="templates" className="mt-8 scroll-mt-4">
+      <section id="templates" className="mt-8 shrink-0 scroll-mt-4">
         <h2 className="text-ink text-lg font-bold">Start from a ready-made agent</h2>
         <p className="text-ink-muted text-sm">Each one is pre-tuned for the Indian real-estate workflow. You can change everything in the next step.</p>
 
@@ -242,63 +242,74 @@ function MyAgentCard({ agent, onOpen, onDelete }: { agent: AgentConfig; onOpen: 
   const t = templateById(agent.templateId);
   const [confirming, setConfirming] = useState(false);
 
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-black/[0.08] bg-white p-4">
-      {confirming ? (
-        <div className="flex w-full items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-red-50 text-red-500">
-              <Trash2 className="size-4.5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-ink truncate text-sm font-semibold">Delete {agent.name}?</p>
-              <p className="text-ink-muted text-xs">This cannot be undone.</p>
-            </div>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="text-ink h-8 rounded-lg border border-black/15 px-3 text-xs font-semibold hover:bg-black/[0.03]"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="h-8 rounded-lg bg-red-500 px-3 text-xs font-semibold text-white hover:bg-red-600"
-            >
-              Delete
-            </button>
+  if (confirming) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-white p-4">
+        <div className="flex items-center gap-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-red-50 text-red-500">
+            <Trash2 className="size-4.5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-ink truncate text-sm font-semibold">Delete {agent.name}?</p>
+            <p className="text-ink-muted text-xs">This cannot be undone.</p>
           </div>
         </div>
-      ) : (
-        <>
-          <AgentOrb colors={t.gradient} size={52} icon={t.icon} />
-          <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-            <p className="text-ink truncate font-bold">{agent.name}</p>
-            <p className="text-ink-muted truncate text-xs">{agent.role}</p>
-            <div className="mt-1.5 flex items-center gap-1.5">
-              {agent.channels.map((c) => (
-                <ChannelBadge key={c} channel={c} />
-              ))}
-            </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="text-ink h-8 rounded-lg border border-black/15 px-3 text-xs font-semibold hover:bg-black/[0.03]"
+          >
+            Cancel
           </button>
-          <div className="flex flex-col items-end gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirming(true)}
-              aria-label={`Delete ${agent.name}`}
-              className="text-ink-muted hover:text-red-500 grid size-7 place-items-center rounded-lg hover:bg-red-50"
-            >
-              <Trash2 className="size-4" />
-            </button>
-            <button type="button" onClick={onOpen} className="text-accent-blue text-xs font-semibold">
-              Manage
-            </button>
-          </div>
-        </>
-      )}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="h-8 rounded-lg bg-red-500 px-3 text-xs font-semibold text-white hover:bg-red-600"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="group hover:border-accent-blue/40 flex cursor-pointer flex-col rounded-2xl border border-black/[0.08] bg-white p-4 outline-none transition-colors hover:bg-black/[0.01] focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+    >
+      <div className="flex items-center gap-3">
+        <AgentOrb colors={t.gradient} size={44} icon={t.icon} />
+        <div className="min-w-0 flex-1">
+          <p className="text-ink truncate font-bold">{agent.name}</p>
+          <p className="text-ink-muted truncate text-xs">{agent.role}</p>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirming(true);
+          }}
+          aria-label={`Delete ${agent.name}`}
+          className="text-ink-muted hover:text-red-500 grid size-7 shrink-0 place-items-center rounded-lg hover:bg-red-50"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+      <div className="mt-3 flex items-center gap-1.5">
+        {agent.channels.map((c) => (
+          <ChannelBadge key={c} channel={c} />
+        ))}
+      </div>
     </div>
   );
 }

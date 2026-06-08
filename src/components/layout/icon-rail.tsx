@@ -101,13 +101,14 @@ export function IconRail() {
         </button>
       </div>
 
-      <nav className="mt-8 flex w-full flex-1 flex-col gap-2">
+      {/* Scrolls internally on short screens so Settings/Logout stay pinned and visible. */}
+      <nav className="mt-6 flex w-full min-h-0 flex-1 flex-col gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {primary.map((item) => (
           <RailButton key={item.label} {...item} />
         ))}
       </nav>
 
-      <div className="mt-4 flex w-full flex-col gap-2 border-t border-white/10 pt-5">
+      <div className="mt-4 flex w-full shrink-0 flex-col gap-2 border-t border-white/10 pt-4">
         {secondary.map((item) => (
           <RailButton key={item.label} {...item} />
         ))}
