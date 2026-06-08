@@ -38,6 +38,7 @@ export function AgentDetail({ id }: { id: string }) {
   const isNew = useSearchParams().get("new") === "1";
   const [agent, setAgent] = useState<AgentConfig | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     setAgent(getAgent(id));
@@ -76,7 +77,7 @@ export function AgentDetail({ id }: { id: string }) {
           <ArrowLeft className="size-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <AgentOrb colors={t.gradient} size={40} />
+          <AgentOrb colors={t.gradient} size={40} icon={t.icon} />
           <div className="min-w-0">
             <p className="text-ink truncate font-bold">{agent.name}</p>
             <p className="text-ink-muted truncate text-xs">{agent.role}</p>
@@ -85,7 +86,7 @@ export function AgentDetail({ id }: { id: string }) {
         <button type="button" onClick={() => router.push(`/ai-team/build/${agent.templateId}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium sm:inline-flex">
           <Pencil className="size-4" /> Edit
         </button>
-        <button type="button" onClick={remove} aria-label="Delete" className="text-ink-muted hover:text-red-500 grid size-9 place-items-center rounded-lg hover:bg-red-50">
+        <button type="button" onClick={() => setConfirmDelete(true)} aria-label={`Delete ${agent.name}`} className="text-ink-muted hover:text-red-500 grid size-9 place-items-center rounded-lg hover:bg-red-50">
           <Trash2 className="size-4" />
         </button>
       </div>
@@ -185,6 +186,36 @@ export function AgentDetail({ id }: { id: string }) {
               {agent.channels.includes("chat") && <EmbedCard agentName={agent.name} />}
             </div>
           </div>
+        </div>
+      </div>
+
+      {confirmDelete && (
+        <ConfirmDelete name={agent.name} onCancel={() => setConfirmDelete(false)} onConfirm={remove} />
+      )}
+    </div>
+  );
+}
+
+function ConfirmDelete({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()} style={{ animation: "fade-in-up 200ms ease-out both" }}>
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-red-50 text-red-500">
+            <Trash2 className="size-5" />
+          </span>
+          <div>
+            <p className="text-ink font-bold">Delete {name}?</p>
+            <p className="text-ink-muted text-sm">This agent and its setup will be removed. This cannot be undone.</p>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="text-ink h-10 rounded-lg border border-black/15 px-4 text-sm font-semibold hover:bg-black/[0.03]">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} className="h-10 rounded-lg bg-red-500 px-4 text-sm font-semibold text-white hover:bg-red-600">
+            Delete Agent
+          </button>
         </div>
       </div>
     </div>

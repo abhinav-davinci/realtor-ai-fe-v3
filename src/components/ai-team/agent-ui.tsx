@@ -1,24 +1,28 @@
 "use client";
 
-import { MessageSquare, Phone } from "lucide-react";
+import { MessageSquare, Phone, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { readiness as computeReadiness, type Channel, type KnowledgeState } from "@/lib/agents";
 
 /* --------------------------------- orb ------------------------------------ */
 
 /**
- * Animated agent "orb". A soft conic-gradient sphere that gently rotates, with
- * an optional speaking waveform. The voice/template colors drive the gradient.
+ * Animated agent "orb". A soft conic-gradient sphere that gently rotates. Shows
+ * a speaking waveform when `speaking`, otherwise the agent's role icon when one
+ * is passed. The voice/template colors drive the gradient. Using the same orb
+ * everywhere (templates, saved agents, detail) keeps one visual language.
  */
 export function AgentOrb({
   colors,
   size = 132,
   speaking = false,
+  icon: Icon,
   className,
 }: {
   colors: [string, string];
   size?: number;
   speaking?: boolean;
+  icon?: LucideIcon;
   className?: string;
 }) {
   const [a, b] = colors;
@@ -39,8 +43,7 @@ export function AgentOrb({
       >
         {/* inner highlight */}
         <span className="absolute inset-[14%] rounded-full bg-white/15 blur-md" style={{ top: "10%", left: "16%", width: "40%", height: "34%" }} />
-        {/* speaking bars */}
-        {speaking && (
+        {speaking ? (
           <span className="relative z-10 flex items-end gap-1" style={{ height: size * 0.22 }}>
             {[0, 1, 2, 3, 4].map((i) => (
               <span
@@ -50,7 +53,13 @@ export function AgentOrb({
               />
             ))}
           </span>
-        )}
+        ) : Icon ? (
+          <Icon
+            className="relative z-10 text-white drop-shadow-sm"
+            style={{ width: size * 0.42, height: size * 0.42 }}
+            strokeWidth={1.75}
+          />
+        ) : null}
       </span>
     </div>
   );
