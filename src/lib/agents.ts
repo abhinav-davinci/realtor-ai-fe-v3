@@ -125,7 +125,7 @@ export const TEMPLATES: AgentTemplate[] = [
     icon: Sparkles,
     gradient: ["#ef8e2b", "#e23b58"],
     handles: [
-      "Replies to leads from 99acres, MagicBricks, Housing, and ads right away",
+      "Replies to leads from property portals and ads right away",
       "Captures budget, location, BHK, purpose, and timeline",
       "Checks if they need a home loan and pre-qualifies them",
       "Books a site visit and adds it to your calendar",
