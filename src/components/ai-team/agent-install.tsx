@@ -27,12 +27,14 @@ function Field({ label, optional, children }: { label: string; optional?: boolea
  */
 export function InstallWidget({
   agent,
+  status,
   onClose,
   onStatus,
 }: {
   agent: AgentConfig;
+  status: "pending" | "requested" | "live";
   onClose: () => void;
-  onStatus: (s: "requested" | "live") => void;
+  onStatus: (s: "pending" | "requested" | "live") => void;
 }) {
   const snippet = `<script src="https://cdn.trythat.ai/widget.js" data-agent="${agent.id}"></script>`;
   const steps = `TryThat.ai website chat widget install steps
@@ -195,10 +197,27 @@ Questions? Email support@trythat.ai.`;
 
         {view === "options" && (
           <div className="flex items-center justify-between gap-3 border-t border-black/[0.06] px-5 py-3">
-            <span className="text-ink-muted text-xs">Already added it to your site?</span>
-            <button type="button" onClick={() => { onStatus("live"); onClose(); }} className="text-brand-green inline-flex items-center gap-1.5 text-sm font-semibold outline-none">
-              <Check className="size-4" /> Mark as live
-            </button>
+            {status === "live" ? (
+              <>
+                <span className="text-brand-green inline-flex items-center gap-1.5 text-sm font-semibold">
+                  <Check className="size-4" /> Live on your site
+                </span>
+                <button type="button" onClick={() => onStatus("pending")} className="text-ink-muted hover:text-ink text-xs font-medium outline-none">
+                  Mark as not live
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-ink-muted text-xs">Already added it to your site?</span>
+                <button
+                  type="button"
+                  onClick={() => onStatus("live")}
+                  className="text-ink hover:bg-black/[0.04] inline-flex h-8 items-center rounded-lg border border-black/15 px-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+                >
+                  Mark as live
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

@@ -78,7 +78,7 @@ export function AgentDetail({ id }: { id: string }) {
     router.push("/ai-team");
   }
 
-  function setWidgetStatus(s: "requested" | "live") {
+  function setWidgetStatus(s: "pending" | "requested" | "live") {
     const updated = { ...agent!, widgetStatus: s };
     saveAgent(updated);
     setAgent(updated);
@@ -272,7 +272,7 @@ export function AgentDetail({ id }: { id: string }) {
       )}
 
       {installOpen && (
-        <InstallWidget agent={agent} onClose={() => setInstallOpen(false)} onStatus={setWidgetStatus} />
+        <InstallWidget agent={agent} status={widgetStatus} onClose={() => setInstallOpen(false)} onStatus={setWidgetStatus} />
       )}
     </div>
   );
