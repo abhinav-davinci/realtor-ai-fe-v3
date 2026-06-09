@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationsBell } from "./notifications-panel";
 import { MobileNav } from "./mobile-nav";
 
@@ -46,11 +46,7 @@ export function TopBar() {
           </button>
           <NotificationsBell />
           <Avatar className="size-9">
-            <AvatarImage
-              src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=80&q=80"
-              alt="Account"
-            />
-            <AvatarFallback>SR</AvatarFallback>
+            <AvatarFallback className="bg-brand-orange font-semibold text-white">AR</AvatarFallback>
           </Avatar>
         </div>
       </div>
