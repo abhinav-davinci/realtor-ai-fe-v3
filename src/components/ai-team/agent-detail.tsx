@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
-  Copy,
   Languages,
   MessageSquare,
   Mic,
@@ -25,12 +24,14 @@ import {
   deleteAgent,
   getAgent,
   readiness,
+  saveAgent,
   templateById,
   voiceById,
   type AgentConfig,
 } from "@/lib/agents";
 import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
 import { AgentConversations } from "./agent-conversations";
+import { InstallWidget } from "./agent-install";
 import { conversationsFor } from "@/lib/conversations";
 
 type DetailTab = "conversations" | "test" | "setup";
@@ -43,6 +44,7 @@ export function AgentDetail({ id }: { id: string }) {
   const [agent, setAgent] = useState<AgentConfig | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
   // A new agent opens on Test (try it now); an existing one opens on its history.
   const [tab, setTab] = useState<DetailTab>(isNew ? "test" : "conversations");
 
@@ -69,10 +71,17 @@ export function AgentDetail({ id }: { id: string }) {
   const t = templateById(agent.templateId);
   const voice = voiceById(agent.voiceId);
   const rd = readiness(agent);
+  const widgetStatus = agent.widgetStatus ?? "pending";
 
   function remove() {
     deleteAgent(agent!.id);
     router.push("/ai-team");
+  }
+
+  function setWidgetStatus(s: "requested" | "live") {
+    const updated = { ...agent!, widgetStatus: s };
+    saveAgent(updated);
+    setAgent(updated);
   }
 
   return (
@@ -229,7 +238,30 @@ export function AgentDetail({ id }: { id: string }) {
                   <ChannelBadge channel="voice" />
                 </div>
               )}
-              {agent.channels.includes("chat") && <EmbedCard agentName={agent.name} />}
+              {agent.channels.includes("chat") && (
+                <div className="rounded-xl bg-black/[0.02] p-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="bg-brand-green/10 text-brand-green grid size-9 shrink-0 place-items-center rounded-lg"><MessageSquare className="size-4.5" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-ink text-sm font-semibold">Website chat widget</p>
+                      <p className="text-ink-muted text-xs">
+                        {widgetStatus === "live" ? "Live on your site" : widgetStatus === "requested" ? "Setup requested, our team is on it" : "Not installed yet"}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        widgetStatus === "live" ? "bg-brand-green/10 text-brand-green" : widgetStatus === "requested" ? "bg-brand-orange/10 text-brand-orange" : "bg-black/[0.06] text-ink-muted"
+                      )}
+                    >
+                      {widgetStatus === "live" ? "Live" : widgetStatus === "requested" ? "Requested" : "Not installed"}
+                    </span>
+                  </div>
+                  <Button onClick={() => setInstallOpen(true)} className="bg-surface text-ink hover:bg-black/[0.04] mt-2.5 h-9 w-full rounded-lg text-sm font-semibold ring-1 ring-black/[0.08]">
+                    {widgetStatus === "live" ? "Manage install" : "Set up widget"}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -237,6 +269,10 @@ export function AgentDetail({ id }: { id: string }) {
 
       {confirmDelete && (
         <ConfirmDelete name={agent.name} onCancel={() => setConfirmDelete(false)} onConfirm={remove} />
+      )}
+
+      {installOpen && (
+        <InstallWidget agent={agent} onClose={() => setInstallOpen(false)} onStatus={setWidgetStatus} />
       )}
     </div>
   );
@@ -399,30 +435,3 @@ function KItem({ on, label }: { on: boolean; label: string }) {
   );
 }
 
-function EmbedCard({ agentName }: { agentName: string }) {
-  const [copied, setCopied] = useState(false);
-  const snippet = `<script src="https://cdn.trythat.ai/widget.js" data-agent="${agentName.toLowerCase()}"></script>`;
-  function copy() {
-    try {
-      navigator.clipboard?.writeText(snippet);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch { /* ignore */ }
-  }
-  return (
-    <div className="rounded-xl bg-black/[0.02] p-3">
-      <div className="flex items-center gap-2">
-        <span className="bg-brand-green/10 text-brand-green grid size-9 place-items-center rounded-lg"><MessageSquare className="size-4.5" /></span>
-        <div className="min-w-0 flex-1">
-          <p className="text-ink text-sm font-semibold">Website chat widget</p>
-          <p className="text-ink-muted text-xs">Paste before &lt;/body&gt;, or send it to your web person.</p>
-        </div>
-        <ChannelBadge channel="chat" />
-      </div>
-      <pre className="text-ink mt-2.5 overflow-x-auto rounded-lg bg-white p-2.5 text-[11px] ring-1 ring-black/[0.06]">{snippet}</pre>
-      <button type="button" onClick={copy} className={cn("mt-2 inline-flex items-center gap-1.5 text-xs font-semibold", copied ? "text-brand-green" : "text-accent-blue")}>
-        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? "Copied!" : "Copy embed code"}
-      </button>
-    </div>
-  );
-}

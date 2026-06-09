@@ -272,6 +272,8 @@ export interface AgentConfig {
   collects: string[];
   guardrails: string[];
   knowledge: KnowledgeState;
+  /** Website chat widget install state. Defaults to "pending" when unset. */
+  widgetStatus?: "pending" | "requested" | "live";
   createdAt: number;
 }
 
