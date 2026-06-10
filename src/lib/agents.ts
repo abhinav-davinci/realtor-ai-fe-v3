@@ -131,7 +131,7 @@ export const TEMPLATES: AgentTemplate[] = [
       "Books a site visit and adds it to your calendar",
     ],
     greeting:
-      "Hi, this is Priya from {company}. I saw you were interested in our project. Can I ask a couple of quick questions to help you better?",
+      "Hi, this is {name} from {company}. I saw you were interested in our project. Can I ask a couple of quick questions to help you better?",
     collects: ["Budget", "Preferred location", "Configuration (BHK)", "Purpose (end-use / investment)", "Possession timeline", "Home-loan requirement"],
     channels: ["voice", "chat"],
     voiceId: "priya",
@@ -154,7 +154,7 @@ export const TEMPLATES: AgentTemplate[] = [
       "Captures caller name and number for follow-up",
     ],
     greeting:
-      "Namaste, thank you for calling {company}. I'm Aarav. How can I help you today?",
+      "Namaste, thank you for calling {company}. I'm {name}. How can I help you today?",
     collects: ["Preferred location", "Configuration (BHK)", "Preferred call-back time"],
     channels: ["voice", "chat"],
     voiceId: "aarav",
@@ -176,7 +176,7 @@ export const TEMPLATES: AgentTemplate[] = [
       "Reschedules instantly when plans change",
     ],
     greeting:
-      "Hi, it's Meera from {company}. I'd like to set up your visit to our project. What day works best for you?",
+      "Hi, it's {name} from {company}. I'd like to set up your visit to our project. What day works best for you?",
     collects: ["Preferred location", "Move-in date", "Preferred call-back time"],
     channels: ["voice", "chat"],
     voiceId: "meera",
@@ -198,7 +198,7 @@ export const TEMPLATES: AgentTemplate[] = [
       "Re-engages dormant leads with the right nudge",
     ],
     greeting:
-      "Hello, this is Kabir from {company}. Thanks for visiting us. I'd like to hear your honest thoughts on the project.",
+      "Hello, this is {name} from {company}. Thanks for visiting us. I'd like to hear your honest thoughts on the project.",
     collects: ["Purpose (end-use / investment)", "Possession timeline"],
     channels: ["voice", "chat"],
     voiceId: "kabir",
@@ -220,7 +220,7 @@ export const TEMPLATES: AgentTemplate[] = [
       "Answers payment plan and schedule questions",
     ],
     greeting:
-      "Hi, this is Saanvi from {company}. I have a quick update on your booking. Is now a good time?",
+      "Hi, this is {name} from {company}. I have a quick update on your booking. Is now a good time?",
     collects: ["Preferred call-back time"],
     channels: ["voice", "chat"],
     voiceId: "saanvi",

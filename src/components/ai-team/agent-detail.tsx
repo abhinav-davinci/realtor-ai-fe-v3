@@ -323,7 +323,7 @@ function ConfirmDelete({ name, onCancel, onConfirm }: { name: string; onCancel: 
 /* ------------------------------- test chat -------------------------------- */
 
 function TestChat({ agent, company }: { agent: AgentConfig; company: string }) {
-  const greeting = agent.greeting.replaceAll("{company}", company);
+  const greeting = agent.greeting.replaceAll("{name}", agent.name).replaceAll("{company}", company);
   const [msgs, setMsgs] = useState<{ who: "agent" | "user"; text: string }[]>([{ who: "agent", text: greeting }]);
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);

@@ -113,7 +113,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
   const createdAtRef = useRef<number | null>(null);
 
   const voice = voiceById(voiceId);
-  const previewGreeting = greeting.replaceAll("{company}", company);
+  const previewGreeting = greeting.replaceAll("{name}", name).replaceAll("{company}", company);
   const rd = readiness({ voiceId, tone, languages, greeting, channels, knowledge });
 
   // Edit mode: load the saved agent (client-only) and prefill every field.
@@ -237,7 +237,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
                 className="text-ink focus:border-accent-blue/50 h-11 w-full rounded-lg border border-black/15 bg-white px-3.5 text-sm outline-none"
               />
             </Field>
-            <Field label="Opening line" hint="Use {company} to insert your business name.">
+            <Field label="Opening line" hint="Use {name} and {company} to insert the agent and business names.">
               <textarea
                 value={greeting}
                 onChange={(e) => setGreeting(e.target.value)}
