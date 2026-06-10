@@ -22,7 +22,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="bg-cream text-ink min-h-screen">
+      {/* suppressHydrationWarning: browser extensions (ColorZilla, Grammarly,
+          etc.) inject attributes onto <body> before hydration; this ignores
+          attribute-only diffs on this element, not its children. */}
+      <body className="bg-cream text-ink min-h-screen" suppressHydrationWarning>
         <AuthProvider>
           <TooltipProvider delay={200}>{children}</TooltipProvider>
         </AuthProvider>
