@@ -66,7 +66,7 @@ function LeadAvatar({ lead, className }: { lead: Lead; className?: string }) {
         <span className="bg-accent-blue/10 text-accent-blue grid size-full place-items-center rounded-lg">
           <Phone className="size-5" />
         </span>
-        <span className="bg-brand-green absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full text-white ring-2 ring-white">
+        <span className="text-brand-green absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full bg-white shadow-sm ring-2 ring-white">
           <MessageSquare className="size-3" />
         </span>
       </span>
