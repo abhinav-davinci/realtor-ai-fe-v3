@@ -410,6 +410,95 @@
   }
 }
 
+/* Agent launch celebration ("Liftoff"): the rocket crouches, ignites, and lifts
+   off the pad into a night sky, leaving a confirmed check rising in its place.
+   A one-shot celebration, so CSS keyframes (off the main thread) suit it.
+   Transform/opacity only. Per-step easing gives a slow crouch then a fast,
+   accelerating blast (the one place ease-in is correct: a real rocket
+   accelerates). */
+@keyframes liftoff-rocket {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  22% {
+    transform: translate(-50%, calc(-50% + 7px)) scale(0.9);
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 0.45);
+  }
+  38% {
+    transform: translate(-50%, calc(-50% - 10px)) scale(1.08);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.75, 0);
+  }
+  82% {
+    transform: translate(-50%, calc(-50% - 132px)) scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, calc(-50% - 188px)) scale(1.2);
+    opacity: 0;
+  }
+}
+@keyframes liftoff-exhaust {
+  0%,
+  26% {
+    transform: translateX(-50%) scaleY(0.2);
+    opacity: 0;
+  }
+  40% {
+    transform: translateX(-50%) scaleY(1.2);
+    opacity: 0.95;
+  }
+  70% {
+    transform: translateX(-50%) scaleY(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(-50%) scaleY(1.1);
+    opacity: 0;
+  }
+}
+@keyframes liftoff-shockwave {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0;
+  }
+  28% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.7);
+    opacity: 0;
+  }
+}
+@keyframes liftoff-smoke {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--sx, 0px)), calc(-50% + var(--sy, 0px))) scale(1.8);
+    opacity: 0;
+  }
+}
+@keyframes liftoff-check {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.16);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* Reduced motion: keep the gradient, drop the movement. */
 @media (prefers-reduced-motion: reduce) {
   .agent-blob-a,
@@ -417,7 +506,9 @@
   .agent-sheen,
   .agent-breathe,
   .agent-wave-bar,
-  .modal-pop {
-    animation: none;
+  .modal-pop,
+  .launch-celebration *,
+  .launch-celebration {
+    animation: none !important;
   }
 }

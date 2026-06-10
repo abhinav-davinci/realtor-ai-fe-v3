@@ -186,7 +186,8 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
     };
     saveAgent(agent);
     setLaunched(true);
-    setTimeout(() => router.push(`/ai-team/agents/${agent.id}${editId ? "" : "?new=1"}`), 1700);
+    // Give the launch celebration room to play before moving on.
+    setTimeout(() => router.push(`/ai-team/agents/${agent.id}${editId ? "" : "?new=1"}`), editId ? 1500 : 2100);
   }
 
   if (!ready) {
@@ -1087,18 +1088,146 @@ function LaunchReview({
   );
 }
 
+/* Confetti, stars, and smoke for the launch celebration. Fixed values keep the
+   burst stable (no Math.random, SSR-safe); colours are design tokens. */
+const LAUNCH_CONFETTI = [
+  { w: 7, h: 7, color: "var(--color-brand-green)", round: true, delay: 600, tx: -86, peakY: -58, fallY: 70, r: -180 },
+  { w: 6, h: 10, color: "var(--color-accent-blue)", round: false, delay: 600, tx: -54, peakY: -70, fallY: 64, r: 150 },
+  { w: 8, h: 8, color: "var(--color-brand-orange)", round: true, delay: 620, tx: -22, peakY: -64, fallY: 80, r: -120 },
+  { w: 6, h: 9, color: "var(--color-gold)", round: false, delay: 600, tx: 8, peakY: -72, fallY: 60, r: 200 },
+  { w: 7, h: 7, color: "var(--color-brand-blue)", round: true, delay: 640, tx: 40, peakY: -60, fallY: 74, r: 120 },
+  { w: 6, h: 10, color: "var(--color-brand-green)", round: false, delay: 600, tx: 72, peakY: -52, fallY: 66, r: -160 },
+  { w: 5, h: 5, color: "var(--color-accent-blue)", round: true, delay: 660, tx: 96, peakY: -40, fallY: 58, r: 90 },
+  { w: 8, h: 8, color: "var(--color-brand-orange)", round: true, delay: 620, tx: -100, peakY: -44, fallY: 52, r: -90 },
+  { w: 6, h: 9, color: "var(--color-gold)", round: false, delay: 640, tx: 24, peakY: -76, fallY: 70, r: 170 },
+  { w: 5, h: 5, color: "var(--color-brand-blue)", round: true, delay: 600, tx: -40, peakY: -50, fallY: 84, r: -140 },
+  { w: 6, h: 6, color: "var(--color-brand-green)", round: true, delay: 660, tx: 58, peakY: -66, fallY: 56, r: 110 },
+  { w: 6, h: 9, color: "var(--color-brand-orange)", round: false, delay: 620, tx: -70, peakY: -72, fallY: 62, r: -200 },
+];
+
+const LAUNCH_STARS = [
+  { x: "16%", y: "26%", r: 3, o: 0.7, dur: 1500, delay: 0 },
+  { x: "30%", y: "16%", r: 2, o: 0.5, dur: 1700, delay: 200 },
+  { x: "44%", y: "30%", r: 2, o: 0.6, dur: 1400, delay: 120 },
+  { x: "62%", y: "18%", r: 3, o: 0.8, dur: 1600, delay: 320 },
+  { x: "74%", y: "30%", r: 2, o: 0.5, dur: 1800, delay: 80 },
+  { x: "84%", y: "22%", r: 2, o: 0.6, dur: 1500, delay: 240 },
+  { x: "22%", y: "44%", r: 2, o: 0.45, dur: 1650, delay: 160 },
+  { x: "54%", y: "10%", r: 2, o: 0.55, dur: 1550, delay: 360 },
+  { x: "70%", y: "44%", r: 2, o: 0.4, dur: 1750, delay: 60 },
+];
+
+const LAUNCH_SMOKE = [
+  { sx: -20, sy: 8 },
+  { sx: 20, sy: 10 },
+  { sx: -30, sy: 2 },
+  { sx: 30, sy: 4 },
+  { sx: 0, sy: 14 },
+];
+
 function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
+  if (edited) return <EditedSuccess name={name} />;
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div className="flex w-full max-w-sm flex-col items-center rounded-2xl bg-white px-6 py-10 text-center shadow-2xl" style={{ animation: "fade-in-up 300ms ease-out both" }}>
-        <span className="grid size-16 place-items-center rounded-full bg-green-500 text-white" style={{ animation: "tick-pop 500ms cubic-bezier(0.2,0.8,0.2,1.4) both" }}>
-          {edited ? <Check className="size-8" strokeWidth={3} /> : <Rocket className="size-8" />}
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" style={{ animation: "fade-in 200ms ease-out both" }}>
+      <div className="launch-celebration modal-pop w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+        {/* night-sky launch theater */}
+        <div className="from-rail relative h-44 overflow-hidden bg-gradient-to-b to-[#1d2f50]">
+          {/* twinkling stars */}
+          {LAUNCH_STARS.map((s, i) => (
+            <span
+              key={i}
+              className="absolute rounded-full bg-white"
+              style={{ left: s.x, top: s.y, width: s.r, height: s.r, opacity: s.o, animation: `twinkle ${s.dur}ms ease-in-out ${s.delay}ms infinite` }}
+            />
+          ))}
+
+          {/* ignition smoke */}
+          {LAUNCH_SMOKE.map((p, i) => (
+            <span
+              key={i}
+              className="bg-brand-green/20 absolute top-[64%] left-1/2 size-7 rounded-full opacity-0 blur-[1px]"
+              style={{ animation: "liftoff-smoke 900ms ease-out 600ms forwards", "--sx": `${p.sx}px`, "--sy": `${p.sy}px` } as React.CSSProperties}
+            />
+          ))}
+
+          {/* shockwave ring */}
+          <span
+            className="border-brand-green/50 absolute top-[64%] left-1/2 size-16 rounded-full border-2 opacity-0"
+            style={{ animation: "liftoff-shockwave 720ms ease-out 600ms forwards" }}
+          />
+
+          {/* confetti burst */}
+          {LAUNCH_CONFETTI.map((c, i) => (
+            <span
+              key={i}
+              className="pointer-events-none absolute top-[64%] left-1/2 opacity-0"
+              style={{
+                width: c.w,
+                height: c.h,
+                backgroundColor: c.color,
+                borderRadius: c.round ? "9999px" : "1px",
+                animation: `confetti-pop 1200ms cubic-bezier(0.15, 0.6, 0.4, 1) ${c.delay}ms forwards`,
+                "--tx": `${c.tx}px`,
+                "--peak-y": `${c.peakY}px`,
+                "--fall-y": `${c.fallY}px`,
+                "--r": `${c.r}deg`,
+              } as React.CSSProperties}
+            />
+          ))}
+
+          {/* launch pad badge, with the confirmed check that rises after liftoff */}
+          <span className="absolute top-[64%] left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <span
+              className="bg-brand-green grid size-16 place-items-center rounded-full text-white shadow-lg shadow-black/20"
+              style={{ animation: "tick-pop 460ms cubic-bezier(0.2, 0.8, 0.2, 1.4) 120ms both" }}
+            >
+              <span className="opacity-0" style={{ animation: "liftoff-check 380ms cubic-bezier(0.2, 0.8, 0.2, 1.4) 860ms both" }}>
+                <Check className="size-7" strokeWidth={3} />
+              </span>
+            </span>
+          </span>
+
+          {/* the rocket that lifts off */}
+          <span
+            className="absolute top-[64%] left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+            style={{ animation: "liftoff-rocket 1150ms 260ms both" }}
+          >
+            <span className="relative grid place-items-center">
+              {/* exhaust trail */}
+              <span
+                className="from-brand-orange via-gold absolute top-full left-1/2 h-6 w-2 origin-top rounded-full bg-gradient-to-b to-transparent opacity-0 blur-[1px]"
+                style={{ animation: "liftoff-exhaust 1150ms 260ms both" }}
+              />
+              <Rocket className="size-9 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]" />
+            </span>
+          </span>
+        </div>
+
+        {/* copy */}
+        <div className="px-6 pt-3 pb-8 text-center">
+          <h2 className="text-ink text-2xl font-bold" style={{ animation: "fade-in-up 420ms ease-out 900ms both" }}>
+            {name} is live
+          </h2>
+          <p className="text-ink-muted mx-auto mt-2 max-w-[17rem] text-sm" style={{ animation: "fade-in-up 420ms ease-out 1000ms both" }}>
+            Your agent is ready to take calls and answer chats. Opening its dashboard now.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditedSuccess({ name }: { name: string }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" style={{ animation: "fade-in 200ms ease-out both" }}>
+      <div className="modal-pop flex w-full max-w-sm flex-col items-center rounded-2xl bg-white px-6 py-10 text-center shadow-2xl">
+        <span className="bg-brand-green grid size-16 place-items-center rounded-full text-white" style={{ animation: "tick-pop 500ms cubic-bezier(0.2, 0.8, 0.2, 1.4) both" }}>
+          <Check className="size-8" strokeWidth={3} />
         </span>
-        <h2 className="text-ink mt-5 text-2xl font-bold">{name} {edited ? "updated" : "is live"}</h2>
-        <p className="text-ink-muted mt-2 text-sm">
-          {edited
-            ? "Your changes are saved. Taking you back to its dashboard."
-            : "Your agent is ready to take calls and answer chats. Opening its dashboard now."}
+        <h2 className="text-ink mt-5 text-2xl font-bold" style={{ animation: "fade-in-up 380ms ease-out 200ms both" }}>{name} updated</h2>
+        <p className="text-ink-muted mt-2 text-sm" style={{ animation: "fade-in-up 380ms ease-out 300ms both" }}>
+          Your changes are saved. Taking you back to its dashboard.
         </p>
       </div>
     </div>
