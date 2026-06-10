@@ -1188,18 +1188,23 @@ function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
             </span>
           </span>
 
-          {/* the rocket that lifts off */}
+          {/* the rocket that lifts off, nose pointing the way it travels (up) */}
           <span
             className="absolute top-[64%] left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
             style={{ animation: "liftoff-rocket 1150ms 260ms both" }}
           >
             <span className="relative grid place-items-center">
-              {/* exhaust trail */}
+              {/* exhaust trail, directly behind the nozzle, stretching with speed */}
               <span
-                className="from-brand-orange via-gold absolute top-full left-1/2 h-6 w-2 origin-top rounded-full bg-gradient-to-b to-transparent opacity-0 blur-[1px]"
+                className="from-brand-orange via-gold absolute top-[78%] left-1/2 h-7 w-2 origin-top rounded-full bg-gradient-to-b to-transparent opacity-0 blur-[1.5px]"
                 style={{ animation: "liftoff-exhaust 1150ms 260ms both" }}
               />
-              <Rocket className="size-9 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]" />
+              {/* warm thrust glow */}
+              <span
+                className="bg-brand-orange/30 absolute size-10 rounded-full opacity-0 blur-md"
+                style={{ animation: "liftoff-glow 1150ms 260ms both" }}
+              />
+              <Rocket className="size-9 -rotate-45 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]" />
             </span>
           </span>
         </div>
