@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Code2, Copy, Headphones, Mail, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Code, Copy, Headphones, Mail, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AgentConfig } from "@/lib/agents";
@@ -101,7 +101,9 @@ Questions? Email support@trythat.ai.`;
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
             {/* the code */}
             <div className="rounded-xl border border-black/[0.08] p-3.5">
-              <p className="text-ink-muted text-xs font-medium">Your widget code</p>
+              <p className="text-ink-muted flex items-center gap-1.5 text-xs font-medium">
+                <Code className="text-accent-blue size-4" /> Your widget code
+              </p>
               <pre className="text-ink mt-2 overflow-x-auto rounded-lg bg-black/[0.03] p-3 text-[11px] leading-relaxed">{snippet}</pre>
               <button
                 type="button"
@@ -116,7 +118,7 @@ Questions? Email support@trythat.ai.`;
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* self / developer */}
               <div className="flex flex-col rounded-xl border border-black/[0.08] p-4">
-                <span className="bg-accent-blue/10 text-accent-blue grid size-9 place-items-center rounded-lg"><Code2 className="size-5" /></span>
+                <span className="bg-accent-blue/10 text-accent-blue grid size-9 place-items-center rounded-lg"><Code className="size-5" /></span>
                 <p className="text-ink mt-2.5 font-semibold">You or your developer</p>
                 <p className="text-ink-muted mt-1 mb-3 text-xs leading-snug">Paste the code just before the &lt;/body&gt; tag. It takes about a minute.</p>
                 <div className="mt-auto space-y-2">
