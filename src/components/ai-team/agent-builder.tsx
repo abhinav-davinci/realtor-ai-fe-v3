@@ -187,7 +187,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
     saveAgent(agent);
     setLaunched(true);
     // Give the launch celebration room to play before moving on.
-    setTimeout(() => router.push(`/ai-team/agents/${agent.id}${editId ? "" : "?new=1"}`), editId ? 1500 : 2100);
+    setTimeout(() => router.push(`/ai-team/agents/${agent.id}${editId ? "" : "?new=1"}`), editId ? 1500 : 2300);
   }
 
   if (!ready) {
@@ -1147,14 +1147,14 @@ function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
             <span
               key={i}
               className="bg-brand-green/20 absolute top-[64%] left-1/2 size-7 rounded-full opacity-0 blur-[1px]"
-              style={{ animation: "liftoff-smoke 900ms ease-out 600ms forwards", "--sx": `${p.sx}px`, "--sy": `${p.sy}px` } as React.CSSProperties}
+              style={{ animation: "liftoff-smoke 900ms ease-out 810ms forwards", "--sx": `${p.sx}px`, "--sy": `${p.sy}px` } as React.CSSProperties}
             />
           ))}
 
           {/* shockwave ring */}
           <span
             className="border-brand-green/50 absolute top-[64%] left-1/2 size-16 rounded-full border-2 opacity-0"
-            style={{ animation: "liftoff-shockwave 720ms ease-out 600ms forwards" }}
+            style={{ animation: "liftoff-shockwave 720ms ease-out 810ms forwards" }}
           />
 
           {/* confetti burst */}
@@ -1167,7 +1167,7 @@ function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
                 height: c.h,
                 backgroundColor: c.color,
                 borderRadius: c.round ? "9999px" : "1px",
-                animation: `confetti-pop 1200ms cubic-bezier(0.15, 0.6, 0.4, 1) ${c.delay}ms forwards`,
+                animation: `confetti-pop 1200ms cubic-bezier(0.15, 0.6, 0.4, 1) ${c.delay + 210}ms forwards`,
                 "--tx": `${c.tx}px`,
                 "--peak-y": `${c.peakY}px`,
                 "--fall-y": `${c.fallY}px`,
@@ -1180,9 +1180,9 @@ function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
           <span className="absolute top-[64%] left-1/2 -translate-x-1/2 -translate-y-1/2">
             <span
               className="bg-brand-green grid size-16 place-items-center rounded-full text-white shadow-lg shadow-black/20"
-              style={{ animation: "tick-pop 460ms cubic-bezier(0.2, 0.8, 0.2, 1.4) 120ms both" }}
+              style={{ animation: "tick-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1.4) 100ms both" }}
             >
-              <span className="opacity-0" style={{ animation: "liftoff-check 380ms cubic-bezier(0.2, 0.8, 0.2, 1.4) 860ms both" }}>
+              <span className="opacity-0" style={{ animation: "liftoff-check 400ms cubic-bezier(0.23, 1, 0.32, 1) 900ms both" }}>
                 <Check className="size-7" strokeWidth={3} />
               </span>
             </span>
@@ -1191,18 +1191,18 @@ function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
           {/* the rocket that lifts off, nose pointing the way it travels (up) */}
           <span
             className="absolute top-[64%] left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
-            style={{ animation: "liftoff-rocket 1150ms 260ms both" }}
+            style={{ animation: "liftoff-rocket 1150ms 100ms both" }}
           >
             <span className="relative grid place-items-center">
               {/* exhaust trail, directly behind the nozzle, stretching with speed */}
               <span
                 className="from-brand-orange via-gold absolute top-[78%] left-1/2 h-7 w-2 origin-top rounded-full bg-gradient-to-b to-transparent opacity-0 blur-[1.5px]"
-                style={{ animation: "liftoff-exhaust 1150ms 260ms both" }}
+                style={{ animation: "liftoff-exhaust 600ms 770ms both" }}
               />
               {/* warm thrust glow */}
               <span
                 className="bg-brand-orange/30 absolute size-10 rounded-full opacity-0 blur-md"
-                style={{ animation: "liftoff-glow 1150ms 260ms both" }}
+                style={{ animation: "liftoff-glow 460ms 740ms both" }}
               />
               <Rocket className="size-9 -rotate-45 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]" />
             </span>
@@ -1211,10 +1211,10 @@ function LaunchSuccess({ name, edited }: { name: string; edited?: boolean }) {
 
         {/* copy */}
         <div className="px-6 pt-3 pb-8 text-center">
-          <h2 className="text-ink text-2xl font-bold" style={{ animation: "fade-in-up 420ms ease-out 900ms both" }}>
+          <h2 className="text-ink text-2xl font-bold" style={{ animation: "fade-in-up 440ms ease-out 1080ms both" }}>
             {name} is live
           </h2>
-          <p className="text-ink-muted mx-auto mt-2 max-w-[17rem] text-sm" style={{ animation: "fade-in-up 420ms ease-out 1000ms both" }}>
+          <p className="text-ink-muted mx-auto mt-2 max-w-[17rem] text-sm" style={{ animation: "fade-in-up 440ms ease-out 1180ms both" }}>
             Your agent is ready to take calls and answer chats. Opening its dashboard now.
           </p>
         </div>
