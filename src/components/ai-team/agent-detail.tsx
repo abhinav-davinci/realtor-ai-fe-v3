@@ -32,7 +32,7 @@ import {
 import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
 import { AgentConversations } from "./agent-conversations";
 import { InstallWidget } from "./agent-install";
-import { conversationsFor } from "@/lib/conversations";
+import { leadsFor } from "@/lib/conversations";
 
 type DetailTab = "conversations" | "test" | "setup";
 
@@ -121,7 +121,7 @@ export function AgentDetail({ id }: { id: string }) {
             <TabButton active={tab === "conversations"} onClick={() => setTab("conversations")}>
               Conversations
               <span className="bg-black/[0.06] text-ink-muted ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold">
-                {conversationsFor(agent.templateId).length}
+                {leadsFor(agent.templateId).length}
               </span>
             </TabButton>
             <TabButton active={tab === "test"} onClick={() => setTab("test")}>Test</TabButton>

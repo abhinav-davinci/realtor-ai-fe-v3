@@ -56,9 +56,36 @@ const LEAD_QUALIFIER: Conversation[] = [
     ],
   },
   {
+    // Same lead as the chat below (grouped by phone): Rohan first chatted on the
+    // widget, then the agent called him back. The list shows both under one lead.
+    id: "c6",
+    channel: "voice",
+    customer: "Rohan Mehta",
+    phone: "+91 99820 31552",
+    when: "Yesterday",
+    meta: "2m 12s",
+    outcome: "Site visit booked",
+    tone: "good",
+    summary: "Followed up on his home-loan question and booked a Saturday visit.",
+    captured: [
+      { label: "Budget", value: "₹1.6 Cr" },
+      { label: "Configuration", value: "3BHK" },
+      { label: "Visit", value: "Sat 4 PM" },
+    ],
+    transcript: [
+      { who: "agent", text: "Hi Rohan, this is a quick follow-up on your chat about the Kharadi homes. Is now a good time?" },
+      { who: "customer", text: "Yes, I had asked about the home loan." },
+      { who: "agent", text: "Right. We have tie-ups with leading banks for up to 90% financing, and I can get your eligibility checked. Would you like to see the 3BHK in person first?" },
+      { who: "customer", text: "Sure, this Saturday could work." },
+      { who: "agent", text: "Done, I've booked Saturday 4 PM and will send the location pin on WhatsApp. Our loan desk will call you alongside." },
+      { who: "customer", text: "Great, thanks." },
+    ],
+  },
+  {
     id: "c2",
     channel: "chat",
     customer: "Rohan Mehta",
+    phone: "+91 99820 31552",
     when: "Yesterday",
     meta: "9 messages",
     outcome: "Callback scheduled",
@@ -128,6 +155,7 @@ const LEAD_QUALIFIER: Conversation[] = [
     id: "c5",
     channel: "chat",
     customer: "Sneha Patil",
+    phone: "+91 98191 27640",
     when: "3 days ago",
     meta: "5 messages",
     outcome: "Brochure shared",
@@ -443,5 +471,103 @@ export function conversationStats(convs: Conversation[]) {
     calls: convs.filter((c) => c.channel === "voice").length,
     chats: convs.filter((c) => c.channel === "chat").length,
     wins: convs.filter((c) => c.tone === "good").length,
+  };
+}
+
+/* ------------------------------ leads (grouping) -------------------------- */
+
+/**
+ * A lead is a single person, identified by phone number, who may have reached
+ * the agent on more than one channel (e.g. chatted on the website widget, then
+ * got a call back). Grouping by phone keeps those touchpoints under one row so
+ * the builder sees one lead with both transcripts, not two strangers.
+ */
+export interface Lead {
+  /** Normalized phone, or `solo:<convId>` when the channel had no number. */
+  id: string;
+  name: string;
+  phone?: string;
+  /** Latest first. */
+  conversations: Conversation[];
+  hasCall: boolean;
+  hasChat: boolean;
+  /** Carried from the most recent conversation. */
+  when: string;
+  outcome: string;
+  tone: OutcomeTone;
+  summary: string;
+  /** Union of details captured across every conversation, first value wins. */
+  captured: { label: string; value: string }[];
+}
+
+/** Strip formatting so "+91 98201 44231" and "+919820144231" group together. */
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^\d]/g, "");
+}
+
+const ANON_NAMES = new Set(["Unknown caller", "Website visitor", "Website chat"]);
+
+/** Parse a call's "3m 41s" duration into seconds (chats return 0). */
+export function parseDurationSec(meta: string): number {
+  const m = /(\d+)\s*m/.exec(meta);
+  const s = /(\d+)\s*s/.exec(meta);
+  if (!m && !s) return 0;
+  return (m ? Number(m[1]) : 0) * 60 + (s ? Number(s[1]) : 0);
+}
+
+/** Group an agent's conversations into leads, keeping recency order. */
+export function leadsFor(templateId: TemplateId): Lead[] {
+  const convs = conversationsFor(templateId);
+  const groups = new Map<string, Conversation[]>();
+  const order: string[] = [];
+
+  for (const c of convs) {
+    const key = c.phone ? normalizePhone(c.phone) : `solo:${c.id}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(c);
+  }
+
+  return order.map((key) => {
+    // Source array is latest-first, so the first item is the most recent touch.
+    const items = groups.get(key)!;
+    const latest = items[0];
+    const named = items.find((c) => !ANON_NAMES.has(c.customer)) ?? latest;
+
+    const captured: { label: string; value: string }[] = [];
+    const seen = new Set<string>();
+    for (const c of items) {
+      for (const d of c.captured ?? []) {
+        if (seen.has(d.label)) continue;
+        seen.add(d.label);
+        captured.push(d);
+      }
+    }
+
+    return {
+      id: key,
+      name: named.customer,
+      phone: latest.phone,
+      conversations: items,
+      hasCall: items.some((c) => c.channel === "voice"),
+      hasChat: items.some((c) => c.channel === "chat"),
+      when: latest.when,
+      outcome: latest.outcome,
+      tone: latest.tone,
+      summary: latest.summary,
+      captured,
+    };
+  });
+}
+
+export function leadStats(leads: Lead[]) {
+  const convs = leads.flatMap((l) => l.conversations);
+  return {
+    leads: leads.length,
+    calls: convs.filter((c) => c.channel === "voice").length,
+    chats: convs.filter((c) => c.channel === "chat").length,
+    wins: leads.filter((l) => l.tone === "good").length,
   };
 }
