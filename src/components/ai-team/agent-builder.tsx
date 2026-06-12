@@ -602,6 +602,16 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
               ) : (
                 <ChatPreview agentName={name} greeting={previewGreeting} reply={cannedReply(t.id, knowledge, company)} />
               )}
+
+              {/* Launch right from the preview, so you can review then go live in place. */}
+              <Button
+                onClick={onLaunchClick}
+                disabled={launching}
+                className="bg-brand-green hover:bg-brand-green-hover mt-3 h-10 w-full rounded-lg text-sm font-semibold text-white"
+              >
+                {editId ? <Check className="size-4" /> : <Rocket className="size-4" />}
+                {editId ? "Save Changes" : "Launch Agent"}
+              </Button>
             </div>
           </div>
 
