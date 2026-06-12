@@ -545,7 +545,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
 
         {/* -------------------------- right: preview ------------------------ */}
         <div className="lg:sticky lg:top-20 lg:self-start">
-          <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-gradient-to-b from-[#16243f] to-[#1d2f50] text-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl bg-gradient-to-b from-[#16243f] to-[#1d2f50] text-white shadow-[0_2px_6px_-2px_rgba(22,36,63,0.18),0_18px_44px_-18px_rgba(22,36,63,0.32)]">
             <div className="flex flex-col items-center px-5 pt-6 pb-4">
               <AgentOrb colors={[voice.color, "#2f6bed"]} size={104} speaking={speaking || previewMode === "voice"} />
               <p className="mt-3 text-lg font-bold">{name}</p>
