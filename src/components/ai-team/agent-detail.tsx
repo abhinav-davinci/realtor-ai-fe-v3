@@ -276,7 +276,7 @@ export function AgentDetail({ id }: { id: string }) {
       )}
 
       {installOpen && (
-        <InstallWidget agent={agent} status={widgetStatus} onClose={() => setInstallOpen(false)} onStatus={setWidgetStatus} />
+        <InstallWidget agent={agent} onClose={() => setInstallOpen(false)} onStatus={setWidgetStatus} />
       )}
     </div>
   );

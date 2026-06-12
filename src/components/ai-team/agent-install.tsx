@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Code, Copy, Headphones, Mail, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Clock, Headphones, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AgentConfig } from "@/lib/agents";
 
 const inputCls = "text-ink focus:border-accent-blue/50 h-10 w-full rounded-lg border border-black/15 px-3 text-sm outline-none";
+
+/** Why a realtor should add the chat widget to their site. */
+const BENEFITS: { icon: LucideIcon; title: string; desc: string }[] = [
+  { icon: Clock, title: "Always on, day and night", desc: "Replies the moment a visitor lands, so no enquiry waits or slips away." },
+  { icon: ClipboardCheck, title: "Qualifies leads for you", desc: "Captures budget, location, and timeline, then books a site visit automatically." },
+  { icon: TrendingUp, title: "More booked visits", desc: "Turns website chats into named, qualified leads in your pipeline." },
+];
 
 function Field({ label, optional, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
   return (
@@ -21,54 +28,26 @@ function Field({ label, optional, children }: { label: string; optional?: boolea
 }
 
 /**
- * Install the website chat widget. Two clear paths: do it yourself / hand it to
- * a developer, or have the TryThat.ai team install it via a quick form. Mock
- * only (no backend): the assistance request and email show success states.
+ * Install the website chat widget. The TryThat.ai team installs it for the
+ * client, so the modal sells the value of the widget and collects a request
+ * for assisted setup. Mock only (no backend): the request shows a success state.
  */
 export function InstallWidget({
   agent,
-  status,
   onClose,
   onStatus,
 }: {
   agent: AgentConfig;
-  status: "pending" | "requested" | "live";
   onClose: () => void;
   onStatus: (s: "pending" | "requested" | "live") => void;
 }) {
-  const snippet = `<script src="https://cdn.trythat.ai/widget.js" data-agent="${agent.id}"></script>`;
-  const steps = `TryThat.ai website chat widget install steps
-
-1. Open your website's HTML, or the "custom code" / "footer" section of your site builder.
-2. Paste this line just before the closing </body> tag:
-
-${snippet}
-
-3. Save and publish. The chat bubble appears on your site.
-
-Questions? Email support@trythat.ai.`;
-
   const [view, setView] = useState<"options" | "assist">("options");
   const [done, setDone] = useState(false);
-  const [copied, setCopied] = useState<"" | "code" | "steps">("");
-  const [emailOpen, setEmailOpen] = useState(false);
-  const [devEmail, setDevEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
 
   const [name, setName] = useState("");
   const [site, setSite] = useState(agent.knowledge.website || "");
   const [contact, setContact] = useState("");
   const [notes, setNotes] = useState("");
-
-  function copy(what: "code" | "steps") {
-    try {
-      navigator.clipboard?.writeText(what === "code" ? snippet : steps);
-      setCopied(what);
-      setTimeout(() => setCopied(""), 1500);
-    } catch {
-      /* ignore */
-    }
-  }
 
   const canSubmit = name.trim() && site.trim() && contact.trim();
 
@@ -89,7 +68,9 @@ Questions? Email support@trythat.ai.`;
             )}
             <p className="text-ink text-lg font-bold">{view === "assist" ? "Request install help" : "Add the chat widget to your site"}</p>
             <p className="text-ink-muted text-sm">
-              {view === "assist" ? "Share a few details and our team installs it for you." : `Two ways to get ${agent.name} live on your website.`}
+              {view === "assist"
+                ? "Share a few details and our team installs it for you."
+                : `Turn website visitors into qualified leads with ${agent.name}, 24x7.`}
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="text-ink-muted hover:bg-black/[0.05] grid size-8 shrink-0 place-items-center rounded-full">
@@ -99,71 +80,40 @@ Questions? Email support@trythat.ai.`;
 
         {view === "options" ? (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-            {/* the code */}
-            <div className="rounded-xl border border-black/[0.08] p-3.5">
-              <p className="text-ink-muted flex items-center gap-1.5 text-xs font-medium">
-                <Code className="text-accent-blue size-4" /> Your widget code
-              </p>
-              <pre className="text-ink mt-2 overflow-x-auto rounded-lg bg-black/[0.03] p-3 text-[11px] leading-relaxed">{snippet}</pre>
-              <button
-                type="button"
-                onClick={() => copy("code")}
-                className={cn("mt-2 inline-flex items-center gap-1.5 text-xs font-semibold", copied === "code" ? "text-brand-green" : "text-accent-blue")}
-              >
-                {copied === "code" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied === "code" ? "Copied" : "Copy code"}
-              </button>
+            {/* why add the widget */}
+            <div className="rounded-xl border border-black/[0.08] p-4">
+              <p className="text-ink font-semibold">Why add {agent.name} to your website</p>
+              <ul className="mt-3 space-y-3">
+                {BENEFITS.map(({ icon: Icon, title, desc }) => (
+                  <li key={title} className="flex items-start gap-3">
+                    <span className="bg-brand-green/10 text-brand-green grid size-8 shrink-0 place-items-center rounded-lg">
+                      <Icon className="size-4" />
+                    </span>
+                    <div>
+                      <p className="text-ink text-sm font-semibold">{title}</p>
+                      <p className="text-ink-muted text-xs leading-snug">{desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {/* two paths */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {/* self / developer */}
-              <div className="flex flex-col rounded-xl border border-black/[0.08] p-4">
-                <span className="bg-accent-blue/10 text-accent-blue grid size-9 place-items-center rounded-lg"><Code className="size-5" /></span>
-                <p className="text-ink mt-2.5 font-semibold">You or your developer</p>
-                <p className="text-ink-muted mt-1 mb-3 text-xs leading-snug">Paste the code just before the &lt;/body&gt; tag. It takes about a minute.</p>
-                <div className="mt-auto space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => copy("steps")}
-                    className="text-ink hover:bg-black/[0.03] flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-black/15 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40"
-                  >
-                    {copied === "steps" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied === "steps" ? "Copied steps" : "Copy install steps"}
-                  </button>
-                  {emailOpen ? (
-                    emailSent ? (
-                      <p className="text-brand-green flex items-center gap-1.5 px-1 text-xs font-medium"><Check className="size-3.5" /> Sent to {devEmail}</p>
-                    ) : (
-                      <div className="flex gap-1.5">
-                        <input
-                          value={devEmail}
-                          onChange={(e) => setDevEmail(e.target.value)}
-                          placeholder="developer@email.com"
-                          className="text-ink focus:border-accent-blue/50 h-9 min-w-0 flex-1 rounded-lg border border-black/15 px-2.5 text-xs outline-none"
-                        />
-                        <button type="button" onClick={() => devEmail.trim() && setEmailSent(true)} className="bg-brand-blue hover:bg-brand-blue-hover h-9 shrink-0 rounded-lg px-3 text-xs font-semibold text-white">Send</button>
-                      </div>
-                    )
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setEmailOpen(true)}
-                      className="text-ink hover:bg-black/[0.03] flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-black/15 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40"
-                    >
-                      <Mail className="size-3.5" /> Email to developer
-                    </button>
-                  )}
+            {/* assisted install (the only path) */}
+            <div className="border-accent-blue/30 bg-accent-blue/[0.04] rounded-xl border p-5">
+              <div className="flex items-start gap-3">
+                <span className="bg-accent-blue grid size-10 shrink-0 place-items-center rounded-lg text-white">
+                  <Headphones className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-ink font-semibold">We&apos;ll set it up for you</p>
+                  <p className="text-ink-muted mt-1 text-sm leading-snug">
+                    Share your website and our team adds {agent.name} to it for you, usually within one business day. Nothing technical on your end.
+                  </p>
                 </div>
               </div>
-
-              {/* assisted */}
-              <div className="border-accent-blue/30 bg-accent-blue/[0.03] flex flex-col rounded-xl border p-4">
-                <span className="bg-accent-blue grid size-9 place-items-center rounded-lg text-white"><Headphones className="size-5" /></span>
-                <p className="text-ink mt-2.5 font-semibold">Let our team install it</p>
-                <p className="text-ink-muted mt-1 mb-3 text-xs leading-snug">Not technical? Share your site and the TryThat.ai team adds the widget for you, usually within one business day.</p>
-                <Button onClick={() => setView("assist")} className="bg-brand-blue hover:bg-brand-blue-hover mt-auto h-9 w-full rounded-lg text-sm font-semibold text-white">
-                  Request Assistance <ArrowRight className="size-4" />
-                </Button>
-              </div>
+              <Button onClick={() => setView("assist")} className="bg-brand-blue hover:bg-brand-blue-hover mt-4 h-10 w-full rounded-lg text-sm font-semibold text-white">
+                Request Installation <ArrowRight className="size-4" />
+              </Button>
             </div>
           </div>
         ) : (
@@ -193,32 +143,6 @@ Questions? Email support@trythat.ai.`;
                   Send Request
                 </Button>
               </div>
-            )}
-          </div>
-        )}
-
-        {view === "options" && (
-          <div className="flex items-center justify-between gap-3 border-t border-black/[0.06] px-5 py-3">
-            {status === "live" ? (
-              <>
-                <span className="text-brand-green inline-flex items-center gap-1.5 text-sm font-semibold">
-                  <Check className="size-4" /> Live on your site
-                </span>
-                <button type="button" onClick={() => onStatus("pending")} className="text-ink-muted hover:text-ink text-xs font-medium outline-none">
-                  Mark as not live
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="text-ink-muted text-xs">Already added it to your site?</span>
-                <button
-                  type="button"
-                  onClick={() => onStatus("live")}
-                  className="text-ink hover:bg-black/[0.04] inline-flex h-8 items-center rounded-lg border border-black/15 px-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40"
-                >
-                  Mark as live
-                </button>
-              </>
             )}
           </div>
         )}
