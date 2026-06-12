@@ -110,24 +110,6 @@ export function InstallWidget({
               </ul>
             </div>
 
-            {/* assisted install (the only path) */}
-            <div className="border-accent-blue/30 bg-accent-blue/[0.04] rounded-xl border p-5">
-              <div className="flex items-start gap-3">
-                <span className="bg-accent-blue grid size-10 shrink-0 place-items-center rounded-lg text-white">
-                  <Headphones className="size-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-ink font-semibold">We&apos;ll set it up for you</p>
-                  <p className="text-ink-muted mt-1 text-sm leading-snug">
-                    Share your website and our team adds {agent.name} to it for you, usually within one business day. Nothing technical on your end.
-                  </p>
-                </div>
-              </div>
-              <Button onClick={() => setView("assist")} className="bg-brand-blue hover:bg-brand-blue-hover mt-4 h-10 w-full rounded-lg text-sm font-semibold text-white">
-                Request Installation <ArrowRight className="size-4" />
-              </Button>
-            </div>
-
             {/* the widget code, shown for context — our team installs it for you */}
             <div className="rounded-xl border border-black/[0.08] p-3.5">
               <p className="text-ink-muted flex items-center gap-1.5 text-xs font-medium">
@@ -144,6 +126,24 @@ export function InstallWidget({
               >
                 {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? "Copied" : "Copy code"}
               </button>
+            </div>
+
+            {/* assisted install (the only path), the closing call to action */}
+            <div className="border-accent-blue/30 bg-accent-blue/[0.04] rounded-xl border p-5">
+              <div className="flex items-start gap-3">
+                <span className="bg-accent-blue grid size-10 shrink-0 place-items-center rounded-lg text-white">
+                  <Headphones className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-ink font-semibold">We&apos;ll set it up for you</p>
+                  <p className="text-ink-muted mt-1 text-sm leading-snug">
+                    Share your website and our team adds {agent.name} to it for you, usually within one business day. Nothing technical on your end.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setView("assist")} className="bg-brand-blue hover:bg-brand-blue-hover mt-4 h-10 w-full rounded-lg text-sm font-semibold text-white">
+                Request Installation <ArrowRight className="size-4" />
+              </Button>
             </div>
           </div>
         ) : (
