@@ -7,6 +7,7 @@ import {
   Building2,
   Check,
   ChevronDown,
+  Crown,
   FileText,
   Info,
   Languages,
@@ -33,19 +34,30 @@ import {
   GUARDRAILS,
   LANGUAGES,
   LEAD_FIELDS,
+  SUPER_TEMPLATE,
   TONES,
   VOICES,
+  aggregateKnowledge,
+  coveredSkills,
   getAgent,
+  getSuperAgent,
+  isSuperAgent,
+  listAgents,
+  mergeKnowledge,
   readiness,
   saveAgent,
+  subtractKnowledge,
+  superInherited,
   templateById,
   voiceById,
   type AgentConfig,
   type Channel,
   type FaqItem,
   type KnowledgeState,
+  type TemplateId,
 } from "@/lib/agents";
 import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
+import { CapabilityCoverage, InheritedSummary, SourceAgentPicker } from "./super-agent-ui";
 
 /* ----------------------------- speech helper ------------------------------ */
 
@@ -79,7 +91,10 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
   const editId = useSearchParams().get("edit");
   const { orgName } = useAuth();
   const company = orgName || "your company";
-  const t = useMemo(() => templateById(templateId), [templateId]);
+  // The Super Agent (the master) is built via templateId "super"; it uses its
+  // own premium defaults and adds a "learn from your agents" step.
+  const isSuper = templateId === "super";
+  const t = useMemo(() => (isSuper ? SUPER_TEMPLATE : templateById(templateId)), [isSuper, templateId]);
 
   const [name, setName] = useState(t.name);
   const [greeting, setGreeting] = useState(t.greeting);
@@ -107,17 +122,54 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [launched, setLaunched] = useState(false);
-  // New builds render immediately; edits wait one tick to load from localStorage.
-  const [ready, setReady] = useState(!editId);
+  // New builds render immediately; edits (and super, which checks for an existing
+  // master) wait one tick to load from localStorage.
+  const [ready, setReady] = useState(!editId && !isSuper);
   const fileRef = useRef<HTMLInputElement>(null);
   const createdAtRef = useRef<number | null>(null);
+  // Super Agent state: specialists it can learn from + the ones picked.
+  const [allAgents, setAllAgents] = useState<AgentConfig[]>([]);
+  const [sources, setSources] = useState<string[]>([]);
+  const superIdRef = useRef<string | null>(null);
 
   const voice = voiceById(voiceId);
   const previewGreeting = greeting.replaceAll("{name}", name).replaceAll("{company}", company);
-  const rd = readiness({ voiceId, tone, languages, greeting, channels, knowledge });
+  // Super Agent: knowledge inherited from the picked specialists, merged with manual adds.
+  const selectedSources = allAgents.filter((a) => sources.includes(a.id));
+  const inherited = useMemo(
+    () => aggregateKnowledge(allAgents.filter((a) => sources.includes(a.id))),
+    [allAgents, sources]
+  );
+  const effKnowledge = isSuper ? mergeKnowledge(inherited, knowledge) : knowledge;
+  const isEditing = !!editId || superIdRef.current != null;
+  const rd = readiness({ voiceId, tone, languages, greeting, channels, knowledge: effKnowledge });
 
-  // Edit mode: load the saved agent (client-only) and prefill every field.
+  // Load (client-only): super mode pulls the specialists + the existing master
+  // (singleton), edit mode prefills the agent being edited.
   useEffect(() => {
+    if (isSuper) {
+      setAllAgents(listAgents().filter((a) => !isSuperAgent(a)));
+      const existing = getSuperAgent();
+      if (existing) {
+        setName(existing.name);
+        setGreeting(existing.greeting);
+        setVoiceId(existing.voiceId);
+        setLanguages(existing.languages);
+        setTone(existing.tone);
+        setCollects(existing.collects);
+        setChannels(existing.channels);
+        setAlwaysOn(existing.alwaysOn);
+        setEscalateTo(existing.escalateTo);
+        setGuardrails(existing.guardrails);
+        setSources(existing.sourceAgentIds ?? []);
+        // The editable "manual" knowledge is the snapshot minus what its sources give.
+        setKnowledge(subtractKnowledge(existing.knowledge, superInherited(existing)));
+        createdAtRef.current = existing.createdAt;
+        superIdRef.current = existing.id;
+      }
+      setReady(true);
+      return;
+    }
     if (!editId) return;
     const a = getAgent(editId);
     if (a) {
@@ -135,7 +187,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
       createdAtRef.current = a.createdAt;
     }
     setReady(true);
-  }, [editId]);
+  }, [editId, isSuper]);
 
   // When channels drop voice, force the chat preview.
   useEffect(() => {
@@ -160,7 +212,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
 
   // Build mode reviews before going live; edit mode saves directly (already live).
   function onLaunchClick() {
-    if (editId) launch();
+    if (isEditing) launch();
     else setReviewOpen(true);
   }
 
@@ -168,8 +220,9 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
     setReviewOpen(false);
     setLaunching(true);
     const agent: AgentConfig = {
-      id: editId || `agent-${Date.now().toString(36)}`,
-      templateId: t.id,
+      id: editId || superIdRef.current || `agent-${Date.now().toString(36)}`,
+      // A Super Agent is stored as a custom agent flagged kind: "super".
+      templateId: isSuper ? "custom" : (t.id as TemplateId),
       name,
       role: t.role,
       voiceId,
@@ -181,13 +234,14 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
       escalateTo,
       collects,
       guardrails,
-      knowledge,
+      knowledge: effKnowledge,
+      ...(isSuper ? { kind: "super" as const, sourceAgentIds: sources } : {}),
       createdAt: createdAtRef.current ?? Date.now(),
     };
     saveAgent(agent);
     setLaunched(true);
     // Give the launch celebration room to play before moving on.
-    setTimeout(() => router.push(`/ai-team/agents/${agent.id}${editId ? "" : "?new=1"}`), editId ? 1500 : 2300);
+    setTimeout(() => router.push(`/ai-team/agents/${agent.id}${isEditing ? "" : "?new=1"}`), isEditing ? 1500 : 2300);
   }
 
   if (!ready) {
@@ -211,9 +265,13 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
           <ArrowLeft className="size-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-ink truncate font-bold">{editId ? "Edit" : "Build"} your {t.role}</p>
+          <p className="text-ink truncate font-bold">{isEditing ? "Edit" : "Build"} your {t.role}</p>
           <p className="text-ink-muted truncate text-xs">
-            {editId ? "Update anything, then save your changes." : "Everything has a default, so you can launch now. Adding knowledge makes it smarter."}
+            {isEditing
+              ? "Update anything, then save your changes."
+              : isSuper
+                ? "It learns from your agents and your knowledge. Everything has a default, so you can launch now."
+                : "Everything has a default, so you can launch now. Adding knowledge makes it smarter."}
           </p>
         </div>
         <Button
@@ -221,14 +279,26 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
           disabled={launching}
           className="bg-brand-green hover:bg-brand-green-hover hidden h-10 rounded-lg px-4 text-sm font-semibold text-white sm:inline-flex"
         >
-          {editId ? <Check className="size-4" /> : <Rocket className="size-4" />}
-          {editId ? "Save Changes" : "Launch Agent"}
+          {isEditing ? <Check className="size-4" /> : <Rocket className="size-4" />}
+          {isEditing ? "Save Changes" : "Launch Agent"}
         </Button>
       </div>
 
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_360px] lg:px-8">
         {/* -------------------------- left: inputs -------------------------- */}
         <div className="min-w-0 space-y-5">
+          {/* Learn from your agents (Super Agent only) */}
+          {isSuper && (
+            <SectionCard
+              icon={Crown}
+              title="Learn from your agents"
+              desc="Pick the specialists you've deployed. Your Super Agent absorbs their skills and knowledge automatically."
+            >
+              <SourceAgentPicker agents={allAgents} selected={sources} onToggle={(id) => toggle(sources, id, setSources)} />
+              <InheritedSummary knowledge={inherited} sourceCount={sources.length} />
+            </SectionCard>
+          )}
+
           {/* Identity */}
           <SectionCard icon={Sparkles} title="Identity" desc="What your agent is called and how it opens a conversation.">
             <Field label="Agent name">
@@ -538,8 +608,8 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
             disabled={launching}
             className="bg-brand-green hover:bg-brand-green-hover h-12 w-full rounded-xl text-base font-semibold text-white sm:hidden"
           >
-            {editId ? <Check className="size-5" /> : <Rocket className="size-5" />}
-            {editId ? "Save Changes" : "Launch Agent"}
+            {isEditing ? <Check className="size-5" /> : <Rocket className="size-5" />}
+            {isEditing ? "Save Changes" : "Launch Agent"}
           </Button>
         </div>
 
@@ -547,8 +617,15 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
         <div className="lg:sticky lg:top-20 lg:self-start">
           <div className="overflow-hidden rounded-2xl bg-gradient-to-b from-[#16243f] to-[#1d2f50] text-white shadow-[0_2px_6px_-2px_rgba(22,36,63,0.18),0_18px_44px_-18px_rgba(22,36,63,0.32)]">
             <div className="flex flex-col items-center px-5 pt-6 pb-4">
-              <AgentOrb colors={[voice.color, "#2f6bed"]} size={104} speaking={speaking || previewMode === "voice"} />
-              <p className="mt-3 text-lg font-bold">{name}</p>
+              <AgentOrb colors={isSuper ? SUPER_TEMPLATE.gradient : [voice.color, "#2f6bed"]} size={104} speaking={speaking || previewMode === "voice"} />
+              <div className="mt-3 flex items-center gap-2">
+                <p className="text-lg font-bold">{name}</p>
+                {isSuper && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold ring-1 ring-white/20">
+                    <Crown className="size-2.5" /> SUPER
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-white/70">{t.role}</p>
               <div className="mt-2 flex flex-wrap justify-center gap-1.5">
                 {tone.slice(0, 3).map((to) => (
@@ -559,17 +636,21 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
 
             {/* readiness on a light tray */}
             <div className="bg-white px-5 py-4">
-              <ReadinessMeter voiceId={voiceId} tone={tone} languages={languages} greeting={greeting} channels={channels} knowledge={knowledge} />
+              <ReadinessMeter voiceId={voiceId} tone={tone} languages={languages} greeting={greeting} channels={channels} knowledge={effKnowledge} />
               <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
                 <div
                   className={cn("h-full rounded-full transition-[width] duration-500", rd.tone === "weak" ? "bg-amber-500" : rd.tone === "ok" ? "bg-accent-blue" : "bg-brand-green")}
                   style={{ width: `${rd.score}%` }}
                 />
               </div>
-              {rd.knowledgePoints < 30 && (
-                <p className="text-ink-muted mt-2 text-xs">
-                  Add your projects and company profile to take this past <span className="text-ink font-semibold">Capable</span>.
-                </p>
+              {isSuper ? (
+                <CapabilityCoverage covered={coveredSkills(selectedSources)} className="mt-4" />
+              ) : (
+                rd.knowledgePoints < 30 && (
+                  <p className="text-ink-muted mt-2 text-xs">
+                    Add your projects and company profile to take this past <span className="text-ink font-semibold">Capable</span>.
+                  </p>
+                )
               )}
             </div>
 
@@ -600,7 +681,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
                   </button>
                 </div>
               ) : (
-                <ChatPreview agentName={name} greeting={previewGreeting} reply={cannedReply(t.id, knowledge, company)} />
+                <ChatPreview agentName={name} greeting={previewGreeting} reply={cannedReply(t.id, effKnowledge, company)} />
               )}
 
               {/* Launch right from the preview, so you can review then go live in place. */}
@@ -609,8 +690,8 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
                 disabled={launching}
                 className="bg-brand-green hover:bg-brand-green-hover mt-3 h-10 w-full rounded-lg text-sm font-semibold text-white"
               >
-                {editId ? <Check className="size-4" /> : <Rocket className="size-4" />}
-                {editId ? "Save Changes" : "Launch Agent"}
+                {isEditing ? <Check className="size-4" /> : <Rocket className="size-4" />}
+                {isEditing ? "Save Changes" : "Launch Agent"}
               </Button>
             </div>
           </div>
@@ -655,7 +736,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
         />
       )}
 
-      {launched && <LaunchSuccess name={name} edited={!!editId} />}
+      {launched && <LaunchSuccess name={name} edited={isEditing} />}
     </div>
   );
 }

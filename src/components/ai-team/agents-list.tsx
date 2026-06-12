@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bot, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { deleteAgent, listAgents, readiness, templateById, type AgentConfig } from "@/lib/agents";
+import { agentVisual, deleteAgent, listAgents, readiness, type AgentConfig } from "@/lib/agents";
 import { AgentOrb, ChannelBadge } from "./agent-ui";
 
 export function AgentsList() {
@@ -69,7 +69,7 @@ export function AgentsList() {
 }
 
 function AgentListCard({ agent, onOpen, onDelete }: { agent: AgentConfig; onOpen: () => void; onDelete: () => void }) {
-  const t = templateById(agent.templateId);
+  const t = agentVisual(agent);
   const rd = readiness(agent);
   const [confirming, setConfirming] = useState(false);
 

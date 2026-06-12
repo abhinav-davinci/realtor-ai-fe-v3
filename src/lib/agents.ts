@@ -6,6 +6,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   CalendarCheck,
+  Crown,
   MessageSquareHeart,
   PhoneCall,
   Sparkles,
@@ -247,6 +248,43 @@ export const CUSTOM_TEMPLATE: AgentTemplate = {
 export const templateById = (id: string): AgentTemplate =>
   TEMPLATES.find((t) => t.id === id) ?? CUSTOM_TEMPLATE;
 
+/**
+ * The Super Agent's premium visual + builder defaults. A Super Agent is not a
+ * real TemplateId (it's stored as templateId "custom" + kind "super"); this only
+ * feeds the orb/card visuals and the builder's starting values.
+ */
+export const SUPER_TEMPLATE: Omit<AgentTemplate, "id"> & { id: "super" } = {
+  id: "super",
+  name: "Aria",
+  role: "Super Agent",
+  tagline: "One master agent for your whole lead lifecycle",
+  description:
+    "Your master AI. It learns from your specialist agents and your knowledge base to qualify, answer, schedule, follow up, and handle payments, all in one.",
+  icon: Crown,
+  gradient: ["#7c3aed", "#22d3ee"],
+  handles: [
+    "Learns from the specialists you've deployed",
+    "Qualifies, answers, schedules, and follows up in one flow",
+    "Knows your projects, pricing, and FAQs",
+    "One voice and one widget across your whole site",
+  ],
+  greeting:
+    "Hi, this is {name} from {company}. I can help with anything, from project details to booking a visit. What are you looking for?",
+  collects: ["Budget", "Preferred location", "Configuration (BHK)", "Possession timeline"],
+  channels: ["voice", "chat"],
+  voiceId: "priya",
+  tone: ["Warm", "Professional", "Persuasive"],
+};
+
+/** The five lifecycle skills a Super Agent can master, one per specialist template. */
+export const LIFECYCLE_SKILLS: { template: TemplateId; label: string }[] = [
+  { template: "lead-qualifier", label: "Qualify leads" },
+  { template: "receptionist", label: "Answer calls" },
+  { template: "site-visit", label: "Book site visits" },
+  { template: "feedback", label: "Collect feedback" },
+  { template: "payment", label: "Track payments" },
+];
+
 /* ------------------------------ saved agents ------------------------------ */
 
 export interface KnowledgeState {
@@ -274,6 +312,10 @@ export interface AgentConfig {
   knowledge: KnowledgeState;
   /** Website chat widget install state. Defaults to "pending" when unset. */
   widgetStatus?: "pending" | "requested" | "live";
+  /** Set on the singleton Super Agent (the master that learns from specialists). */
+  kind?: "super";
+  /** For a Super Agent: the specialist agents it learned from. */
+  sourceAgentIds?: string[];
   createdAt: number;
 }
 
@@ -314,6 +356,117 @@ export function deleteAgent(id: string) {
   } catch {
     /* ignore */
   }
+}
+
+/* ------------------------------ super agent ------------------------------- */
+
+export function isSuperAgent(a: { kind?: string }): boolean {
+  return a.kind === "super";
+}
+
+/** The single Super Agent (the master), or null. */
+export function getSuperAgent(): AgentConfig | null {
+  return listAgents().find((a) => a.kind === "super") ?? null;
+}
+
+/** Visual + defaults for an agent: the Super Agent's premium look, else its template. */
+export function agentVisual(a: AgentConfig): Omit<AgentTemplate, "id"> & { id: string } {
+  return isSuperAgent(a) ? SUPER_TEMPLATE : templateById(a.templateId);
+}
+
+/** Skills a set of source agents cover (by template), in lifecycle order. */
+export function coveredSkills(sources: AgentConfig[]): TemplateId[] {
+  const set = new Set(sources.map((a) => a.templateId));
+  return LIFECYCLE_SKILLS.map((s) => s.template).filter((t) => set.has(t));
+}
+
+/* ------------------------- knowledge aggregation -------------------------- */
+
+const emptyKnowledge = (): KnowledgeState => ({ companyProfile: false, projects: [], docs: [], faqs: [], website: "" });
+const faqKey = (f: FaqItem) => f.q.trim().toLowerCase();
+const uniq = (xs: string[]) => [...new Set(xs)];
+
+export function mergeKnowledge(a: KnowledgeState, b: KnowledgeState): KnowledgeState {
+  const faqs = [...a.faqs];
+  const seen = new Set(a.faqs.map(faqKey));
+  for (const f of b.faqs) {
+    if (f.q.trim() && !seen.has(faqKey(f))) {
+      seen.add(faqKey(f));
+      faqs.push(f);
+    }
+  }
+  return {
+    companyProfile: a.companyProfile || b.companyProfile,
+    projects: uniq([...a.projects, ...b.projects]),
+    docs: uniq([...a.docs, ...b.docs]),
+    faqs,
+    website: a.website.trim() || b.website.trim() || "",
+  };
+}
+
+/** Knowledge in `merged` but not in `base` (recovers a Super Agent's manual extras on edit). */
+export function subtractKnowledge(merged: KnowledgeState, base: KnowledgeState): KnowledgeState {
+  const baseFaqs = new Set(base.faqs.map(faqKey));
+  const baseWebsite = base.website.trim();
+  const mergedWebsite = merged.website.trim();
+  return {
+    companyProfile: merged.companyProfile && !base.companyProfile,
+    projects: merged.projects.filter((p) => !base.projects.includes(p)),
+    docs: merged.docs.filter((d) => !base.docs.includes(d)),
+    faqs: merged.faqs.filter((f) => !baseFaqs.has(faqKey(f))),
+    website: mergedWebsite && mergedWebsite !== baseWebsite ? merged.website : "",
+  };
+}
+
+export function aggregateKnowledge(agents: AgentConfig[]): KnowledgeState {
+  return agents.reduce((acc, a) => mergeKnowledge(acc, a.knowledge), emptyKnowledge());
+}
+
+export const aggregateCollects = (agents: AgentConfig[]) => uniq(agents.flatMap((a) => a.collects));
+export const aggregateChannels = (agents: AgentConfig[]): Channel[] =>
+  uniq(agents.flatMap((a) => a.channels)) as Channel[];
+export const aggregateTone = (agents: AgentConfig[]) => uniq(agents.flatMap((a) => a.tone)).slice(0, 3);
+export const aggregateGuardrails = (agents: AgentConfig[]) => uniq(agents.flatMap((a) => a.guardrails));
+
+/* --------------------------- super re-sync -------------------------------- */
+
+/** A Super Agent's source agents that still exist. */
+export function superSources(agent: AgentConfig): AgentConfig[] {
+  return (agent.sourceAgentIds ?? []).map(getAgent).filter((a): a is AgentConfig => !!a);
+}
+
+/** The live aggregate knowledge of a Super Agent's current source agents. */
+export function superInherited(agent: AgentConfig): KnowledgeState {
+  return aggregateKnowledge(superSources(agent));
+}
+
+/** True if a source was removed or its knowledge changed since the snapshot was taken. */
+export function isSuperOutOfDate(agent: AgentConfig): boolean {
+  const ids = agent.sourceAgentIds ?? [];
+  if (ids.length === 0) return false;
+  const live = superSources(agent);
+  if (live.length !== ids.length) return true; // a source was deleted
+  const extra = subtractKnowledge(aggregateKnowledge(live), agent.knowledge);
+  return (
+    extra.companyProfile ||
+    extra.projects.length > 0 ||
+    extra.docs.length > 0 ||
+    extra.faqs.length > 0 ||
+    extra.website.trim().length > 0
+  );
+}
+
+/** Re-merge a Super Agent's snapshot from its current sources, keeping manual extras. */
+export function resyncSuper(agent: AgentConfig): AgentConfig {
+  const inherited = superInherited(agent);
+  const manual = subtractKnowledge(agent.knowledge, inherited);
+  const updated: AgentConfig = {
+    ...agent,
+    sourceAgentIds: superSources(agent).map((a) => a.id), // drop any removed sources
+    knowledge: mergeKnowledge(inherited, manual),
+  };
+  saveAgent(updated);
+  return updated;
 }
 
 /* --------------------------- readiness scoring ---------------------------- */

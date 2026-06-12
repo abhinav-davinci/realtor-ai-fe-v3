@@ -19,6 +19,7 @@ import {
   CUSTOM_TEMPLATE,
   TEMPLATES,
   deleteAgent,
+  isSuperAgent,
   listAgents,
   templateById,
   voiceById,
@@ -26,6 +27,7 @@ import {
   type AgentTemplate,
 } from "@/lib/agents";
 import { AgentOrb, ChannelBadge } from "./agent-ui";
+import { SuperAgentBand } from "./super-agent-ui";
 
 const VALUE_PROPS: { icon: LucideIcon; title: string; desc: string }[] = [
   { icon: Zap, title: "Replies right away", desc: "Engages every lead the moment they enquire." },
@@ -56,7 +58,8 @@ export function LaunchAgents() {
     setAgents(listAgents());
   }
 
-  const shown = agents.slice(0, 3);
+  const specialists = agents.filter((a) => !isSuperAgent(a));
+  const shown = specialists.slice(0, 3);
 
   return (
     <div className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-16 sm:px-6 lg:px-8">
@@ -100,8 +103,11 @@ export function LaunchAgents() {
         </div>
       </div>
 
+      {/* Super Agent */}
+      <SuperAgentBand agents={agents} />
+
       {/* My agents */}
-      {agents.length > 0 && (
+      {specialists.length > 0 && (
         <section className="mt-8 shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-ink text-lg font-bold">My Agents</h2>

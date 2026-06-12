@@ -6,12 +6,14 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  Crown,
   Languages,
   MessageSquare,
   Mic,
   Pencil,
   Phone,
   Radar,
+  RefreshCw,
   Send,
   ShieldCheck,
   Sparkles,
@@ -22,15 +24,21 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import {
+  agentVisual,
+  coveredSkills,
   deleteAgent,
   getAgent,
+  isSuperAgent,
+  isSuperOutOfDate,
   readiness,
+  resyncSuper,
   saveAgent,
-  templateById,
+  superSources,
   voiceById,
   type AgentConfig,
 } from "@/lib/agents";
 import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
+import { CapabilityCoverage, SuperBadge } from "./super-agent-ui";
 import { AgentConversations } from "./agent-conversations";
 import { InstallWidget } from "./agent-install";
 import { leadsFor } from "@/lib/conversations";
@@ -69,7 +77,10 @@ export function AgentDetail({ id }: { id: string }) {
   }
   if (!agent) return null;
 
-  const t = templateById(agent.templateId);
+  const t = agentVisual(agent);
+  const isSuper = isSuperAgent(agent);
+  const superSrc = isSuper ? superSources(agent) : [];
+  const superStale = isSuper && isSuperOutOfDate(agent);
   const voice = voiceById(agent.voiceId);
   const rd = readiness(agent);
   const widgetStatus = agent.widgetStatus ?? "pending";
@@ -95,14 +106,17 @@ export function AgentDetail({ id }: { id: string }) {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <AgentOrb colors={t.gradient} size={40} icon={t.icon} />
           <div className="min-w-0">
-            <p className="text-ink truncate font-bold">{agent.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-ink truncate font-bold">{agent.name}</p>
+              {isSuper && <SuperBadge />}
+            </div>
             <p className="text-ink-muted truncate text-xs">{agent.role}</p>
           </div>
         </div>
         <button type="button" onClick={() => router.push(`/leads?template=${agent.templateId}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium md:inline-flex">
           <Radar className="size-4" /> Lead Intelligence
         </button>
-        <button type="button" onClick={() => router.push(`/ai-team/build/${agent.templateId}?edit=${agent.id}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium sm:inline-flex">
+        <button type="button" onClick={() => router.push(isSuper ? "/ai-team/super" : `/ai-team/build/${agent.templateId}?edit=${agent.id}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium sm:inline-flex">
           <Pencil className="size-4" /> Edit
         </button>
         <button type="button" onClick={() => setConfirmDelete(true)} aria-label={`Delete ${agent.name}`} className="text-ink-muted hover:text-red-500 grid size-9 place-items-center rounded-lg hover:bg-red-50">
@@ -138,6 +152,51 @@ export function AgentDetail({ id }: { id: string }) {
 
           {tab === "setup" && (
           <div className="space-y-5">
+          {/* super agent: sources + capability coverage + re-sync */}
+          {isSuper && (
+            <div className="rounded-2xl border bg-white p-5" style={{ borderColor: `${t.gradient[0]}22` }}>
+              <div className="flex items-center gap-2">
+                <span className="grid size-7 place-items-center rounded-lg text-white" style={{ background: `linear-gradient(135deg, ${t.gradient[0]}, ${t.gradient[1]})` }}>
+                  <Crown className="size-4" />
+                </span>
+                <p className="text-ink font-bold">Super Agent</p>
+                {superStale && (
+                  <span className="bg-brand-orange/10 text-brand-orange rounded-full px-2 py-0.5 text-[11px] font-semibold">Out of date</span>
+                )}
+              </div>
+              {superSrc.length > 0 ? (
+                <>
+                  <p className="text-ink-muted mt-2 text-xs font-medium">Learns from</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {superSrc.map((s) => {
+                      const v = agentVisual(s);
+                      return (
+                        <span key={s.id} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white py-1 pr-2.5 pl-1 text-xs">
+                          <AgentOrb colors={v.gradient} size={20} icon={v.icon} />
+                          <span className="text-ink font-medium">{s.name}</span>
+                          <span className="text-ink-muted">· {s.role}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <p className="text-ink-muted mt-2 text-xs">Built from your own knowledge base. Add specialists in the builder to teach it more.</p>
+              )}
+              <div className="mt-4">
+                <CapabilityCoverage covered={coveredSkills(superSrc)} />
+              </div>
+              {superStale && (
+                <div className="bg-brand-orange/[0.06] mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2.5">
+                  <p className="text-ink-muted min-w-0 flex-1 text-xs">Your agents changed since this was built. Re-sync to pick up their latest knowledge.</p>
+                  <Button onClick={() => setAgent(resyncSuper(agent))} className="bg-brand-blue hover:bg-brand-blue-hover h-8 shrink-0 rounded-lg px-3 text-xs font-semibold text-white">
+                    <RefreshCw className="size-3.5" /> Re-sync
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* configuration */}
           <div className="rounded-2xl border border-black/[0.08] bg-white p-5">
             <p className="text-ink font-bold">Configuration</p>
@@ -187,7 +246,7 @@ export function AgentDetail({ id }: { id: string }) {
               <KItem on={!!agent.knowledge.website} label={agent.knowledge.website ? `Website: ${agent.knowledge.website}` : "Website not linked"} />
             </div>
             {rd.knowledgePoints < 60 && (
-              <button onClick={() => router.push(`/ai-team/build/${agent.templateId}`)} className="text-accent-blue mt-3 inline-flex items-center gap-1 text-sm font-semibold">
+              <button onClick={() => router.push(isSuper ? "/ai-team/super" : `/ai-team/build/${agent.templateId}`)} className="text-accent-blue mt-3 inline-flex items-center gap-1 text-sm font-semibold">
                 <BookOpen className="size-4" /> Add more knowledge to sharpen {agent.name}
               </button>
             )}
