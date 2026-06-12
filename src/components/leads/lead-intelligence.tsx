@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight, Download, PhoneCall, Upload } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Download, PhoneCall, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
@@ -11,16 +11,17 @@ import {
   LIFECYCLE_LABEL,
   LIFECYCLE_TABS,
   TIER_META,
+  TIER_ORDER,
   filterLeads,
   intelligenceStats,
-  leadCategories,
   listScoredLeads,
   tabCounts,
-  type LeadCategory,
   type LifecycleTab,
   type ScoredLead,
+  type Tier,
 } from "@/lib/lead-intelligence";
 import {
+  EASE_OUT,
   FilterToggle,
   Highlight,
   LeadAvatar,
@@ -49,10 +50,9 @@ export function LeadIntelligence() {
 
   const allLeads = useMemo(() => listScoredLeads(), []);
   const stats = useMemo(() => intelligenceStats(allLeads), [allLeads]);
-  const categories = useMemo(() => leadCategories(allLeads), [allLeads]);
 
   const [tab, setTab] = useState<LifecycleTab>(initialTab);
-  const [category, setCategory] = useState<LeadCategory | "all">("all");
+  const [tier, setTier] = useState<Tier | "all">("all");
   const [channel, setChannel] = useState<Filter>("both");
   const [minScore, setMinScore] = useState("");
   const [maxScore, setMaxScore] = useState("");
@@ -64,14 +64,14 @@ export function LeadIntelligence() {
     () =>
       filterLeads(allLeads, {
         tab: "all",
-        category,
+        tier,
         channel,
         minScore: num(minScore),
         maxScore: num(maxScore),
         query,
         templateId,
       }),
-    [allLeads, category, channel, minScore, maxScore, query, templateId]
+    [allLeads, tier, channel, minScore, maxScore, query, templateId]
   );
   const counts = useMemo(() => tabCounts(baseFiltered), [baseFiltered]);
   const visible = tab === "all" ? baseFiltered : baseFiltered.filter((l) => l.status === tab);
@@ -80,7 +80,7 @@ export function LeadIntelligence() {
 
   function resetFilters() {
     setQuery("");
-    setCategory("all");
+    setTier("all");
     setChannel("both");
     setMinScore("");
     setMaxScore("");
@@ -116,16 +116,16 @@ export function LeadIntelligence() {
           <div className="space-y-3">
             {/* score banner for the lead intelligence context */}
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-3">
-              <span className={cn("grid size-11 shrink-0 place-items-center rounded-full text-base font-bold tabular-nums", TIER_META[open.tier].badge)}>
+              <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl text-lg font-bold tabular-nums", TIER_META[open.tier].badge)}>
                 {open.score}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-ink truncate text-sm font-bold">{open.name}</p>
-                  <TierBadge lead={open} />
+                  <TierBadge tier={open.tier} />
                 </div>
                 <p className="text-ink-muted mt-0.5 text-xs capitalize">
-                  {open.status} · {open.category} · scored {open.score}/100 · via {open.agentRole}
+                  {open.status} · scored {open.score}/100 · via {open.agentRole}
                 </p>
               </div>
               <Button className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3 text-sm font-semibold text-white">
@@ -152,20 +152,7 @@ export function LeadIntelligence() {
             <div className="mt-4 flex flex-col gap-2.5 lg:flex-row lg:items-center">
               <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={setOpenId} />
               <div className="flex flex-wrap items-center gap-2">
-                <div className="relative">
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as LeadCategory | "all")}
-                    aria-label="Filter by category"
-                    className="text-ink focus:border-accent-blue/50 h-10 appearance-none rounded-lg border border-black/15 bg-white pr-8 pl-3 text-sm outline-none"
-                  >
-                    <option value="all">All categories</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="text-ink-muted/70 pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2" />
-                </div>
+                <TierFilter value={tier} onChange={setTier} />
                 <input
                   type="number"
                   inputMode="numeric"
@@ -198,7 +185,7 @@ export function LeadIntelligence() {
             ) : (
               <div className="mt-4 grid place-items-center rounded-xl border border-dashed border-black/15 py-14 text-center">
                 <p className="text-ink text-sm font-semibold">No leads match</p>
-                <p className="text-ink-muted mt-1 text-xs">Try a different name, score range, category, or channel.</p>
+                <p className="text-ink-muted mt-1 text-xs">Try a different name, score range, tier, or channel.</p>
                 <button
                   type="button"
                   onClick={resetFilters}
@@ -215,9 +202,79 @@ export function LeadIntelligence() {
   );
 }
 
-function TierBadge({ lead }: { lead: ScoredLead }) {
-  const tier = TIER_META[lead.tier];
-  return <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", tier.badge)}>{tier.label}</span>;
+function TierBadge({ tier }: { tier: Tier }) {
+  const meta = TIER_META[tier];
+  return <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase", meta.badge)}>{meta.name}</span>;
+}
+
+/* ------------------------------ tier dropdown ----------------------------- */
+
+function TierFilter({ value, onChange }: { value: Tier | "all"; onChange: (t: Tier | "all") => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const label = value === "all" ? "All Categories" : TIER_META[value].name;
+  const options: { key: Tier | "all"; name: string }[] = [
+    { key: "all", name: "All Categories" },
+    ...TIER_ORDER.map((t) => ({ key: t, name: TIER_META[t].name })),
+  ];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="text-ink hover:border-black/25 focus-visible:border-accent-blue/50 flex h-10 items-center gap-2 rounded-lg border border-black/15 bg-white pr-2.5 pl-3 text-sm outline-none"
+      >
+        <span>{label}</span>
+        <ChevronDown className={cn("text-ink-muted/70 size-4 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute top-full left-0 z-20 mt-1.5 min-w-[190px] overflow-hidden rounded-xl border border-black/[0.08] bg-white p-1 shadow-lg shadow-black/[0.08]"
+          style={{ animation: `scale-in 160ms ${EASE_OUT} both`, transformOrigin: "top" }}
+        >
+          {options.map((o) => {
+            const selected = o.key === value;
+            return (
+              <button
+                key={o.key}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(o.key);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-sm outline-none transition-colors",
+                  selected ? "text-ink font-semibold" : "text-ink-muted hover:bg-black/[0.04] hover:text-ink"
+                )}
+              >
+                <span className="flex items-center gap-2.5">
+                  {o.key !== "all" && <span className={cn("size-2 rounded-full", TIER_META[o.key as Tier].dot)} />}
+                  {o.name}
+                </span>
+                {selected && <Check className="text-accent-blue size-4 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -237,7 +294,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 }
 
 function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query: string; onOpen: () => void }) {
-  const tier = TIER_META[lead.tier];
+  const meta = TIER_META[lead.tier];
   const channelLabel = lead.hasCall && lead.hasChat ? "Call + Chat" : lead.hasCall ? "Voice" : "Chat";
 
   return (
@@ -252,16 +309,14 @@ function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query: strin
           <p className="text-ink truncate text-sm font-semibold">
             <Highlight text={lead.name} query={query} />
           </p>
-          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", tier.badge)}>{tier.label}</span>
-          <span className="text-ink-muted/80 text-[11px]">{lead.category}</span>
+          <TierBadge tier={lead.tier} />
         </div>
         <p className="text-ink-muted mt-0.5 truncate text-xs">{lead.summary}</p>
         <p className="text-ink-muted/70 mt-0.5 text-[11px]">{channelLabel} · {lead.when}</p>
       </div>
-      <div className="shrink-0 text-right">
-        <span className={cn("text-2xl leading-none font-bold tabular-nums", tier.score)}>{lead.score}</span>
-        <p className="text-ink-muted/50 mt-0.5 text-[10px]">/ 100</p>
-      </div>
+      <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl text-lg font-bold tabular-nums", meta.badge)}>
+        {lead.score}
+      </span>
       <ChevronRight className="text-ink-muted/50 size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
     </button>
   );

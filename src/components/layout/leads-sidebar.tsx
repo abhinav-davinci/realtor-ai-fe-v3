@@ -28,7 +28,7 @@ export function LeadsSidebar() {
   // "Needs attention" count: new + hot leads. Deterministic static data, so it's
   // safe to compute during render (no localStorage, no hydration mismatch).
   const count = useMemo(
-    () => listScoredLeads().filter((l) => l.status === "new" || l.tier === "hot").length,
+    () => listScoredLeads().filter((l) => l.status === "new" || l.tier === "hot" || l.tier === "very-hot").length,
     []
   );
 
