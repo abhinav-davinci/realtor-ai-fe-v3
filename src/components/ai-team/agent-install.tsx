@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Clock, Headphones, TrendingUp, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Clock, Code, Copy, Headphones, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AgentConfig } from "@/lib/agents";
@@ -43,6 +43,18 @@ export function InstallWidget({
 }) {
   const [view, setView] = useState<"options" | "assist">("options");
   const [done, setDone] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const snippet = `<script src="https://cdn.trythat.ai/widget.js" data-agent="${agent.id}"></script>`;
+  function copyCode() {
+    try {
+      navigator.clipboard?.writeText(snippet);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
 
   const [name, setName] = useState("");
   const [site, setSite] = useState(agent.knowledge.website || "");
@@ -114,6 +126,24 @@ export function InstallWidget({
               <Button onClick={() => setView("assist")} className="bg-brand-blue hover:bg-brand-blue-hover mt-4 h-10 w-full rounded-lg text-sm font-semibold text-white">
                 Request Installation <ArrowRight className="size-4" />
               </Button>
+            </div>
+
+            {/* the widget code, shown for context — our team installs it for you */}
+            <div className="rounded-xl border border-black/[0.08] p-3.5">
+              <p className="text-ink-muted flex items-center gap-1.5 text-xs font-medium">
+                <Code className="text-accent-blue size-4" /> Your widget code
+              </p>
+              <p className="text-ink-muted/80 mt-1 text-[11px] leading-snug">
+                This is what our team adds to your site. Share it with whoever manages your website if you like.
+              </p>
+              <pre className="text-ink mt-2 overflow-x-auto rounded-lg bg-black/[0.03] p-3 text-[11px] leading-relaxed">{snippet}</pre>
+              <button
+                type="button"
+                onClick={copyCode}
+                className={cn("mt-2 inline-flex items-center gap-1.5 text-xs font-semibold", copied ? "text-brand-green" : "text-accent-blue")}
+              >
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? "Copied" : "Copy code"}
+              </button>
             </div>
           </div>
         ) : (
