@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   LIFECYCLE_SKILLS,
   SUPER_TEMPLATE,
+  TEMPLATES,
   coveredSkills,
   isSuperAgent,
   readiness,
@@ -178,6 +179,40 @@ export function SourceAgentPicker({
 
 /* ------------------------------ gallery band ------------------------------ */
 
+/** The master orchestrating its specialists: the Super orb ringed by the five
+ * lifecycle agents, lines drawn to each. The visual that gives the Super Agent
+ * its own identity (vs the hero's lone orb). */
+function SuperConstellation() {
+  const SIZE = 190;
+  const R = 70;
+  const c = SIZE / 2;
+  const pts = TEMPLATES.map((t, i) => {
+    const ang = ((-90 + i * (360 / TEMPLATES.length)) * Math.PI) / 180;
+    return { t, x: c + R * Math.cos(ang), y: c + R * Math.sin(ang), i };
+  });
+  return (
+    <div className="relative" style={{ width: SIZE, height: SIZE }}>
+      <svg className="absolute inset-0" width={SIZE} height={SIZE} aria-hidden="true">
+        {pts.map(({ t, x, y }) => (
+          <line key={t.id} x1={c} y1={c} x2={x} y2={y} stroke="white" strokeOpacity="0.16" strokeWidth="1" />
+        ))}
+      </svg>
+      {pts.map(({ t, x, y, i }) => (
+        <div
+          key={t.id}
+          className="absolute -translate-x-1/2 -translate-y-1/2 motion-safe:animate-float"
+          style={{ left: x, top: y, animationDelay: `${i * 0.25}s` }}
+        >
+          <AgentOrb colors={t.gradient} size={30} icon={t.icon} />
+        </div>
+      ))}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+        <AgentOrb colors={SUPER_GRADIENT} size={82} speaking />
+      </div>
+    </div>
+  );
+}
+
 /** The Launch-page flagship: "build your Super Agent" or its live status. */
 export function SuperAgentBand({ agents }: { agents: AgentConfig[] }) {
   const superAgent = agents.find(isSuperAgent) ?? null;
@@ -188,28 +223,20 @@ export function SuperAgentBand({ agents }: { agents: AgentConfig[] }) {
         <div
           className="relative overflow-hidden rounded-2xl px-6 py-5 text-white"
           style={{
-            backgroundImage: `linear-gradient(110deg, #1b1145 0%, ${SUPER_GRADIENT[0]} 55%, ${SUPER_GRADIENT[1]} 130%)`,
+            backgroundImage: `linear-gradient(110deg, #1b1145 0%, ${SUPER_GRADIENT[0]} 58%, ${SUPER_GRADIENT[1]} 135%)`,
             animation: "fade-in-up 400ms ease-out both",
           }}
         >
-          <span className="pointer-events-none absolute -top-20 -right-8 size-56 rounded-full border border-white/10" />
+          <span className="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full border border-white/[0.08]" />
           <div className="relative flex items-center justify-between gap-6">
-            <div className="max-w-2xl">
+            <div className="max-w-md py-1">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
                 <Crown className="size-3.5" /> New · Super Agent
               </span>
               <h2 className="mt-2.5 text-2xl font-bold">Meet your Super Agent</h2>
-              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-white/85">
-                One AI that does the work of your whole team. It learns from the specialists you&apos;ve built and your
-                knowledge base, then qualifies, answers, schedules, and follows up, all in one.
+              <p className="mt-1.5 text-sm leading-relaxed text-white/85">
+                One master AI that unifies your whole team. It learns from your specialists and your knowledge, then qualifies, answers, schedules, and follows up.
               </p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {LIFECYCLE_SKILLS.map((s) => (
-                  <span key={s.template} className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/90 ring-1 ring-white/10">
-                    {s.label}
-                  </span>
-                ))}
-              </div>
               <Link
                 href="/ai-team/super"
                 className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-[#1b1145] transition-transform hover:-translate-y-0.5"
@@ -217,8 +244,8 @@ export function SuperAgentBand({ agents }: { agents: AgentConfig[] }) {
                 <Crown className="size-4" /> Build your Super Agent <ArrowRight className="size-4" />
               </Link>
             </div>
-            <div className="relative hidden shrink-0 pr-2 lg:grid lg:place-items-center">
-              <AgentOrb colors={SUPER_GRADIENT} size={128} speaking />
+            <div className="relative mr-2 hidden shrink-0 lg:block">
+              <SuperConstellation />
             </div>
           </div>
         </div>
