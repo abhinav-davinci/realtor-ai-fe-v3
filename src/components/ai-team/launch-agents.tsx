@@ -86,19 +86,20 @@ export function LaunchAgents() {
         </div>
       </div>
 
-      {/* Super Agent (the master) */}
-      <SuperAgentBand agents={agents} />
-
-      {/* Template gallery */}
+      {/* Agent gallery: the Master Agent leads, then the ready-made specialists */}
       <section id="templates" className="mt-8 shrink-0 scroll-mt-4">
-        <h2 className="text-ink text-lg font-bold">Start from a ready-made agent</h2>
-        <p className="text-ink-muted text-sm">Each one is pre-tuned for the Indian real-estate workflow. You can change everything in the next step.</p>
+        <SuperAgentBand agents={agents} />
 
-        <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {TEMPLATES.map((t, i) => (
-            <TemplateCard key={t.id} t={t} onBuild={() => router.push(`/ai-team/build/${t.id}`)} index={i} />
-          ))}
-          <CustomCard onBuild={() => router.push(`/ai-team/build/${CUSTOM_TEMPLATE.id}`)} />
+        <div className="mt-8">
+          <h2 className="text-ink text-lg font-bold">Start from a ready-made agent</h2>
+          <p className="text-ink-muted text-sm">Each one is pre-tuned for the Indian real-estate workflow. You can change everything in the next step.</p>
+
+          <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {TEMPLATES.map((t, i) => (
+              <TemplateCard key={t.id} t={t} onBuild={() => router.push(`/ai-team/build/${t.id}`)} index={i} />
+            ))}
+            <CustomCard onBuild={() => router.push(`/ai-team/build/${CUSTOM_TEMPLATE.id}`)} />
+          </div>
         </div>
       </section>
     </div>

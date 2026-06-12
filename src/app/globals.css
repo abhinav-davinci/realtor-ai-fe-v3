@@ -529,6 +529,30 @@
   }
 }
 
+/* Master Agent orchestration: specialists slowly orbit the master while it
+   broadcasts a radial waveform and soft pulse rings. Showcase-only,
+   transform/opacity (GPU); gated behind motion-safe at the call sites. */
+@keyframes master-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes master-orbit-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes master-pulse-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.55);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.65);
+    opacity: 0;
+  }
+}
+
 /* Reduced motion: keep the gradient, drop the movement. */
 @media (prefers-reduced-motion: reduce) {
   .agent-blob-a,

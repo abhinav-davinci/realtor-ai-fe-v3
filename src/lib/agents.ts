@@ -256,7 +256,7 @@ export const templateById = (id: string): AgentTemplate =>
 export const SUPER_TEMPLATE: Omit<AgentTemplate, "id"> & { id: "super" } = {
   id: "super",
   name: "Aria",
-  role: "Super Agent",
+  role: "Master Agent",
   tagline: "One master agent for your whole lead lifecycle",
   description:
     "Your master AI. It learns from your specialist agents and your knowledge base to qualify, answer, schedule, follow up, and handle payments, all in one.",

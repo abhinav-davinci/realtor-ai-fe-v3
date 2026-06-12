@@ -57,7 +57,7 @@ import {
   type TemplateId,
 } from "@/lib/agents";
 import { AgentOrb, ChannelBadge, ReadinessMeter } from "./agent-ui";
-import { CapabilityCoverage, InheritedSummary, SourceAgentPicker } from "./super-agent-ui";
+import { CapabilityCoverage, InheritedSummary, MasterCore, SourceAgentPicker } from "./super-agent-ui";
 
 /* ----------------------------- speech helper ------------------------------ */
 
@@ -292,7 +292,7 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
             <SectionCard
               icon={Crown}
               title="Learn from your agents"
-              desc="Pick the specialists you've deployed. Your Super Agent absorbs their skills and knowledge automatically."
+              desc="Pick the specialists you've deployed. Your Master Agent absorbs their skills and knowledge automatically."
             >
               <SourceAgentPicker agents={allAgents} selected={sources} onToggle={(id) => toggle(sources, id, setSources)} />
               <InheritedSummary knowledge={inherited} sourceCount={sources.length} />
@@ -617,12 +617,16 @@ export function AgentBuilder({ templateId }: { templateId: string }) {
         <div className="lg:sticky lg:top-20 lg:self-start">
           <div className="overflow-hidden rounded-2xl bg-gradient-to-b from-[#16243f] to-[#1d2f50] text-white shadow-[0_2px_6px_-2px_rgba(22,36,63,0.18),0_18px_44px_-18px_rgba(22,36,63,0.32)]">
             <div className="flex flex-col items-center px-5 pt-6 pb-4">
-              <AgentOrb colors={isSuper ? SUPER_TEMPLATE.gradient : [voice.color, "#2f6bed"]} size={104} speaking={speaking || previewMode === "voice"} />
+              {isSuper ? (
+                <MasterCore size={104} />
+              ) : (
+                <AgentOrb colors={[voice.color, "#2f6bed"]} size={104} speaking={speaking || previewMode === "voice"} />
+              )}
               <div className="mt-3 flex items-center gap-2">
                 <p className="text-lg font-bold">{name}</p>
                 {isSuper && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold ring-1 ring-white/20">
-                    <Crown className="size-2.5" /> SUPER
+                    <Crown className="size-2.5" /> MASTER
                   </span>
                 )}
               </div>

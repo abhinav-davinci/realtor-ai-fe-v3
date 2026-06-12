@@ -29,7 +29,7 @@ export function SuperBadge({ className }: { className?: string }) {
       )}
       style={{ background: `linear-gradient(90deg, ${SUPER_GRADIENT[0]}, ${SUPER_GRADIENT[1]})` }}
     >
-      <Crown className="size-2.5" /> SUPER
+      <Crown className="size-2.5" /> MASTER
     </span>
   );
 }
@@ -171,7 +171,7 @@ export function SourceAgentPicker({
         })}
       </div>
       {selected.length === 1 && (
-        <p className="text-ink-muted mt-2.5 text-xs">Add one or two more so your Super Agent covers more of the lifecycle.</p>
+        <p className="text-ink-muted mt-2.5 text-xs">Add one or two more so your Master Agent covers more of the lifecycle.</p>
       )}
     </div>
   );
@@ -179,35 +179,77 @@ export function SourceAgentPicker({
 
 /* ------------------------------ gallery band ------------------------------ */
 
-/** The master orchestrating its specialists: the Super orb ringed by the five
- * lifecycle agents, lines drawn to each. The visual that gives the Super Agent
- * its own identity (vs the hero's lone orb). */
-function SuperConstellation() {
-  const SIZE = 190;
-  const R = 70;
+/** The master orb: an aurora sphere that broadcasts a *radial* waveform (bars
+ * radiating in every direction), the master's own signature instead of the
+ * hero's standard linear waveform. */
+export function MasterCore({ size = 88 }: { size?: number }) {
+  const N = 18;
+  const r = size * 0.205; // bar distance from centre
+  const barH = size * 0.13;
+  return (
+    <div className="relative grid place-items-center" style={{ width: size, height: size }}>
+      <AgentOrb colors={SUPER_GRADIENT} size={size} />
+      <span className="absolute inset-0 grid place-items-center">
+        {Array.from({ length: N }).map((_, i) => (
+          <span key={i} className="absolute" style={{ transform: `rotate(${i * (360 / N)}deg)` }}>
+            <span className="block" style={{ transform: `translateY(-${r}px)` }}>
+              <span
+                className="block w-[2px] rounded-full bg-white/90 motion-safe:animate-[agent-wave_1.8s_ease-in-out_infinite]"
+                style={{ height: barH, transformOrigin: "center", animationDelay: `${(i % 6) * 0.12}s` }}
+              />
+            </span>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** The master orchestrating its specialists: it broadcasts (radial wave + pulse
+ * rings) while the five specialist agents slowly orbit it on their links. The
+ * visual that gives the Master Agent its own identity (vs the hero's lone orb). */
+function MasterOrchestration() {
+  const SIZE = 200;
   const c = SIZE / 2;
-  const pts = TEMPLATES.map((t, i) => {
-    const ang = ((-90 + i * (360 / TEMPLATES.length)) * Math.PI) / 180;
-    return { t, x: c + R * Math.cos(ang), y: c + R * Math.sin(ang), i };
-  });
+  const R = 74;
+  const sats = TEMPLATES;
   return (
     <div className="relative" style={{ width: SIZE, height: SIZE }}>
-      <svg className="absolute inset-0" width={SIZE} height={SIZE} aria-hidden="true">
-        {pts.map(({ t, x, y }) => (
-          <line key={t.id} x1={c} y1={c} x2={x} y2={y} stroke="white" strokeOpacity="0.16" strokeWidth="1" />
-        ))}
-      </svg>
-      {pts.map(({ t, x, y, i }) => (
-        <div
-          key={t.id}
-          className="absolute -translate-x-1/2 -translate-y-1/2 motion-safe:animate-float"
-          style={{ left: x, top: y, animationDelay: `${i * 0.25}s` }}
-        >
-          <AgentOrb colors={t.gradient} size={30} icon={t.icon} />
-        </div>
+      {/* broadcast pulse rings */}
+      {[0, 1].map((i) => (
+        <span
+          key={i}
+          className="border-white/30 absolute top-1/2 left-1/2 size-24 -translate-x-1/2 -translate-y-1/2 rounded-full border opacity-0 motion-safe:animate-[master-pulse-ring_3.4s_ease-out_infinite]"
+          style={{ animationDelay: `${i * 1.7}s` }}
+        />
       ))}
+      {/* orbiting specialists + their links (the whole ring rotates) */}
+      <div className="absolute inset-0 motion-safe:animate-[master-orbit_40s_linear_infinite]">
+        <svg className="absolute inset-0" width={SIZE} height={SIZE} aria-hidden="true">
+          {sats.map((t, i) => {
+            const ang = ((-90 + i * (360 / sats.length)) * Math.PI) / 180;
+            return (
+              <line key={t.id} x1={c} y1={c} x2={c + R * Math.cos(ang)} y2={c + R * Math.sin(ang)} stroke="white" strokeOpacity="0.16" strokeWidth="1" />
+            );
+          })}
+        </svg>
+        {sats.map((t, i) => {
+          const ang = ((-90 + i * (360 / sats.length)) * Math.PI) / 180;
+          const x = c + R * Math.cos(ang);
+          const y = c + R * Math.sin(ang);
+          return (
+            <div key={t.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: x, top: y }}>
+              {/* counter-spin so the satellite stays upright while it orbits */}
+              <div className="motion-safe:animate-[master-orbit-rev_40s_linear_infinite]">
+                <AgentOrb colors={t.gradient} size={28} icon={t.icon} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* central master */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-        <AgentOrb colors={SUPER_GRADIENT} size={82} speaking />
+        <MasterCore size={88} />
       </div>
     </div>
   );
@@ -219,37 +261,35 @@ export function SuperAgentBand({ agents }: { agents: AgentConfig[] }) {
 
   if (!superAgent) {
     return (
-      <section className="mt-6 shrink-0">
-        <div
-          className="relative overflow-hidden rounded-2xl px-6 py-5 text-white"
-          style={{
-            backgroundImage: `linear-gradient(110deg, #1b1145 0%, ${SUPER_GRADIENT[0]} 58%, ${SUPER_GRADIENT[1]} 135%)`,
-            animation: "fade-in-up 400ms ease-out both",
-          }}
-        >
-          <span className="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full border border-white/[0.08]" />
-          <div className="relative flex items-center justify-between gap-6">
-            <div className="max-w-md py-1">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
-                <Crown className="size-3.5" /> New · Super Agent
-              </span>
-              <h2 className="mt-2.5 text-2xl font-bold">Meet your Super Agent</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-white/85">
-                One master AI that unifies your whole team. It learns from your specialists and your knowledge, then qualifies, answers, schedules, and follows up.
-              </p>
-              <Link
-                href="/ai-team/super"
-                className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-[#1b1145] transition-transform hover:-translate-y-0.5"
-              >
-                <Crown className="size-4" /> Build your Super Agent <ArrowRight className="size-4" />
-              </Link>
-            </div>
-            <div className="relative mr-2 hidden shrink-0 lg:block">
-              <SuperConstellation />
-            </div>
+      <div
+        className="relative overflow-hidden rounded-2xl px-6 py-5 text-white shadow-[0_18px_44px_-22px_rgba(124,58,237,0.55)]"
+        style={{
+          backgroundImage: `linear-gradient(110deg, #1b1145 0%, ${SUPER_GRADIENT[0]} 58%, ${SUPER_GRADIENT[1]} 135%)`,
+          animation: "fade-in-up 400ms ease-out both",
+        }}
+      >
+        <span className="pointer-events-none absolute -bottom-24 -left-10 size-56 rounded-full border border-white/[0.08]" />
+        <div className="relative flex items-center justify-between gap-6">
+          <div className="max-w-md py-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
+              <Crown className="size-3.5" /> New · Master Agent
+            </span>
+            <h2 className="mt-2.5 text-2xl font-bold">Meet your Master Agent</h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-white/85">
+              One master AI that unifies your whole team. It learns from your specialists and your knowledge, then qualifies, answers, schedules, and follows up.
+            </p>
+            <Link
+              href="/ai-team/super"
+              className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-[#1b1145] transition-transform hover:-translate-y-0.5"
+            >
+              <Crown className="size-4" /> Build your Master Agent <ArrowRight className="size-4" />
+            </Link>
+          </div>
+          <div className="relative mr-2 hidden shrink-0 lg:block">
+            <MasterOrchestration />
           </div>
         </div>
-      </section>
+      </div>
     );
   }
 
@@ -260,38 +300,36 @@ export function SuperAgentBand({ agents }: { agents: AgentConfig[] }) {
   const covered = coveredSkills(sources);
 
   return (
-    <section className="mt-6 shrink-0">
-      <div className="relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm" style={{ borderColor: `${SUPER_GRADIENT[0]}22` }}>
-        <span className="pointer-events-none absolute -top-16 -right-12 size-48 rounded-full blur-2xl" style={{ background: `${SUPER_GRADIENT[0]}12` }} />
-        <div className="relative flex flex-wrap items-center gap-4">
-          <AgentOrb colors={SUPER_GRADIENT} size={60} speaking />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="text-ink text-lg font-bold">{superAgent.name}</p>
-              <SuperBadge />
-              <span className="text-brand-green inline-flex items-center gap-1 text-[11px] font-semibold">
-                <span className="bg-brand-green size-1.5 animate-pulse rounded-full" /> Live
-              </span>
-            </div>
-            <p className="text-ink-muted text-sm">Your master agent across calls and chat</p>
-            <div className="mt-1.5 flex items-center gap-1.5">
-              {superAgent.channels.map((c) => (
-                <ChannelBadge key={c} channel={c} />
-              ))}
-            </div>
+    <div className="relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm" style={{ borderColor: `${SUPER_GRADIENT[0]}22` }}>
+      <span className="pointer-events-none absolute -top-16 -right-12 size-48 rounded-full blur-2xl" style={{ background: `${SUPER_GRADIENT[0]}12` }} />
+      <div className="relative flex flex-wrap items-center gap-4">
+        <MasterCore size={60} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-ink text-lg font-bold">{superAgent.name}</p>
+            <SuperBadge />
+            <span className="text-brand-green inline-flex items-center gap-1 text-[11px] font-semibold">
+              <span className="bg-brand-green size-1.5 animate-pulse rounded-full" /> Live
+            </span>
           </div>
-          <ReadinessMeter {...superAgent} size={76} />
-          <Link
-            href={`/ai-team/agents/${superAgent.id}`}
-            className="bg-surface text-ink ring-1 ring-black/[0.08] hover:bg-black/[0.03] inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold"
-          >
-            Manage <ArrowRight className="size-4" />
-          </Link>
+          <p className="text-ink-muted text-sm">Your master agent across calls and chat</p>
+          <div className="mt-1.5 flex items-center gap-1.5">
+            {superAgent.channels.map((c) => (
+              <ChannelBadge key={c} channel={c} />
+            ))}
+          </div>
         </div>
-        <div className="relative mt-4 border-t border-black/[0.06] pt-4">
-          <CapabilityCoverage covered={covered} />
-        </div>
+        <ReadinessMeter {...superAgent} size={76} />
+        <Link
+          href={`/ai-team/agents/${superAgent.id}`}
+          className="bg-surface text-ink ring-1 ring-black/[0.08] hover:bg-black/[0.03] inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold"
+        >
+          Manage <ArrowRight className="size-4" />
+        </Link>
       </div>
-    </section>
+      <div className="relative mt-4 border-t border-black/[0.06] pt-4">
+        <CapabilityCoverage covered={covered} />
+      </div>
+    </div>
   );
 }

@@ -159,7 +159,7 @@ export function AgentDetail({ id }: { id: string }) {
                 <span className="grid size-7 place-items-center rounded-lg text-white" style={{ background: `linear-gradient(135deg, ${t.gradient[0]}, ${t.gradient[1]})` }}>
                   <Crown className="size-4" />
                 </span>
-                <p className="text-ink font-bold">Super Agent</p>
+                <p className="text-ink font-bold">Master Agent</p>
                 {superStale && (
                   <span className="bg-brand-orange/10 text-brand-orange rounded-full px-2 py-0.5 text-[11px] font-semibold">Out of date</span>
                 )}
