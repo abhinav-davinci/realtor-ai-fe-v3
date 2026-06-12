@@ -465,6 +465,9 @@ export function conversationsFor(templateId: TemplateId): Conversation[] {
   return BY_TEMPLATE[templateId] ?? CUSTOM;
 }
 
+/** Every template id that has mock conversations, for org-wide aggregation. */
+export const ALL_TEMPLATE_IDS = Object.keys(BY_TEMPLATE) as TemplateId[];
+
 export function conversationStats(convs: Conversation[]) {
   return {
     total: convs.length,
@@ -515,9 +518,8 @@ export function parseDurationSec(meta: string): number {
   return (m ? Number(m[1]) : 0) * 60 + (s ? Number(s[1]) : 0);
 }
 
-/** Group an agent's conversations into leads, keeping recency order. */
-export function leadsFor(templateId: TemplateId): Lead[] {
-  const convs = conversationsFor(templateId);
+/** Group conversations into leads (by phone), keeping recency order. */
+export function leadsFromConversations(convs: Conversation[]): Lead[] {
   const groups = new Map<string, Conversation[]>();
   const order: string[] = [];
 
@@ -562,6 +564,11 @@ export function leadsFor(templateId: TemplateId): Lead[] {
   });
 }
 
+/** Group a single agent template's conversations into leads. */
+export function leadsFor(templateId: TemplateId): Lead[] {
+  return leadsFromConversations(conversationsFor(templateId));
+}
+
 export function leadStats(leads: Lead[]) {
   const convs = leads.flatMap((l) => l.conversations);
   return {
@@ -570,4 +577,13 @@ export function leadStats(leads: Lead[]) {
     chats: convs.filter((c) => c.channel === "chat").length,
     wins: leads.filter((l) => l.tone === "good").length,
   };
+}
+
+/** Does a lead match a free-text query (name, summary, or phone digits)? */
+export function matchesQuery(lead: Lead, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const digits = q.replace(/\D/g, "");
+  const phoneHit = digits.length >= 2 && !!lead.phone && lead.phone.replace(/\D/g, "").includes(digits);
+  return lead.name.toLowerCase().includes(q) || lead.summary.toLowerCase().includes(q) || phoneHit;
 }

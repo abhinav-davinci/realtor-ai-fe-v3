@@ -11,6 +11,7 @@ import {
   Mic,
   Pencil,
   Phone,
+  Radar,
   Send,
   ShieldCheck,
   Sparkles,
@@ -98,6 +99,9 @@ export function AgentDetail({ id }: { id: string }) {
             <p className="text-ink-muted truncate text-xs">{agent.role}</p>
           </div>
         </div>
+        <button type="button" onClick={() => router.push(`/leads?template=${agent.templateId}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium md:inline-flex">
+          <Radar className="size-4" /> Lead Intelligence
+        </button>
         <button type="button" onClick={() => router.push(`/ai-team/build/${agent.templateId}?edit=${agent.id}`)} className="text-ink-muted hover:bg-black/[0.04] hidden h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium sm:inline-flex">
           <Pencil className="size-4" /> Edit
         </button>

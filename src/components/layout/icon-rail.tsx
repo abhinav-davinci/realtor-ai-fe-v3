@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   Megaphone,
   Sparkles,
+  Radar,
   LineChart,
   Spline,
   Settings,
@@ -28,6 +29,7 @@ export const PRIMARY: RailItem[] = [
   { label: "Dashboard", icon: LayoutGrid },
   { label: "Content Studio", icon: Megaphone, href: "/" },
   { label: "AI Team", icon: Sparkles, href: "/ai-team" },
+  { label: "Leads", icon: Radar, href: "/leads" },
   { label: "Insights", icon: LineChart },
   { label: "Build Workflow", icon: Spline },
 ];
@@ -63,16 +65,17 @@ export function IconRail() {
   const pathname = usePathname();
   const { logout } = useAuth();
 
-  // AI Team is active on /ai-team*; Content Studio owns every other app route.
-  const inAiTeam = pathname.startsWith("/ai-team");
+  // Each section owns its href prefix (/ai-team, /leads, ...); Content Studio
+  // ("/") is the fallback that owns every route not claimed by a section.
+  const sectionHrefs = PRIMARY.map((i) => i.href).filter((h): h is string => !!h && h !== "/");
+  const isActive = (href?: string) => {
+    if (!href) return false;
+    if (href === "/") return !sectionHrefs.some((h) => pathname.startsWith(h));
+    return pathname === href || pathname.startsWith(href + "/");
+  };
   const primary = PRIMARY.map((item) => ({
     ...item,
-    active:
-      item.href === "/ai-team"
-        ? inAiTeam
-        : item.href === "/"
-          ? !inAiTeam
-          : false,
+    active: isActive(item.href),
     onClick: item.href ? () => router.push(item.href!) : undefined,
   }));
 
