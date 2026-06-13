@@ -1,22 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Check, ChevronDown, ChevronRight, Download, PhoneCall, Upload } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Check, ChevronDown, ChevronRight, Download, PhoneCall, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
 import { templateById, type TemplateId } from "@/lib/agents";
 import {
-  LIFECYCLE_LABEL,
-  LIFECYCLE_TABS,
+  SOURCE_META,
+  SOURCE_ORDER,
   TIER_META,
   TIER_ORDER,
+  bestConvertingSource,
   filterLeads,
-  intelligenceStats,
+  leadSummary,
   listScoredLeads,
-  tabCounts,
-  type LifecycleTab,
+  sourceBreakdown,
+  sourceCounts,
+  type LeadSource,
   type ScoredLead,
   type Tier,
 } from "@/lib/lead-intelligence";
@@ -29,13 +31,11 @@ import {
   SearchBar,
   type Filter,
 } from "@/components/conversations/conversation-ui";
-
-const num = (s: string): number | null => {
-  const n = parseInt(s, 10);
-  return Number.isFinite(n) ? n : null;
-};
+import { KpiStrip, SourcesPanel } from "./lead-sources";
+import { SourceChip, SourceIcon } from "./source-icons";
 
 export function LeadIntelligence() {
+  const router = useRouter();
   const params = useSearchParams();
   // Deep links from an agent page filter to that agent's template (SSR-safe: no
   // localStorage needed, the template id rides in the URL).
@@ -43,48 +43,42 @@ export function LeadIntelligence() {
   const templateId: TemplateId | null = ALL_TEMPLATE_IDS.includes(templateParam as TemplateId)
     ? (templateParam as TemplateId)
     : null;
-  const tabParam = params.get("tab");
-  const initialTab: LifecycleTab = LIFECYCLE_TABS.includes(tabParam as LifecycleTab)
-    ? (tabParam as LifecycleTab)
-    : "all";
 
   const allLeads = useMemo(() => listScoredLeads(), []);
-  const stats = useMemo(() => intelligenceStats(allLeads), [allLeads]);
+  const summary = useMemo(() => leadSummary(), []);
+  const sources = useMemo(() => sourceBreakdown(), []);
+  const best = useMemo(() => bestConvertingSource(), []);
+  const perSource = useMemo(() => sourceCounts(allLeads), [allLeads]);
 
-  const [tab, setTab] = useState<LifecycleTab>(initialTab);
   const [tier, setTier] = useState<Tier | "all">("all");
   const [channel, setChannel] = useState<Filter>("both");
-  const [minScore, setMinScore] = useState("");
-  const [maxScore, setMaxScore] = useState("");
+  const [source, setSource] = useState<LeadSource | "all">("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Everything except the lifecycle tab, so the tab counts reflect the rest.
-  const baseFiltered = useMemo(
+  const visible = useMemo(
     () =>
       filterLeads(allLeads, {
         tab: "all",
         tier,
         channel,
-        minScore: num(minScore),
-        maxScore: num(maxScore),
+        source,
+        minScore: null,
+        maxScore: null,
         query,
         templateId,
       }),
-    [allLeads, tier, channel, minScore, maxScore, query, templateId]
+    [allLeads, tier, channel, source, query, templateId]
   );
-  const counts = useMemo(() => tabCounts(baseFiltered), [baseFiltered]);
-  const visible = tab === "all" ? baseFiltered : baseFiltered.filter((l) => l.status === tab);
 
   const open = allLeads.find((l) => l.id === openId) ?? null;
+  const filtered = tier !== "all" || channel !== "both" || source !== "all" || query.trim() !== "";
 
   function resetFilters() {
     setQuery("");
     setTier("all");
     setChannel("both");
-    setMinScore("");
-    setMaxScore("");
-    setTab("all");
+    setSource("all");
   }
 
   return (
@@ -94,7 +88,7 @@ export function LeadIntelligence() {
         <div className="min-w-0 flex-1">
           <h1 className="text-ink text-xl font-bold">Lead Intelligence</h1>
           <p className="text-ink-muted text-sm">
-            {stats.total} leads qualified by AI · last 30 days
+            {summary.total.toLocaleString("en-IN")} leads across {sources.length} channels · last 30 days
             {templateId && <span> · {templateById(templateId).role}</span>}
           </p>
         </div>
@@ -103,10 +97,10 @@ export function LeadIntelligence() {
             <Upload className="size-4" /> Upload Leads
           </Button>
           <Button className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3.5 text-sm font-semibold text-white">
-            <PhoneCall className="size-4" /> Auto-call Leads
+            <PhoneCall className="size-4" /> Auto-call Hot Leads
           </Button>
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
-            <Download className="size-4" /> Export CSV
+            <Download className="size-4" /> Export
           </Button>
         </div>
       </div>
@@ -114,7 +108,7 @@ export function LeadIntelligence() {
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
         {open ? (
           <div className="space-y-3">
-            {/* score banner for the lead intelligence context */}
+            {/* score banner for the open lead */}
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-3">
               <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl text-lg font-bold tabular-nums", TIER_META[open.tier].badge)}>
                 {open.score}
@@ -123,6 +117,10 @@ export function LeadIntelligence() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-ink truncate text-sm font-bold">{open.name}</p>
                   <TierBadge tier={open.tier} />
+                  <span className="text-ink-muted inline-flex items-center gap-1 text-xs">
+                    <SourceChip source={open.source} className="size-4" iconClassName="size-2.5" />
+                    {SOURCE_META[open.source].label}
+                  </span>
                 </div>
                 <p className="text-ink-muted mt-0.5 text-xs capitalize">
                   {open.status} · scored {open.score}/100 · via {open.agentRole}
@@ -134,80 +132,143 @@ export function LeadIntelligence() {
             </div>
             <LeadDetail lead={open} agentName={open.agentRole} onBack={() => setOpenId(null)} />
           </div>
+        ) : allLeads.length === 0 ? (
+          <EmptyLeads onLaunch={() => router.push("/ai-team")} />
         ) : (
-          <>
-            {/* lifecycle tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto border-b border-black/[0.06]">
-              {LIFECYCLE_TABS.map((t) => (
-                <TabButton key={t} active={tab === t} onClick={() => setTab(t)}>
-                  {LIFECYCLE_LABEL[t]}
-                  <span className="bg-black/[0.06] text-ink-muted ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-bold">
-                    {counts[t]}
-                  </span>
-                </TabButton>
-              ))}
-            </div>
+          <div className="space-y-5">
+            <KpiStrip summary={summary} />
+            <SourcesPanel data={sources} summary={summary} best={best} />
 
-            {/* filter row */}
-            <div className="mt-4 flex flex-col gap-2.5 lg:flex-row lg:items-center">
-              <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={setOpenId} />
-              <div className="flex flex-wrap items-center gap-2">
-                <TierFilter value={tier} onChange={setTier} />
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={minScore}
-                  onChange={(e) => setMinScore(e.target.value)}
-                  placeholder="Min score"
-                  aria-label="Minimum score"
-                  className="text-ink focus:border-accent-blue/50 h-10 w-28 rounded-lg border border-black/15 bg-white px-3 text-sm outline-none"
-                />
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={maxScore}
-                  onChange={(e) => setMaxScore(e.target.value)}
-                  placeholder="Max score"
-                  aria-label="Maximum score"
-                  className="text-ink focus:border-accent-blue/50 h-10 w-28 rounded-lg border border-black/15 bg-white px-3 text-sm outline-none"
-                />
-                <FilterToggle value={channel} onChange={setChannel} />
+            {/* recent leads */}
+            <section className="rounded-2xl border border-black/[0.07] bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-ink font-bold">Recent leads</h2>
+                  <p className="text-ink-muted text-xs">Every lead your AI captured, scored by buying intent.</p>
+                </div>
               </div>
-            </div>
 
-            {/* list */}
-            {visible.length > 0 ? (
-              <div className="mt-4 space-y-2.5">
-                {visible.map((l) => (
-                  <ScoredLeadRow key={l.id} lead={l} query={query} onOpen={() => setOpenId(l.id)} />
-                ))}
+              {/* source filter chips */}
+              <div className="mt-4">
+                <SourceFilter value={source} counts={perSource} total={allLeads.length} onChange={setSource} />
               </div>
-            ) : (
-              <div className="mt-4 grid place-items-center rounded-xl border border-dashed border-black/15 py-14 text-center">
-                <p className="text-ink text-sm font-semibold">No leads match</p>
-                <p className="text-ink-muted mt-1 text-xs">Try a different name, score range, tier, or channel.</p>
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="text-accent-blue mt-3 text-xs font-semibold outline-none hover:underline"
-                >
-                  Clear all filters
-                </button>
+
+              {/* search + tier + channel */}
+              <div className="mt-3 flex flex-col gap-2.5 lg:flex-row lg:items-center">
+                <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={setOpenId} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <TierFilter value={tier} onChange={setTier} />
+                  <FilterToggle value={channel} onChange={setChannel} />
+                </div>
               </div>
-            )}
-          </>
+
+              {/* list */}
+              {visible.length > 0 ? (
+                <div className="mt-4 space-y-2.5">
+                  {visible.map((l) => (
+                    <ScoredLeadRow key={l.id} lead={l} query={query} onOpen={() => setOpenId(l.id)} />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 grid place-items-center rounded-xl border border-dashed border-black/15 py-14 text-center">
+                  <p className="text-ink text-sm font-semibold">No leads match</p>
+                  <p className="text-ink-muted mt-1 text-xs">Try a different name, source, tier, or channel.</p>
+                  {filtered && (
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="text-accent-blue mt-3 text-xs font-semibold outline-none hover:underline"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
+/* ------------------------------ source filter ----------------------------- */
+
+function SourceFilter({
+  value,
+  counts,
+  total,
+  onChange,
+}: {
+  value: LeadSource | "all";
+  counts: Record<LeadSource, number>;
+  total: number;
+  onChange: (s: LeadSource | "all") => void;
+}) {
+  const chips: { key: LeadSource | "all"; label: string; count: number }[] = [
+    { key: "all", label: "All sources", count: total },
+    ...SOURCE_ORDER.filter((s) => counts[s] > 0).map((s) => ({ key: s, label: SOURCE_META[s].short, count: counts[s] })),
+  ];
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+      {chips.map((c) => {
+        const sel = value === c.key;
+        return (
+          <button
+            key={c.key}
+            type="button"
+            onClick={() => onChange(c.key)}
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/30",
+              sel ? "border-transparent bg-ink text-white" : "text-ink-muted hover:text-ink border-black/10 hover:border-black/25"
+            )}
+          >
+            {c.key !== "all" && <SourceIcon source={c.key} className="size-3.5" />}
+            {c.label}
+            <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] tabular-nums", sel ? "bg-white/20 text-white" : "bg-black/[0.06] text-ink-muted")}>
+              {c.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* -------------------------------- empty ----------------------------------- */
+
+function EmptyLeads({ onLaunch }: { onLaunch: () => void }) {
+  return (
+    <div className="mx-auto grid max-w-md place-items-center py-16 text-center">
+      <div className="flex -space-x-1.5">
+        {(["whatsapp", "voice", "website", "instagram", "facebook"] as LeadSource[]).map((s, i) => (
+          <span
+            key={s}
+            className="ring-cream rounded-xl ring-4"
+            style={{ animation: `fade-in-up 360ms ease-out ${i * 60}ms both`, zIndex: 10 - i }}
+          >
+            <SourceChip source={s} className="size-10" iconClassName="size-5" />
+          </span>
+        ))}
+      </div>
+      <h2 className="text-ink mt-5 text-lg font-bold">No leads yet</h2>
+      <p className="text-ink-muted mt-1.5 text-sm">
+        Connect your channels and your AI agents start capturing leads from calls, WhatsApp, your website, and social.
+        They show up here, scored and ready to call.
+      </p>
+      <Button onClick={onLaunch} className="bg-brand-green hover:bg-brand-green-hover mt-5 h-10 rounded-lg px-4 text-sm font-semibold text-white">
+        <Sparkles className="size-4" /> Launch an Agent
+      </Button>
+    </div>
+  );
+}
+
+/* --------------------------------- bits ----------------------------------- */
+
 function TierBadge({ tier }: { tier: Tier }) {
   const meta = TIER_META[tier];
   return <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase", meta.badge)}>{meta.name}</span>;
 }
-
-/* ------------------------------ tier dropdown ----------------------------- */
 
 function TierFilter({ value, onChange }: { value: Tier | "all"; onChange: (t: Tier | "all") => void }) {
   const [open, setOpen] = useState(false);
@@ -277,25 +338,11 @@ function TierFilter({ value, onChange }: { value: Tier | "all"; onChange: (t: Ti
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative inline-flex shrink-0 items-center px-3 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40",
-        active ? "text-ink" : "text-ink-muted hover:text-ink"
-      )}
-    >
-      {children}
-      {active && <span className="bg-accent-blue absolute inset-x-3 -bottom-px h-0.5 rounded-full" />}
-    </button>
-  );
-}
-
 function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query: string; onOpen: () => void }) {
   const meta = TIER_META[lead.tier];
-  const channelLabel = lead.hasCall && lead.hasChat ? "Call + Chat" : lead.hasCall ? "Voice" : "Chat";
+  // The source already implies a single channel; only call out the mix when a
+  // lead reached us on both, so we never print "Voice · Voice".
+  const both = lead.hasCall && lead.hasChat;
 
   return (
     <button
@@ -312,7 +359,11 @@ function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query: strin
           <TierBadge tier={lead.tier} />
         </div>
         <p className="text-ink-muted mt-0.5 truncate text-xs">{lead.summary}</p>
-        <p className="text-ink-muted/70 mt-0.5 text-[11px]">{channelLabel} · {lead.when}</p>
+        <p className="text-ink-muted/70 mt-1 flex items-center gap-1.5 text-[11px]">
+          <SourceChip source={lead.source} className="size-4" iconClassName="size-2.5" />
+          {SOURCE_META[lead.source].short}
+          {both && " · Call + Chat"} · {lead.when}
+        </p>
       </div>
       <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl text-lg font-bold tabular-nums", meta.badge)}>
         {lead.score}

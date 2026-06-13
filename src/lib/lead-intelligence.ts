@@ -17,6 +17,17 @@ import { templateById, type TemplateId } from "@/lib/agents";
 export type Tier = "very-hot" | "hot" | "warm" | "light" | "casual";
 export type LeadStatus = "new" | "contacted" | "retry" | "unreachable";
 
+/** Where a lead first reached us. The org connects these channels; every lead
+ * carries one so builders can see which platforms actually bring business. */
+export type LeadSource =
+  | "whatsapp"
+  | "website"
+  | "voice"
+  | "instagram"
+  | "facebook"
+  | "youtube"
+  | "upload";
+
 export interface ScoredLead extends Lead {
   /** The agent template that produced this lead (for cross-linking). */
   templateId: TemplateId;
@@ -25,6 +36,8 @@ export interface ScoredLead extends Lead {
   score: number;
   tier: Tier;
   status: LeadStatus;
+  /** Origin platform (deterministic, design mode). */
+  source: LeadSource;
 }
 
 /* --------------------------------- tiers ---------------------------------- */
@@ -50,6 +63,87 @@ export const TIER_META: Record<Tier, { name: string; badge: string; score: strin
   casual: { name: "Casual", badge: "bg-black/[0.05] text-ink-muted", score: "text-ink-muted", dot: "bg-ink-muted/40" },
 };
 
+/* --------------------------------- sources -------------------------------- */
+
+export const SOURCE_ORDER: LeadSource[] = [
+  "whatsapp",
+  "website",
+  "voice",
+  "instagram",
+  "facebook",
+  "youtube",
+  "upload",
+];
+
+/** Presentation for each source: label, a chart colour, and the tinted chip
+ * classes (same soft-tint pattern as TIER_META). The chart `color` is a single
+ * data-viz hue per platform so the donut segments stay distinguishable. */
+export const SOURCE_META: Record<
+  LeadSource,
+  { label: string; short: string; color: string; tintBg: string; tintText: string }
+> = {
+  whatsapp: { label: "WhatsApp", short: "WhatsApp", color: "#22c55e", tintBg: "bg-green-50", tintText: "text-green-600" },
+  website: { label: "Website chat", short: "Website", color: "#2f6bed", tintBg: "bg-blue-50", tintText: "text-blue-600" },
+  voice: { label: "AI Voice Call", short: "Voice", color: "#7c3aed", tintBg: "bg-violet-50", tintText: "text-violet-600" },
+  instagram: { label: "Instagram", short: "Instagram", color: "#ec4899", tintBg: "bg-pink-50", tintText: "text-pink-600" },
+  facebook: { label: "Facebook", short: "Facebook", color: "#4f46e5", tintBg: "bg-indigo-50", tintText: "text-indigo-600" },
+  youtube: { label: "YouTube", short: "YouTube", color: "#ef4444", tintBg: "bg-red-50", tintText: "text-red-600" },
+  upload: { label: "Uploaded list", short: "Uploaded", color: "#64748b", tintBg: "bg-slate-100", tintText: "text-slate-600" },
+};
+
+/** Org-wide lead inflow by platform (design mode: stable, realistic volumes so
+ * the chart and KPIs read like a live account). `qualified`/`hot` drive the
+ * quality view; `trend` is the % change vs the previous period. */
+const SOURCE_STATS: Record<LeadSource, { leads: number; qualified: number; hot: number; trend: number }> = {
+  whatsapp: { leads: 432, qualified: 168, hot: 96, trend: 18.6 },
+  website: { leads: 368, qualified: 132, hot: 74, trend: 12.4 },
+  voice: { leads: 342, qualified: 150, hot: 88, trend: 22.1 },
+  instagram: { leads: 296, qualified: 84, hot: 52, trend: 31.5 },
+  facebook: { leads: 228, qualified: 70, hot: 40, trend: 8.2 },
+  youtube: { leads: 184, qualified: 44, hot: 24, trend: -4.1 },
+  upload: { leads: 134, qualified: 58, hot: 30, trend: 5.3 },
+};
+
+export interface SourceStat {
+  source: LeadSource;
+  leads: number;
+  qualified: number;
+  hot: number;
+  trend: number;
+  /** Fraction of all leads (0–1). */
+  share: number;
+  /** Fraction of this platform's leads that qualified (0–1). */
+  qualifiedRate: number;
+}
+
+/** Per-platform breakdown, sorted by volume (largest first). */
+export function sourceBreakdown(): SourceStat[] {
+  const total = SOURCE_ORDER.reduce((sum, k) => sum + SOURCE_STATS[k].leads, 0);
+  return SOURCE_ORDER.map((source) => {
+    const st = SOURCE_STATS[source];
+    return { source, ...st, share: st.leads / total, qualifiedRate: st.qualified / st.leads };
+  }).sort((a, b) => b.leads - a.leads);
+}
+
+/** The platform that turns the most of its leads into qualified ones. */
+export function bestConvertingSource(): SourceStat {
+  return sourceBreakdown().reduce((best, s) => (s.qualifiedRate > best.qualifiedRate ? s : best));
+}
+
+/** Headline numbers for the KPI strip, derived from the platform stats. */
+export function leadSummary() {
+  const total = SOURCE_ORDER.reduce((sum, k) => sum + SOURCE_STATS[k].leads, 0);
+  const qualified = SOURCE_ORDER.reduce((sum, k) => sum + SOURCE_STATS[k].qualified, 0);
+  const veryHot = SOURCE_ORDER.reduce((sum, k) => sum + SOURCE_STATS[k].hot, 0);
+  return {
+    total,
+    qualified,
+    veryHot,
+    avgIntent: 78,
+    trends: { total: 18.6, qualified: 15.7, veryHot: 12.1, avgIntent: 6 },
+  };
+}
+
 /* ------------------------------ enrichment -------------------------------- */
 
 /** djb2-style hash → stable pseudo-random, same convention as waveform()/AgentOrb. */
@@ -57,6 +151,17 @@ function hash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
+}
+
+/** Give each detailed lead a believable origin: website visitors stay on the
+ * widget, voice-only leads came by phone or WhatsApp call, and the rest spread
+ * across chat + social. Deterministic so a lead's badge never changes. */
+function sourceForLead(lead: Lead): LeadSource {
+  if (/website|widget/i.test(lead.name)) return "website";
+  const h = hash(lead.id + "src");
+  if (lead.hasCall && !lead.hasChat) return (["voice", "whatsapp", "voice"] as LeadSource[])[h % 3];
+  const pool: LeadSource[] = ["whatsapp", "website", "instagram", "facebook", "youtube", "whatsapp", "website"];
+  return pool[h % pool.length];
 }
 
 /** Stable 0–100 score nudged by real signals so the list looks intentional. */
@@ -101,6 +206,7 @@ export function listScoredLeads(): ScoredLead[] {
       score,
       tier: tierForScore(score),
       status: statusFor(lead),
+      source: sourceForLead(lead),
     };
   });
 }
@@ -124,6 +230,7 @@ export interface LeadFilters {
   tab: LifecycleTab;
   tier: Tier | "all";
   channel: ChannelFilter;
+  source: LeadSource | "all";
   minScore: number | null;
   maxScore: number | null;
   query: string;
@@ -134,6 +241,7 @@ export function filterLeads(leads: ScoredLead[], f: LeadFilters): ScoredLead[] {
   return leads.filter((l) => {
     if (f.tab !== "all" && l.status !== f.tab) return false;
     if (f.tier !== "all" && l.tier !== f.tier) return false;
+    if (f.source !== "all" && l.source !== f.source) return false;
     if (f.channel === "calls" && !l.hasCall) return false;
     if (f.channel === "chats" && !l.hasChat) return false;
     if (f.minScore != null && l.score < f.minScore) return false;
@@ -146,6 +254,13 @@ export function filterLeads(leads: ScoredLead[], f: LeadFilters): ScoredLead[] {
 export function tabCounts(leads: ScoredLead[]): Record<LifecycleTab, number> {
   const counts: Record<LifecycleTab, number> = { all: leads.length, new: 0, contacted: 0, retry: 0, unreachable: 0 };
   for (const l of leads) counts[l.status]++;
+  return counts;
+}
+
+/** How many of the given leads came from each source (for the filter chips). */
+export function sourceCounts(leads: ScoredLead[]): Record<LeadSource, number> {
+  const counts = Object.fromEntries(SOURCE_ORDER.map((s) => [s, 0])) as Record<LeadSource, number>;
+  for (const l of leads) counts[l.source]++;
   return counts;
 }
 

@@ -308,6 +308,16 @@
   }
 }
 
+/* Donut chart: each segment sweeps in from hidden to its drawn position.
+   --seg-from (set inline per segment) is the fully-hidden dash offset; the
+   element's own stroke-dashoffset is the drawn target. Apply with motion-safe
+   so reduced motion simply shows the donut fully drawn. */
+@keyframes donut-seg {
+  from {
+    stroke-dashoffset: var(--seg-from);
+  }
+}
+
 /* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
    gradient feels alive and futuristic. Transform/opacity only (GPU, off the
    main thread). Slow ease-in-out for organic morphing. */
