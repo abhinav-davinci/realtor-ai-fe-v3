@@ -170,10 +170,11 @@ export function OnboardingFlow() {
               title={
                 <>
                   <span className="text-ink-muted mb-1.5 block text-base font-semibold tracking-wide">Welcome to</span>
-                  <span className="block text-[30px] leading-[1.1] sm:text-[34px]">
+                  <span className="block text-[30px] leading-[1.15] sm:text-[34px]">
                     TryThat.ai
                     <br />
-                    <span className="text-brand-blue">for Realtors</span>
+                    <span className="text-ink-muted/60 text-base font-medium">for</span>{" "}
+                    <span className="text-brand-blue text-[26px] font-bold">Realtors</span>
                   </span>
                 </>
               }
