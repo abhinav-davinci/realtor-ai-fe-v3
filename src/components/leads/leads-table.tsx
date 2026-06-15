@@ -78,7 +78,7 @@ export function LeadsTable() {
           <p className="text-ink-muted text-sm">{allLeads.length} leads · last 30 days</p>
         </div>
         <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
-          <Download className="size-4" /> Export
+          <Download className="size-4" /> Download All Leads
         </Button>
       </div>
 
