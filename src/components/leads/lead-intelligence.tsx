@@ -17,6 +17,7 @@ import { LeadDetail } from "@/components/conversations/conversation-ui";
 import { KpiStrip, SourcesPanel } from "./lead-sources";
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceChip } from "./source-icons";
+import { UploadLeadsModal } from "./upload-leads-modal";
 
 const PREVIEW_COUNT = 6;
 
@@ -36,6 +37,7 @@ export function LeadIntelligence() {
   const best = useMemo(() => bestConvertingSource(), []);
 
   const [openId, setOpenId] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const scoped = templateId ? allLeads.filter((l) => l.templateId === templateId) : allLeads;
   const recent = scoped.slice(0, PREVIEW_COUNT);
@@ -55,7 +57,7 @@ export function LeadIntelligence() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
+          <Button onClick={() => setUploadOpen(true)} variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Upload className="size-4" /> Upload Leads
           </Button>
           <Button className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3.5 text-sm font-semibold text-white">
@@ -122,6 +124,8 @@ export function LeadIntelligence() {
           </div>
         )}
       </div>
+
+      {uploadOpen && <UploadLeadsModal onClose={() => setUploadOpen(false)} />}
     </div>
   );
 }
