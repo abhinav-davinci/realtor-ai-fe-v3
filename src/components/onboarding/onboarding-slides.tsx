@@ -186,45 +186,57 @@ function AiTeamSlide() {
 
 /* ------------------------------ pipeline slide ---------------------------- */
 
-const STAGES: { icon: LucideIcon; title: string; sub: string }[] = [
+const STAGES: { icon: LucideIcon; title: string; sub: string; done?: boolean }[] = [
   { icon: UserPlus, title: "New Lead", sub: "Fresh lead captured" },
   { icon: BadgeCheck, title: "Qualified", sub: "AI has qualified the lead" },
   { icon: MapPin, title: "Site Visit", sub: "Visit scheduled" },
   { icon: Handshake, title: "Negotiation", sub: "Price discussion" },
+  { icon: Trophy, title: "Closed", sub: "Deal won", done: true },
 ];
 
 function PipelineSlide() {
-  // Stagger so each stage lights up as the connector charge reaches it. The line
-  // fills over ~70% of the 5s cycle, so the last node peaks just as it lands.
-  const step = 1.15;
+  // Stagger so each stage lights up as the connector charge reaches it; the line
+  // fills over ~70% of the cycle and ends green at the won deal.
+  const step = 0.9;
   return (
     <div className="relative mx-auto w-72">
-      {/* connector: a faint base line with an accent charge that draws down */}
+      {/* connector: a faint base line with a charge that draws down, blue -> green */}
       <span className="absolute top-7 bottom-7 left-[25px] w-0.5 -translate-x-1/2 rounded-full bg-white/12" aria-hidden />
       <span
-        className="bg-accent-blue absolute top-7 bottom-7 left-[25px] w-0.5 origin-top -translate-x-1/2 rounded-full opacity-0 motion-safe:animate-[pipeline-line_5s_ease-in-out_infinite]"
-        style={{ boxShadow: "0 0 9px rgba(47,107,237,0.65)" }}
+        className="from-accent-blue to-brand-green absolute top-7 bottom-7 left-[25px] w-0.5 origin-top -translate-x-1/2 rounded-full bg-gradient-to-b opacity-0 motion-safe:animate-[pipeline-line_5s_ease-in-out_infinite]"
         aria-hidden
       />
 
       <div className="relative space-y-3">
         {STAGES.map((s, i) => (
-          <div key={s.title} className="relative flex items-center gap-3" style={enter(140 + i * 110)}>
-            <span
-              className="relative z-10 grid size-[52px] shrink-0 place-items-center rounded-xl text-white ring-1 ring-white/15 motion-safe:animate-[pipeline-pop_5s_ease-out_infinite]"
-              style={{ animationDelay: `${i * step}s` }}
-            >
-              <span className="absolute inset-0 rounded-xl bg-white/10 backdrop-blur-sm" aria-hidden />
+          <div key={s.title} className="relative flex items-center gap-3" style={enter(140 + i * 100)}>
+            {s.done ? (
+              <span className="bg-brand-green shadow-brand-green/30 ring-brand-green/40 relative z-10 grid size-[52px] shrink-0 place-items-center rounded-xl text-white shadow-lg ring-1">
+                <span className="bg-brand-green/40 absolute -inset-1.5 rounded-2xl blur-md motion-safe:animate-[onb-glow_3s_ease-in-out_infinite]" aria-hidden />
+                <s.icon className="relative z-10 size-5" />
+              </span>
+            ) : (
               <span
-                className="bg-accent-blue absolute inset-0 rounded-xl opacity-0 motion-safe:animate-[pipeline-fill_5s_ease-out_infinite]"
-                style={{ animationDelay: `${i * step}s`, boxShadow: "0 0 18px rgba(47,107,237,0.55)" }}
-                aria-hidden
-              />
-              <s.icon className="relative z-10 size-5" />
-            </span>
-            <div className="flex-1 rounded-xl bg-white/[0.06] px-3.5 py-2.5 ring-1 ring-white/10 backdrop-blur-sm">
+                className="relative z-10 grid size-[52px] shrink-0 place-items-center rounded-xl text-white ring-1 ring-white/15 motion-safe:animate-[pipeline-pop_5s_ease-out_infinite]"
+                style={{ animationDelay: `${i * step}s` }}
+              >
+                <span className="absolute inset-0 rounded-xl bg-white/10 backdrop-blur-sm" aria-hidden />
+                <span
+                  className="bg-accent-blue absolute inset-0 rounded-xl opacity-0 motion-safe:animate-[pipeline-fill_5s_ease-out_infinite]"
+                  style={{ animationDelay: `${i * step}s`, boxShadow: "0 0 18px rgba(47,107,237,0.55)" }}
+                  aria-hidden
+                />
+                <s.icon className="relative z-10 size-5" />
+              </span>
+            )}
+            <div
+              className={cn(
+                "flex-1 rounded-xl px-3.5 py-2.5 ring-1 backdrop-blur-sm",
+                s.done ? "bg-brand-green/[0.1] ring-brand-green/25" : "bg-white/[0.06] ring-white/10"
+              )}
+            >
               <p className="text-[13px] font-semibold text-white">{s.title}</p>
-              <p className="text-[11px] text-white/55">{s.sub}</p>
+              <p className={cn("text-[11px]", s.done ? "text-green-300" : "text-white/55")}>{s.sub}</p>
             </div>
           </div>
         ))}
