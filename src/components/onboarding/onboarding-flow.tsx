@@ -8,6 +8,7 @@ import {
   Briefcase,
   Building2,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Loader2,
   ShieldCheck,
@@ -61,6 +62,17 @@ const STEP_LABEL: Record<Step, string> = {
   projects: "Step 4 of 4. Add your projects.",
   done: "You are all set.",
 };
+
+// A small burst behind the success check (rare, first-time, so a little delight
+// is warranted). Each piece flies out and falls; motion-safe only.
+const CONFETTI: { tx: number; r: number; color: string }[] = [
+  { tx: -58, r: -110, color: "bg-brand-orange" },
+  { tx: -32, r: -50, color: "bg-accent-blue" },
+  { tx: -12, r: 40, color: "bg-brand-green" },
+  { tx: 16, r: -40, color: "bg-brand-orange" },
+  { tx: 38, r: 80, color: "bg-accent-blue" },
+  { tx: 60, r: 120, color: "bg-brand-green" },
+];
 
 /* --------------------------------- flow ----------------------------------- */
 
@@ -175,7 +187,7 @@ export function OnboardingFlow() {
           <span className="text-ink-muted text-[11px] font-semibold tracking-[0.18em]">FOR REALTORS</span>
         </div>
 
-        <div className={cn("mx-auto flex w-full max-w-xl flex-1 flex-col px-6 sm:px-10", short ? "justify-center py-8" : "py-9 sm:py-12")}>
+        <div className={cn("mx-auto flex w-full max-w-xl flex-1 flex-col px-6 sm:px-10", short ? "py-9 md:justify-center md:py-8" : "py-9 sm:py-12")}>
           <p className="sr-only" role="status" aria-live="polite">{STEP_LABEL[step]}</p>
           {showBack && (
             <button
@@ -189,10 +201,10 @@ export function OnboardingFlow() {
 
           {isProfile && (
             <div className="mb-5">
-              <p className="text-brand-orange text-xs font-bold tracking-wide uppercase">Step {profileIdx + 1} of {PROFILE_STEPS.length}</p>
+              <p className="text-brand-blue text-xs font-bold tracking-wide uppercase">Step {profileIdx + 1} of {PROFILE_STEPS.length}</p>
               <div className="mt-2 flex gap-1.5">
                 {PROFILE_STEPS.map((s, k) => (
-                  <span key={s} className={cn("h-1 flex-1 rounded-full transition-colors duration-300", k <= profileIdx ? "bg-brand-orange" : "bg-black/10")} />
+                  <span key={s} className={cn("h-1 flex-1 rounded-full transition-colors duration-300", k <= profileIdx ? "bg-brand-blue" : "bg-black/10")} />
                 ))}
               </div>
             </div>
@@ -212,12 +224,12 @@ export function OnboardingFlow() {
                   <span className="text-ink-muted mb-1.5 block text-base font-semibold tracking-wide">Welcome to</span>
                   <span className="block text-[28px] leading-[1.15] sm:text-[32px]">
                     TryThat.ai{" "}
-                    <span className="text-ink-muted/60 text-base font-medium">for</span>{" "}
+                    <span className="text-ink-muted text-base font-medium">for</span>{" "}
                     <span className="text-brand-blue">Realtors</span>
                   </span>
                 </>
               }
-              subtitle="Set up your AI sales team in a few quick steps, and start turning every enquiry into a qualified lead. Enter your mobile number to begin."
+              subtitle="Set up your AI sales team in a few quick steps. Enter your mobile number to begin."
             >
               <Field label="Mobile number" error={phoneTouched && phone !== "" && !phoneOk ? "Enter a 10-digit mobile number." : undefined}>
                 <PhoneInput value={phone} onChange={setPhone} onBlur={() => setPhoneTouched(true)} invalid={phoneTouched && phone !== "" && !phoneOk} />
@@ -362,12 +374,19 @@ export function OnboardingFlow() {
 
           {step === "done" && (
             <div className="text-center">
-              <span
-                className="bg-brand-green/10 text-brand-green mx-auto grid size-16 place-items-center rounded-2xl"
-                style={{ animation: "scale-in 360ms cubic-bezier(0.23,1,0.32,1) both" }}
-              >
-                <CheckCircle2 className="size-9" />
-              </span>
+              <div className="relative mx-auto size-16">
+                {CONFETTI.map((c, i) => (
+                  <span
+                    key={i}
+                    aria-hidden
+                    className={cn("absolute top-1/2 left-1/2 size-1.5 rounded-[2px] opacity-0 motion-safe:animate-[confetti-pop_1100ms_ease-out_forwards]", c.color)}
+                    style={{ "--tx": `${c.tx}px`, "--peak-y": "-54px", "--fall-y": "96px", "--r": `${c.r}deg`, animationDelay: `${150 + i * 45}ms` } as React.CSSProperties}
+                  />
+                ))}
+                <span className="bg-brand-green/10 text-brand-green relative grid size-full place-items-center rounded-2xl motion-safe:animate-[tick-pop_460ms_cubic-bezier(0.23,1,0.32,1)_both]">
+                  <CheckCircle2 className="size-9" />
+                </span>
+              </div>
               <h1 className="text-ink mt-5 text-2xl font-bold">You&apos;re all set, {fullName.split(" ")[0] || "there"}</h1>
               <p className="text-ink-muted mx-auto mt-2 max-w-sm text-sm">
                 Your AI agent is being prepared. Your onboarding specialist will reach you within 4 hours to take it live.
@@ -493,7 +512,7 @@ function OtpBoxes({ value, onChange, error }: { value: string[]; onChange: (v: s
     onChange(nextArr);
   };
   return (
-    <div className="flex gap-2 sm:gap-2.5">
+    <div className="flex gap-1.5 sm:gap-2.5">
       {value.map((c, i) => (
         <input
           key={i}
@@ -526,7 +545,7 @@ function OtpBoxes({ value, onChange, error }: { value: string[]; onChange: (v: s
             refs.current[Math.min(txt.length, 5)]?.focus();
           }}
           className={cn(
-            "size-12 rounded-xl border bg-white text-center text-lg font-semibold text-ink outline-none transition-colors focus:ring-2",
+            "size-10 rounded-xl border bg-white text-center text-lg font-semibold text-ink outline-none transition-colors focus:ring-2 sm:size-12",
             error
               ? "border-red-400 focus:border-red-500 focus:ring-red-200/70"
               : cn("focus:border-accent-blue focus:ring-accent-blue/20", c ? "border-black/25" : "border-black/12")
@@ -553,7 +572,7 @@ function CitySelect({ value, onChange }: { value: string; onChange: (v: string) 
           <option key={c} value={c} className="text-ink">{c}</option>
         ))}
       </select>
-      <ArrowRight className="text-ink-muted/60 pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 rotate-90" />
+      <ChevronDown className="text-ink-muted/60 pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
     </div>
   );
 }
