@@ -163,13 +163,18 @@ export function OnboardingFlow() {
           {step === "phone" && (
             <Section
               icon={
-                <span className="bg-brand-orange/10 text-brand-orange grid size-11 place-items-center rounded-2xl">
+                <span className="bg-brand-blue/10 text-brand-blue grid size-11 place-items-center rounded-2xl">
                   <Sparkles className="size-5 motion-safe:animate-[welcome-spark_2.6s_ease-in-out_infinite]" />
                 </span>
               }
               title={
                 <>
-                  Welcome to TryThat.ai <span className="text-brand-orange">for Realtors</span>
+                  <span className="text-ink-muted mb-1.5 block text-base font-semibold tracking-wide">Welcome to</span>
+                  <span className="block text-[30px] leading-[1.1] sm:text-[34px]">
+                    TryThat.ai
+                    <br />
+                    <span className="text-brand-blue">for Realtors</span>
+                  </span>
                 </>
               }
               subtitle="Set up your AI sales team in a few quick steps, and start turning every enquiry into a qualified lead. Enter your mobile number to begin."
