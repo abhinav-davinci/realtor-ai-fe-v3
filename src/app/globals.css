@@ -394,6 +394,52 @@
   }
 }
 
+/* Social slide: content publishes from the centre hub and flows out to every
+   channel (dashes travel along the spokes); each channel pulses as it lands and
+   a reaction floats up. dashoffset/opacity/transform only, gated motion-safe. */
+@keyframes social-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+@keyframes social-pulse {
+  0%,
+  55%,
+  100% {
+    transform: scale(1);
+  }
+  68% {
+    transform: scale(1.12);
+  }
+}
+@keyframes social-react {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.5);
+  }
+  22% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-22px) scale(0.85);
+  }
+}
+@keyframes social-hub {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.05);
+  }
+}
+
 /* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
    gradient feels alive and futuristic. Transform/opacity only (GPU, off the
    main thread). Slow ease-in-out for organic morphing. */

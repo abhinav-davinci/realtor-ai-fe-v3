@@ -35,72 +35,68 @@ const enter = (delay: number): CSSProperties => ({
 
 /* ------------------------------ social slide ------------------------------ */
 
-function FloatTile({
-  className,
-  bg = "bg-white",
-  variant = "a",
-  duration = 6,
-  delay = 0,
-  enterDelay = 0,
-  children,
-}: {
-  className?: string;
-  bg?: string;
-  variant?: "a" | "b";
-  duration?: number;
-  delay?: number;
-  enterDelay?: number;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn("absolute", className)} style={enter(enterDelay)}>
-      <div
-        className={cn("grid size-full place-items-center rounded-2xl shadow-lg shadow-black/25", bg)}
-        style={{
-          animation: `onb-float-${variant} ${duration}s ease-in-out ${delay}s infinite`,
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
+/** One published post fans out to every channel; each lands and reacts. The
+ * orange hub = publish, spokes carry the post out, reactions float up. */
+const CHANNELS: {
+  src: "instagram" | "facebook" | "youtube";
+  color: string;
+  cx: number;
+  cy: number;
+  react: LucideIcon;
+  reactColor: string;
+  delay: number;
+}[] = [
+  { src: "instagram", color: "text-pink-600", cx: 74, cy: 70, react: Heart, reactColor: "fill-red-500 text-red-500", delay: 0 },
+  { src: "facebook", color: "text-[#1877F2]", cx: 246, cy: 80, react: MessageSquare, reactColor: "text-accent-blue", delay: 0.55 },
+  { src: "youtube", color: "text-red-600", cx: 160, cy: 240, react: Share2, reactColor: "text-brand-green", delay: 1.1 },
+];
 
 function SocialSlide() {
   return (
-    <div className="relative mx-auto h-64 w-72">
-      <FloatTile className="top-2 left-6 size-14" enterDelay={40} delay={0} duration={6}>
-        <SourceIcon source="instagram" className="size-7 text-pink-600" />
-      </FloatTile>
-      <FloatTile className="top-4 right-4 size-14" variant="b" enterDelay={120} delay={0.4} duration={7}>
-        <SourceIcon source="facebook" className="size-7 text-[#1877F2]" />
-      </FloatTile>
-      <FloatTile className="top-24 left-2 size-12" variant="b" enterDelay={200} delay={0.8} duration={6.5}>
-        <SourceIcon source="youtube" className="size-6 text-red-600" />
-      </FloatTile>
+    <div className="relative mx-auto h-72 w-80">
+      {/* spokes carrying the post outward from the hub */}
+      <svg viewBox="0 0 320 288" className="absolute inset-0 size-full" aria-hidden>
+        {CHANNELS.map((c) => (
+          <line
+            key={c.src}
+            x1="160"
+            y1="144"
+            x2={c.cx}
+            y2={c.cy}
+            stroke="rgba(255,255,255,0.28)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeDasharray="2 7"
+            className="motion-safe:animate-[social-flow_1.1s_linear_infinite]"
+          />
+        ))}
+      </svg>
 
-      {/* the focal "publish" tile */}
-      <FloatTile className="top-20 left-1/2 size-16 -translate-x-1/2" bg="bg-brand-orange" enterDelay={0} delay={0.2} duration={5.5}>
-        <Upload className="size-7 text-white" />
-      </FloatTile>
+      {/* channels */}
+      {CHANNELS.map((c) => (
+        <div key={c.src} className="absolute" style={{ left: c.cx - 28, top: c.cy - 28, ...enter(160 + c.delay * 120) }}>
+          <div
+            className="relative grid size-14 place-items-center rounded-2xl bg-white shadow-lg shadow-black/25 motion-safe:animate-[social-pulse_2.6s_ease-in-out_infinite]"
+            style={{ animationDelay: `${c.delay}s` }}
+          >
+            <SourceIcon source={c.src} className={cn("size-7", c.color)} />
+            <span
+              className="absolute -top-2.5 -right-2.5 grid size-7 place-items-center rounded-full bg-white shadow-md motion-safe:animate-[social-react_2.6s_ease-in-out_infinite]"
+              style={{ animationDelay: `${c.delay + 0.65}s` }}
+            >
+              <c.react className={cn("size-3.5", c.reactColor)} />
+            </span>
+          </div>
+        </div>
+      ))}
 
-      <FloatTile className="top-36 right-10 size-9" variant="a" enterDelay={260} delay={1} duration={6}>
-        <MessageSquare className="size-4 text-ink-muted" />
-      </FloatTile>
-
-      {/* engagement reactions along the bottom */}
-      <FloatTile className="bottom-2 left-10 size-9 rounded-full" variant="b" enterDelay={300} delay={0.5} duration={6}>
-        <Heart className="size-4 fill-red-500 text-red-500" />
-      </FloatTile>
-      <FloatTile className="bottom-0 left-1/3 size-9 rounded-full" variant="a" enterDelay={360} delay={0.9} duration={6.5}>
-        <MessageSquare className="size-4 text-accent-blue" />
-      </FloatTile>
-      <FloatTile className="right-1/3 bottom-1 size-9 rounded-full" variant="b" enterDelay={420} delay={0.3} duration={6}>
-        <Share2 className="size-4 text-brand-green" />
-      </FloatTile>
-      <FloatTile className="right-8 bottom-4 size-9 rounded-full" variant="a" enterDelay={480} delay={1.1} duration={7}>
-        <Heart className="size-4 fill-red-500 text-red-500" />
-      </FloatTile>
+      {/* centre publish hub */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={enter(0)}>
+        <span className="bg-brand-orange/40 absolute -inset-3 rounded-3xl blur-xl motion-safe:animate-[onb-glow_3.2s_ease-in-out_infinite]" aria-hidden />
+        <div className="bg-brand-orange relative grid size-16 place-items-center rounded-2xl shadow-xl shadow-black/30 motion-safe:animate-[social-hub_2.6s_ease-in-out_infinite]">
+          <Upload className="size-7 text-white" />
+        </div>
+      </div>
     </div>
   );
 }
