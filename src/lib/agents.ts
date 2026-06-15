@@ -38,12 +38,12 @@ export interface VoiceOption {
 // Voices are named after Indian rivers, a cast of their own that never collides
 // with the agent personas (Priya, Aarav, ...) or lead names, so a "voice" reads
 // as a performer the agent uses, not a clone of the agent. Each river is paired
-// to suit the voice's tone (gentle Kaveri = warm, steady Krishna = professional,
+// to suit the voice's tone (gentle Kaveri = warm, steady Sindhu = professional,
 // sprightly Teesta = upbeat, ...). `id`s are kept stable so saved agents keep
 // their selected voice even though the display name changed.
 export const VOICES: VoiceOption[] = [
   { id: "priya", name: "Kaveri", gender: "female", tagline: "Warm & reassuring", langs: ["English", "Hindi"], color: "#ef8e2b" },
-  { id: "aarav", name: "Krishna", gender: "male", tagline: "Calm & professional", langs: ["English", "Hindi"], color: "#2f6bed" },
+  { id: "aarav", name: "Sindhu", gender: "male", tagline: "Calm & professional", langs: ["English", "Hindi"], color: "#2f6bed" },
   { id: "meera", name: "Teesta", gender: "female", tagline: "Friendly & upbeat", langs: ["English", "Hindi", "Marathi"], color: "#1c9e57" },
   { id: "kabir", name: "Chenab", gender: "male", tagline: "Composed & empathetic", langs: ["English", "Hindi"], color: "#6d3bf5" },
   { id: "saanvi", name: "Narmada", gender: "female", tagline: "Clear & precise", langs: ["English", "Hindi"], color: "#16b8c4" },
