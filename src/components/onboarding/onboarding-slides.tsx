@@ -15,7 +15,6 @@ import {
   Flame,
   Handshake,
   Heart,
-  Mail,
   MapPin,
   MessageSquare,
   Phone,
@@ -165,7 +164,7 @@ function AiTeamSlide() {
     <div className="relative mx-auto h-64 w-80">
       <AgentCard icon={MessageSquare} title="AI Chat Agent" sub="Replies instantly" className="top-0 left-0" enterDelay={120} />
       <AgentCard icon={Phone} title="AI Voice Agent" sub="Calls & qualifies" className="top-0 right-0" enterDelay={200} />
-      <AgentCard icon={Mail} title="Lead Nurture Agent" sub="Smart follow-ups" className="bottom-0 left-0" enterDelay={280} />
+      <AgentCard icon={BadgeCheck} title="Lead Qualifier Agent" sub="Scores buying intent" className="bottom-0 left-0" enterDelay={280} />
       <AgentCard icon={Calendar} title="Appointment Agent" sub="Books site visits" className="right-0 bottom-0" enterDelay={360} />
 
       {/* centre brand with a breathing glow */}
@@ -330,7 +329,7 @@ export const ONB_SLIDES: OnbSlide[] = [
     id: "team",
     Illustration: AiTeamSlide,
     title: [{ t: "Your " }, { t: "AI Team", accent: true }, { t: " Works 24/7" }],
-    text: "AI voice, chat, and nurture agents engage, qualify, and follow up with every lead instantly.",
+    text: "AI voice, chat, and scheduling agents engage, qualify, and follow up with every lead instantly.",
   },
   {
     id: "pipeline",
