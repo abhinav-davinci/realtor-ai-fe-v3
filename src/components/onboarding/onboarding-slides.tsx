@@ -157,14 +157,33 @@ const STAGES: { icon: LucideIcon; title: string; sub: string }[] = [
 ];
 
 function PipelineSlide() {
+  // Stagger so each stage lights up as the connector charge reaches it. The line
+  // fills over ~70% of the 5s cycle, so the last node peaks just as it lands.
+  const step = 1.15;
   return (
     <div className="relative mx-auto w-72">
-      <span className="absolute top-6 bottom-6 left-[26px] w-px bg-white/15" aria-hidden />
-      <div className="space-y-3">
+      {/* connector: a faint base line with an accent charge that draws down */}
+      <span className="absolute top-7 bottom-7 left-[25px] w-0.5 -translate-x-1/2 rounded-full bg-white/12" aria-hidden />
+      <span
+        className="bg-accent-blue absolute top-7 bottom-7 left-[25px] w-0.5 origin-top -translate-x-1/2 rounded-full opacity-0 motion-safe:animate-[pipeline-line_5s_ease-in-out_infinite]"
+        style={{ boxShadow: "0 0 9px rgba(47,107,237,0.65)" }}
+        aria-hidden
+      />
+
+      <div className="relative space-y-3">
         {STAGES.map((s, i) => (
-          <div key={s.title} className="relative flex items-center gap-3" style={enter(120 + i * 110)}>
-            <span className="bg-rail relative z-10 grid size-[52px] shrink-0 place-items-center rounded-xl text-white/80 ring-1 ring-white/15">
-              <s.icon className="size-5" />
+          <div key={s.title} className="relative flex items-center gap-3" style={enter(140 + i * 110)}>
+            <span
+              className="relative z-10 grid size-[52px] shrink-0 place-items-center rounded-xl text-white ring-1 ring-white/15 motion-safe:animate-[pipeline-pop_5s_ease-out_infinite]"
+              style={{ animationDelay: `${i * step}s` }}
+            >
+              <span className="absolute inset-0 rounded-xl bg-white/10 backdrop-blur-sm" aria-hidden />
+              <span
+                className="bg-accent-blue absolute inset-0 rounded-xl opacity-0 motion-safe:animate-[pipeline-fill_5s_ease-out_infinite]"
+                style={{ animationDelay: `${i * step}s`, boxShadow: "0 0 18px rgba(47,107,237,0.55)" }}
+                aria-hidden
+              />
+              <s.icon className="relative z-10 size-5" />
             </span>
             <div className="flex-1 rounded-xl bg-white/[0.06] px-3.5 py-2.5 ring-1 ring-white/10 backdrop-blur-sm">
               <p className="text-[13px] font-semibold text-white">{s.title}</p>
