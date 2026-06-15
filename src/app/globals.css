@@ -318,6 +318,46 @@
   }
 }
 
+/* Onboarding aside illustrations. Continuous, decorative drift for floating
+   tiles; gated with motion-safe in the markup so reduced motion is still. Two
+   paths so a cluster of icons doesn't move in lockstep. Transform/opacity only. */
+@keyframes onb-float-a {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-9px) translateX(3px) rotate(2deg);
+  }
+}
+@keyframes onb-float-b {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(7px) translateX(-3px) rotate(-2deg);
+  }
+}
+/* Soft breathing glow behind the centre logo / focal element. */
+@keyframes onb-glow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
+}
+/* Line-chart draw-on for the dashboard slide (stroke-dashoffset to 0). */
+@keyframes onb-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
    gradient feels alive and futuristic. Transform/opacity only (GPU, off the
    main thread). Slow ease-in-out for organic morphing. */

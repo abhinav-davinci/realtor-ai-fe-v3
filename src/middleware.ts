@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // Server-side route protection. Reads the session cookie set on login.
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/onboarding"];
 
 // Frontend-only mock mode (NEXT_PUBLIC_MOCK=1) — skip auth entirely so designers
 // can reach every route without a backend.
