@@ -12,6 +12,7 @@ import {
   Loader2,
   ShieldCheck,
   ShieldOff,
+  Sparkles,
   User,
   Users,
   type LucideIcon,
@@ -161,7 +162,16 @@ export function OnboardingFlow() {
           {/* ---- step bodies ---- */}
           {step === "phone" && (
             <Section
-              title="Welcome to TryThat.ai"
+              icon={
+                <span className="bg-brand-orange/10 text-brand-orange grid size-11 place-items-center rounded-2xl">
+                  <Sparkles className="size-5 motion-safe:animate-[welcome-spark_2.6s_ease-in-out_infinite]" />
+                </span>
+              }
+              title={
+                <>
+                  Welcome to TryThat.ai <span className="text-brand-orange">for Realtors</span>
+                </>
+              }
               subtitle="Set up your AI sales team in a few quick steps, and start turning every enquiry into a qualified lead. Enter your mobile number to begin."
             >
               <Field label="Mobile number">
@@ -333,9 +343,10 @@ export function OnboardingFlow() {
 
 /* ------------------------------- primitives ------------------------------- */
 
-function Section({ title, subtitle, children }: { title: string; subtitle: React.ReactNode; children: React.ReactNode }) {
+function Section({ icon, title, subtitle, children }: { icon?: React.ReactNode; title: React.ReactNode; subtitle: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{ animation: "fade-in-up 420ms cubic-bezier(0.23,1,0.32,1) both" }}>
+      {icon && <div className="mb-4">{icon}</div>}
       <h1 className="text-ink text-2xl font-bold sm:text-[28px]">{title}</h1>
       <p className="text-ink-muted mt-2 text-sm">{subtitle}</p>
       <div className="mt-6 space-y-4">{children}</div>

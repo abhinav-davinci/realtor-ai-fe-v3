@@ -494,6 +494,19 @@
   }
 }
 
+/* A gentle twinkle for the onboarding welcome sparkle. motion-safe in markup. */
+@keyframes welcome-spark {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15) rotate(9deg);
+    opacity: 0.85;
+  }
+}
+
 /* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
    gradient feels alive and futuristic. Transform/opacity only (GPU, off the
    main thread). Slow ease-in-out for organic morphing. */
