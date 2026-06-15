@@ -126,13 +126,14 @@ export function OnboardingFlow() {
   const next = () => setI((x) => Math.min(STEPS.length - 1, x + 1));
   const back = () => setI((x) => Math.max(0, x - 1));
 
-  // A single user leaves onboarding for the listings app; everyone else selects.
-  const selectType = (key: ProfType) => {
-    if (key === "single") {
+  // A single user finishes onboarding by jumping to the listings app; everyone
+  // else advances to the next step.
+  const aboutContinue = () => {
+    if (type === "single") {
       window.location.assign(SINGLE_USER_URL);
       return;
     }
-    setType(key);
+    next();
   };
 
   // Sending / verifying are simulated async (design mode) so the buttons show a
@@ -288,11 +289,11 @@ export function OnboardingFlow() {
               <Field label="You are a...">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {TYPES.map((t) => (
-                    <SelectTile key={t.key} selected={type === t.key} onClick={() => selectType(t.key)} icon={t.icon} label={t.label} />
+                    <SelectTile key={t.key} selected={type === t.key} onClick={() => setType(t.key)} icon={t.icon} label={t.label} />
                   ))}
                 </div>
               </Field>
-              <Button onClick={next} disabled={!aboutOk} className="bg-brand-blue hover:bg-brand-blue-hover mt-1 h-12 w-full rounded-lg text-sm font-semibold text-white">
+              <Button onClick={aboutContinue} disabled={!aboutOk} className="bg-brand-blue hover:bg-brand-blue-hover mt-1 h-12 w-full rounded-lg text-sm font-semibold text-white">
                 Continue <ArrowRight className="size-4" />
               </Button>
             </Section>
