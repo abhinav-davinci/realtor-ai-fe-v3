@@ -15,12 +15,12 @@ import {
   Flame,
   Handshake,
   Heart,
-  IndianRupee,
   Mail,
   MapPin,
   MessageSquare,
   Phone,
   Share2,
+  Target,
   Trophy,
   Upload,
   UserPlus,
@@ -196,34 +196,57 @@ function PipelineSlide() {
 
 const STATS: { icon: LucideIcon; value: string; label: string; delta: string }[] = [
   { icon: Flame, value: "248", label: "Hot Leads", delta: "+24%" },
-  { icon: CalendarCheck, value: "32", label: "Appointments", delta: "+18%" },
+  { icon: CalendarCheck, value: "32", label: "Site Visits", delta: "+18%" },
   { icon: Trophy, value: "12", label: "Deals Won", delta: "+33%" },
-  { icon: IndianRupee, value: "₹2.48 Cr", label: "Revenue", delta: "+28%" },
+  { icon: Target, value: "34%", label: "Conversion", delta: "+6%" },
 ];
 
+const BARS = [22, 18, 30, 26, 34, 28, 40];
+
 function DashboardSlide() {
-  // A gentle upward line; the path length ~ 320 so the dash draws over ~1.1s.
   return (
     <div className="mx-auto w-80">
       <div className="grid grid-cols-2 gap-3">
         {STATS.map((s, i) => (
-          <div key={s.label} className="rounded-xl bg-white/[0.06] p-3 ring-1 ring-white/10 backdrop-blur-sm" style={enter(100 + i * 80)}>
-            <div className="flex items-center justify-between">
+          <div key={s.label} className="relative overflow-hidden rounded-xl bg-white/[0.06] p-3 ring-1 ring-white/10 backdrop-blur-sm" style={enter(100 + i * 80)}>
+            {/* faint refresh glow that sweeps the cards in turn */}
+            <span
+              className="bg-accent-blue/15 pointer-events-none absolute inset-0 opacity-0 motion-safe:animate-[stat-refresh_4.5s_ease-in-out_infinite]"
+              style={{ animationDelay: `${i * 0.5}s` }}
+              aria-hidden
+            />
+            <div className="relative flex items-center justify-between">
               <span className="grid size-7 place-items-center rounded-lg bg-white/10 text-white/80">
                 <s.icon className="size-4" />
               </span>
-              <span className="text-[11px] font-semibold text-brand-green">{s.delta}</span>
+              <span className="text-brand-green text-[11px] font-semibold">{s.delta}</span>
             </div>
-            <p className="mt-2 text-lg font-bold text-white tabular-nums">{s.value}</p>
-            <p className="text-[11px] text-white/55">{s.label}</p>
+            <p className="relative mt-2 text-lg font-bold text-white tabular-nums">{s.value}</p>
+            <p className="relative text-[11px] text-white/55">{s.label}</p>
           </div>
         ))}
       </div>
 
       <div className="mt-3 rounded-xl bg-white/[0.06] p-3 ring-1 ring-white/10 backdrop-blur-sm" style={enter(460)}>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-medium text-white/55">Leads this week</span>
+          <span className="text-brand-green inline-flex items-center gap-1.5 text-[10px] font-semibold">
+            <span className="bg-brand-green size-1.5 rounded-full motion-safe:animate-[chart-live_1.6s_ease-in-out_infinite]" />
+            Live
+          </span>
+        </div>
         <svg viewBox="0 0 280 70" className="h-16 w-full" preserveAspectRatio="none" aria-hidden>
-          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-            <rect key={i} x={8 + i * 40} y={70 - (12 + ((i * 37) % 30))} width="16" height={12 + ((i * 37) % 30)} rx="3" className="fill-white/[0.07]" />
+          {BARS.map((h, i) => (
+            <rect
+              key={i}
+              x={8 + i * 40}
+              y={70 - h}
+              width="16"
+              height={h}
+              rx="3"
+              className="fill-white/[0.07] motion-safe:animate-[chart-bar_2.4s_ease-in-out_infinite]"
+              style={{ transformBox: "fill-box", transformOrigin: "bottom", animationDelay: `${i * 0.12}s` }}
+            />
           ))}
           <polyline
             points="8,52 48,46 88,40 128,42 168,30 208,22 252,12"
@@ -235,7 +258,7 @@ function DashboardSlide() {
             pathLength={320}
             strokeDasharray={320}
             strokeDashoffset={320}
-            className="motion-safe:animate-[onb-draw_1100ms_cubic-bezier(0.23,1,0.32,1)_300ms_forwards] motion-reduce:[stroke-dashoffset:0]"
+            className="motion-safe:animate-[chart-draw-loop_3.4s_ease-in-out_infinite] motion-reduce:[stroke-dashoffset:0]"
           />
         </svg>
       </div>

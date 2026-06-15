@@ -440,6 +440,60 @@
   }
 }
 
+/* Dashboard slide: a live, looping read-out. The chart redraws on a loop with a
+   pulsing Live dot and gently breathing bars; a faint refresh glow sweeps the
+   stat cards in turn. dashoffset/opacity/transform only, gated motion-safe. */
+@keyframes chart-draw-loop {
+  0% {
+    stroke-dashoffset: 320;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  62%,
+  86% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes chart-bar {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes chart-live {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+@keyframes stat-refresh {
+  0% {
+    opacity: 0;
+  }
+  14% {
+    opacity: 0.6;
+  }
+  32%,
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
    gradient feels alive and futuristic. Transform/opacity only (GPU, off the
    main thread). Slow ease-in-out for organic morphing. */
