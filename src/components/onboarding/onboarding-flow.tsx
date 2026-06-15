@@ -160,7 +160,10 @@ export function OnboardingFlow() {
 
           {/* ---- step bodies ---- */}
           {step === "phone" && (
-            <Section title="Let's set up your AI agent" subtitle="Enter your mobile number to begin. We'll send a one-time verification code.">
+            <Section
+              title="Welcome to TryThat.ai"
+              subtitle="Set up your AI sales team in a few quick steps, and start turning every enquiry into a qualified lead. Enter your mobile number to begin."
+            >
               <Field label="Mobile number">
                 <PhoneInput value={phone} onChange={setPhone} autoFocus />
               </Field>
