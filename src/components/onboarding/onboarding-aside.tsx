@@ -32,15 +32,18 @@ export function OnboardingAside() {
   const slide = ONB_SLIDES[active];
 
   return (
-    <aside className="from-rail via-brand-blue/90 to-brand-blue relative hidden shrink-0 flex-col overflow-hidden bg-gradient-to-b px-10 py-9 lg:flex lg:w-[44%] xl:w-[42%]">
+    <aside className="from-rail via-brand-blue/90 to-brand-blue relative hidden shrink-0 flex-col overflow-hidden bg-gradient-to-b px-8 py-9 md:flex md:w-[42%] lg:w-[44%] lg:px-10 xl:w-[42%]">
       {/* faint depth rings */}
       <span aria-hidden className="pointer-events-none absolute -top-24 -left-16 size-72 rounded-full border border-white/[0.06]" />
       <span aria-hidden className="pointer-events-none absolute right-[-10%] bottom-[12%] size-80 rounded-full border border-white/[0.05]" />
 
       <BrandLogo />
 
-      <div key={slide.id} className="flex flex-1 flex-col">
-        <div className="flex flex-1 items-center justify-center py-8">
+      {/* lg+ shows the animated illustration with the value prop pinned to the
+          bottom; on tablet (md) the illustration is hidden and the value prop is
+          centred so the panel still feels branded, not empty. */}
+      <div key={slide.id} className="flex flex-1 flex-col justify-center lg:justify-end">
+        <div className="hidden flex-1 items-center justify-center py-8 lg:flex">
           <slide.Illustration />
         </div>
 

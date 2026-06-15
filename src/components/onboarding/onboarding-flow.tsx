@@ -52,14 +52,27 @@ const CITIES = [
 
 const empty6 = (): string[] => ["", "", "", "", "", ""];
 
+const STEP_LABEL: Record<Step, string> = {
+  phone: "Welcome. Enter your mobile number.",
+  otp: "Verify your number.",
+  about: "Step 1 of 4. Tell us about you.",
+  reach: "Step 2 of 4. How buyers reach you.",
+  rera: "Step 3 of 4. RERA and compliance.",
+  projects: "Step 4 of 4. Add your projects.",
+  done: "You are all set.",
+};
+
 /* --------------------------------- flow ----------------------------------- */
 
 export function OnboardingFlow() {
   const router = useRouter();
   const [i, setI] = useState(0);
   const step = STEPS[i];
-  const [submitting, setSubmitting] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const [otpError, setOtpError] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState<string[]>(empty6());
@@ -85,24 +98,49 @@ export function OnboardingFlow() {
     return () => clearInterval(t);
   }, [step]);
 
+  // Move focus to the first control of each step so keyboard / screen-reader
+  // users land in the new step rather than on the just-unmounted button. This
+  // only calls .focus(), no setState in the effect body.
+  useEffect(() => {
+    const el = bodyRef.current?.querySelector<HTMLElement>('input:not([type="checkbox"]), select, textarea, button');
+    el?.focus({ preventScroll: true });
+  }, [step]);
+
   const go = (to: Step) => setI(STEPS.indexOf(to));
   const next = () => setI((x) => Math.min(STEPS.length - 1, x + 1));
   const back = () => setI((x) => Math.max(0, x - 1));
 
+  // Sending / verifying are simulated async (design mode) so the buttons show a
+  // real loading state and can't be double-tapped.
   function sendCode() {
-    setOtp(empty6());
-    setResendIn(30);
-    go("otp");
+    setBusy(true);
+    setTimeout(() => {
+      setOtp(empty6());
+      setOtpError(false);
+      setResendIn(30);
+      setBusy(false);
+      go("otp");
+    }, 900);
   }
   function resend() {
     setOtp(empty6());
+    setOtpError(false);
     setResendIn(30);
   }
+  function verify() {
+    setBusy(true);
+    setTimeout(() => {
+      setBusy(false);
+      // Design mode: any 6-digit code passes; 000000 demonstrates the error state.
+      if (otp.join("") === "000000") setOtpError(true);
+      else go("about");
+    }, 900);
+  }
   function finish() {
-    setSubmitting(true);
+    setBusy(true);
     // Design mode: drop a mock session so the app opens, then head to the AI Team.
     setSession("mock-onboarding-token", "mock-org");
-    setTimeout(() => router.push("/ai-team"), 500);
+    setTimeout(() => router.push("/ai-team"), 600);
   }
 
   const phoneOk = /^\d{10}$/.test(phone);
@@ -128,8 +166,8 @@ export function OnboardingFlow() {
       <OnboardingAside />
 
       <main className="flex h-screen flex-1 flex-col overflow-y-auto">
-        {/* mobile brand header (aside is hidden under lg) */}
-        <div className="flex items-center gap-2.5 border-b border-black/[0.06] px-6 py-3.5 lg:hidden">
+        {/* mobile brand header (aside is hidden under md) */}
+        <div className="flex items-center gap-2.5 border-b border-black/[0.06] px-6 py-3.5 md:hidden">
           <span className="text-ink text-lg font-bold tracking-tight">
             TryThat<span className="bg-accent-blue ml-0.5 rounded-md px-1.5 py-0.5 text-sm text-white">.ai</span>
           </span>
@@ -138,6 +176,7 @@ export function OnboardingFlow() {
         </div>
 
         <div className={cn("mx-auto flex w-full max-w-xl flex-1 flex-col px-6 sm:px-10", short ? "justify-center py-8" : "py-9 sm:py-12")}>
+          <p className="sr-only" role="status" aria-live="polite">{STEP_LABEL[step]}</p>
           {showBack && (
             <button
               type="button"
@@ -159,7 +198,8 @@ export function OnboardingFlow() {
             </div>
           )}
 
-          {/* ---- step bodies ---- */}
+          {/* ---- step bodies (focus target on step change) ---- */}
+          <div ref={bodyRef} className="contents">
           {step === "phone" && (
             <Section
               icon={
@@ -179,10 +219,11 @@ export function OnboardingFlow() {
               }
               subtitle="Set up your AI sales team in a few quick steps, and start turning every enquiry into a qualified lead. Enter your mobile number to begin."
             >
-              <Field label="Mobile number">
-                <PhoneInput value={phone} onChange={setPhone} autoFocus />
+              <Field label="Mobile number" error={phoneTouched && phone !== "" && !phoneOk ? "Enter a 10-digit mobile number." : undefined}>
+                <PhoneInput value={phone} onChange={setPhone} onBlur={() => setPhoneTouched(true)} invalid={phoneTouched && phone !== "" && !phoneOk} />
               </Field>
-              <Button onClick={sendCode} disabled={!phoneOk} className="bg-brand-blue hover:bg-brand-blue-hover h-12 w-full rounded-lg text-sm font-semibold text-white">
+              <Button onClick={sendCode} disabled={!phoneOk || busy} className="bg-brand-blue hover:bg-brand-blue-hover h-12 w-full rounded-lg text-sm font-semibold text-white">
+                {busy && <Loader2 className="size-4 animate-spin" />}
                 Send verification code
               </Button>
             </Section>
@@ -190,7 +231,8 @@ export function OnboardingFlow() {
 
           {step === "otp" && (
             <Section title="Verify your number" subtitle={<>We sent a 6-digit code to <span className="text-ink font-semibold">+91 {phone}</span>.</>}>
-              <OtpBoxes value={otp} onChange={setOtp} />
+              <OtpBoxes value={otp} onChange={(v) => { setOtp(v); setOtpError(false); }} error={otpError} />
+              {otpError && <p className="text-sm font-medium text-red-600">That code did not match. Check it and try again.</p>}
               <div className="text-ink-muted flex items-center gap-1.5 text-xs">
                 <Clock className="size-3.5" />
                 {resendIn > 0 ? (
@@ -201,7 +243,8 @@ export function OnboardingFlow() {
                   </button>
                 )}
               </div>
-              <Button onClick={() => go("about")} disabled={!otpOk} className="bg-brand-blue hover:bg-brand-blue-hover h-12 w-full rounded-lg text-sm font-semibold text-white">
+              <Button onClick={verify} disabled={!otpOk || busy} className="bg-brand-blue hover:bg-brand-blue-hover h-12 w-full rounded-lg text-sm font-semibold text-white">
+                {busy && <Loader2 className="size-4 animate-spin" />}
                 Verify &amp; continue
               </Button>
             </Section>
@@ -211,7 +254,7 @@ export function OnboardingFlow() {
             <Section title="Tell us about you" subtitle="Your agent introduces itself with this, speaks for you, and qualifies buyers on your behalf.">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Your full name">
-                  <Input value={fullName} onChange={setFullName} placeholder="e.g. Rahul Sharma" autoFocus />
+                  <Input value={fullName} onChange={setFullName} placeholder="e.g. Rahul Sharma" />
                 </Field>
                 <Field label="Company or firm name">
                   <Input value={company} onChange={setCompany} placeholder="e.g. Sharma Realtors" />
@@ -331,15 +374,16 @@ export function OnboardingFlow() {
               </p>
               <Button
                 onClick={finish}
-                disabled={submitting}
+                disabled={busy}
                 className="bg-brand-green hover:bg-brand-green-hover mx-auto mt-6 h-12 w-full max-w-xs rounded-lg text-sm font-semibold text-white"
               >
-                {submitting && <Loader2 className="size-4 animate-spin" />}
+                {busy && <Loader2 className="size-4 animate-spin" />}
                 Enter your dashboard
               </Button>
               <p className="text-ink-muted/70 mt-4 text-xs">By continuing you agree to TryThat.ai&apos;s Terms &amp; Privacy Policy.</p>
             </div>
           )}
+          </div>
         </div>
       </main>
     </div>
@@ -359,7 +403,7 @@ function Section({ icon, title, subtitle, children }: { icon?: React.ReactNode; 
   );
 }
 
-function Field({ label, optional, hint, children }: { label: string; optional?: boolean; hint?: string; children: React.ReactNode }) {
+function Field({ label, optional, hint, error, children }: { label: string; optional?: boolean; hint?: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="text-ink mb-1.5 flex items-center gap-1.5 text-sm font-medium">
@@ -367,7 +411,11 @@ function Field({ label, optional, hint, children }: { label: string; optional?: 
         {optional && <span className="text-ink-muted/60 text-xs font-normal">(Optional)</span>}
       </span>
       {children}
-      {hint && <span className="text-ink-muted/70 mt-1.5 block text-xs">{hint}</span>}
+      {error ? (
+        <span className="mt-1.5 block text-xs font-medium text-red-600">{error}</span>
+      ) : hint ? (
+        <span className="text-ink-muted/70 mt-1.5 block text-xs">{hint}</span>
+      ) : null}
     </label>
   );
 }
@@ -400,18 +448,26 @@ function Input({
 function PhoneInput({
   value,
   onChange,
+  onBlur,
   disabled,
   whatsapp,
-  autoFocus,
+  invalid,
 }: {
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
   disabled?: boolean;
   whatsapp?: boolean;
-  autoFocus?: boolean;
+  invalid?: boolean;
 }) {
   return (
-    <div className={cn("flex h-11 items-stretch overflow-hidden rounded-lg border border-black/15 bg-white transition-colors focus-within:border-accent-blue/60", disabled && "opacity-70")}>
+    <div
+      className={cn(
+        "flex h-11 items-stretch overflow-hidden rounded-lg border bg-white transition-colors focus-within:border-accent-blue/60",
+        invalid ? "border-red-400" : "border-black/15",
+        disabled && "opacity-70"
+      )}
+    >
       <span className="text-ink flex items-center gap-1.5 border-r border-black/10 bg-black/[0.03] px-3 text-sm font-medium">
         {whatsapp && <span className="bg-brand-green grid size-4 place-items-center rounded-full text-[9px] font-bold text-white">W</span>}
         +91
@@ -419,17 +475,17 @@ function PhoneInput({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 10))}
+        onBlur={onBlur}
         placeholder="98765 43210"
         inputMode="numeric"
         disabled={disabled}
-        autoFocus={autoFocus}
         className="text-ink placeholder:text-ink-muted/50 min-w-0 flex-1 bg-transparent px-3.5 text-sm outline-none disabled:cursor-not-allowed"
       />
     </div>
   );
 }
 
-function OtpBoxes({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+function OtpBoxes({ value, onChange, error }: { value: string[]; onChange: (v: string[]) => void; error?: boolean }) {
   const refs = useRef<Array<HTMLInputElement | null>>([]);
   const edit = (i: number, ch: string) => {
     const nextArr = [...value];
@@ -447,7 +503,8 @@ function OtpBoxes({ value, onChange }: { value: string[]; onChange: (v: string[]
           value={c}
           inputMode="numeric"
           maxLength={1}
-          autoFocus={i === 0}
+          aria-label={`Digit ${i + 1} of 6`}
+          aria-invalid={error || undefined}
           onChange={(e) => {
             const d = e.target.value.replace(/\D/g, "").slice(-1);
             edit(i, d);
@@ -469,8 +526,10 @@ function OtpBoxes({ value, onChange }: { value: string[]; onChange: (v: string[]
             refs.current[Math.min(txt.length, 5)]?.focus();
           }}
           className={cn(
-            "size-12 rounded-xl border bg-white text-center text-lg font-semibold text-ink outline-none transition-colors focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/20",
-            c ? "border-black/25" : "border-black/12"
+            "size-12 rounded-xl border bg-white text-center text-lg font-semibold text-ink outline-none transition-colors focus:ring-2",
+            error
+              ? "border-red-400 focus:border-red-500 focus:ring-red-200/70"
+              : cn("focus:border-accent-blue focus:ring-accent-blue/20", c ? "border-black/25" : "border-black/12")
           )}
         />
       ))}
