@@ -507,6 +507,27 @@
   }
 }
 
+/* Social slide: an engagement reaction travels from a channel down into the
+   captured-lead card. --fx/--fy (set inline) are the channel's offset; it ends
+   absorbed at the lead (0,0). Transform/opacity only, motion-safe. */
+@keyframes s2-capture {
+  0% {
+    opacity: 0;
+    transform: translate(var(--fx), var(--fy)) scale(0.5);
+  }
+  22% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+}
+
 /* Agent orb "aurora": blurred colour blobs drift behind a still icon so the
    gradient feels alive and futuristic. Transform/opacity only (GPU, off the
    main thread). Slow ease-in-out for organic morphing. */

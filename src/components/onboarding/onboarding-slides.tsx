@@ -19,10 +19,10 @@ import {
   MapPin,
   MessageSquare,
   Phone,
-  Share2,
+  Play,
+  Sparkles,
   Target,
   Trophy,
-  Upload,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -35,35 +35,39 @@ const enter = (delay: number): CSSProperties => ({
 
 /* ------------------------------ social slide ------------------------------ */
 
-/** One published post fans out to every channel; each lands and reacts. The
- * orange hub = publish, spokes carry the post out, reactions float up. */
-const CHANNELS: {
-  src: "instagram" | "facebook" | "youtube";
-  color: string;
-  cx: number;
-  cy: number;
-  react: LucideIcon;
-  reactColor: string;
-  delay: number;
-}[] = [
-  { src: "instagram", color: "text-pink-600", cx: 74, cy: 70, react: Heart, reactColor: "fill-red-500 text-red-500", delay: 0 },
-  { src: "facebook", color: "text-[#1877F2]", cx: 246, cy: 80, react: MessageSquare, reactColor: "text-accent-blue", delay: 0.55 },
-  { src: "youtube", color: "text-red-600", cx: 160, cy: 240, react: Share2, reactColor: "text-brand-green", delay: 1.1 },
+/**
+ * The full story, top to bottom: an AI video made from your photos is published
+ * to every channel (spokes carry it out), people react (likes/comments pop), and
+ * that engagement is captured as a new lead. All motion is transform/opacity/dash
+ * and motion-safe, so it goes still under reduced motion.
+ */
+const CHANNELS: { src: "instagram" | "facebook" | "whatsapp" | "youtube"; color: string; cx: number; react: LucideIcon; reactColor: string; delay: number }[] = [
+  { src: "instagram", color: "text-pink-600", cx: 56, react: Heart, reactColor: "fill-red-500 text-red-500", delay: 0 },
+  { src: "facebook", color: "text-[#1877F2]", cx: 126, react: MessageSquare, reactColor: "text-accent-blue", delay: 0.45 },
+  { src: "whatsapp", color: "text-brand-green", cx: 194, react: Heart, reactColor: "fill-red-500 text-red-500", delay: 0.9 },
+  { src: "youtube", color: "text-red-600", cx: 264, react: MessageSquare, reactColor: "text-accent-blue", delay: 1.35 },
+];
+
+// Reactions converging into the lead card (offset from the lead centre = channel).
+const SPARKS: { fx: number; fy: number; icon: LucideIcon; color: string; delay: number }[] = [
+  { fx: -104, fy: -92, icon: Heart, color: "fill-red-500 text-red-500", delay: 0 },
+  { fx: -34, fy: -92, icon: MessageSquare, color: "text-accent-blue", delay: 0.8 },
+  { fx: 104, fy: -92, icon: Heart, color: "fill-red-500 text-red-500", delay: 1.6 },
 ];
 
 function SocialSlide() {
   return (
-    <div className="relative mx-auto h-72 w-80">
-      {/* spokes carrying the post outward from the hub */}
-      <svg viewBox="0 0 320 288" className="absolute inset-0 size-full" aria-hidden>
+    <div className="relative mx-auto h-[300px] w-80">
+      {/* spokes: the AI video publishing out to each channel */}
+      <svg viewBox="0 0 320 300" className="absolute inset-0 size-full" aria-hidden>
         {CHANNELS.map((c) => (
           <line
             key={c.src}
             x1="160"
-            y1="144"
+            y1="66"
             x2={c.cx}
-            y2={c.cy}
-            stroke="rgba(255,255,255,0.28)"
+            y2="126"
+            stroke="rgba(255,255,255,0.26)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeDasharray="2 7"
@@ -72,29 +76,67 @@ function SocialSlide() {
         ))}
       </svg>
 
-      {/* channels */}
+      {/* AI video, made from your photos */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2">
+        <div style={enter(0)}>
+          <div className="relative motion-safe:animate-[onb-float-a_6s_ease-in-out_infinite]">
+            <span className="absolute top-2 -left-3 h-12 w-14 -rotate-6 rounded-lg bg-gradient-to-br from-white/40 to-white/10 shadow-md" aria-hidden />
+            <span className="absolute top-2 -right-3 h-12 w-14 rotate-6 rounded-lg bg-gradient-to-br from-white/30 to-white/5 shadow-md" aria-hidden />
+            <div className="from-accent-blue to-brand-orange relative grid h-16 w-28 place-items-center overflow-hidden rounded-xl bg-gradient-to-br shadow-lg shadow-black/30">
+              <span className="grid size-9 place-items-center rounded-full bg-white/95 shadow">
+                <Play className="fill-ink text-ink size-4 translate-x-px" />
+              </span>
+              <span className="text-ink absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 rounded-full bg-white/95 px-1.5 py-0.5 text-[9px] font-bold shadow-sm">
+                <Sparkles className="text-accent-blue size-2.5 motion-safe:animate-[welcome-spark_2.4s_ease-in-out_infinite]" /> AI
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* channels: published everywhere, people react */}
       {CHANNELS.map((c) => (
-        <div key={c.src} className="absolute" style={{ left: c.cx - 28, top: c.cy - 28, ...enter(160 + c.delay * 120) }}>
+        <div key={c.src} className="absolute top-[126px]" style={{ left: c.cx - 22, ...enter(180 + c.delay * 90) }}>
           <div
-            className="relative grid size-14 place-items-center rounded-2xl bg-white shadow-lg shadow-black/25 motion-safe:animate-[social-pulse_2.6s_ease-in-out_infinite]"
+            className="relative grid size-11 place-items-center rounded-2xl bg-white shadow-lg shadow-black/25 motion-safe:animate-[social-pulse_2.6s_ease-in-out_infinite]"
             style={{ animationDelay: `${c.delay}s` }}
           >
-            <SourceIcon source={c.src} className={cn("size-7", c.color)} />
+            <SourceIcon source={c.src} className={cn("size-6", c.color)} />
             <span
-              className="absolute -top-2.5 -right-2.5 grid size-7 place-items-center rounded-full bg-white shadow-md motion-safe:animate-[social-react_2.6s_ease-in-out_infinite]"
-              style={{ animationDelay: `${c.delay + 0.65}s` }}
+              className="absolute -top-2.5 -right-2 grid size-6 place-items-center rounded-full bg-white shadow-md motion-safe:animate-[social-react_2.6s_ease-in-out_infinite]"
+              style={{ animationDelay: `${c.delay + 0.6}s` }}
             >
-              <c.react className={cn("size-3.5", c.reactColor)} />
+              <c.react className={cn("size-3", c.reactColor)} />
             </span>
           </div>
         </div>
       ))}
 
-      {/* centre publish hub */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={enter(0)}>
-        <span className="bg-brand-orange/40 absolute -inset-3 rounded-3xl blur-xl motion-safe:animate-[onb-glow_3.2s_ease-in-out_infinite]" aria-hidden />
-        <div className="bg-brand-orange relative grid size-16 place-items-center rounded-2xl shadow-xl shadow-black/30 motion-safe:animate-[social-hub_2.6s_ease-in-out_infinite]">
-          <Upload className="size-7 text-white" />
+      {/* captured as a lead */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
+        <div className="relative" style={enter(620)}>
+          <span className="bg-brand-green/40 absolute -inset-2 rounded-2xl blur-lg motion-safe:animate-[onb-glow_3s_ease-in-out_infinite]" aria-hidden />
+          <div className="relative flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-lg shadow-black/25">
+            <span className="bg-brand-green/10 text-brand-green grid size-7 shrink-0 place-items-center rounded-lg">
+              <UserPlus className="size-4" />
+            </span>
+            <span className="leading-tight">
+              <span className="text-ink block text-xs font-bold whitespace-nowrap">New lead captured</span>
+              <span className="text-ink-muted block text-[10px] whitespace-nowrap">From social engagement</span>
+            </span>
+            <span className="bg-brand-green ml-1 size-2 shrink-0 rounded-full motion-safe:animate-[onb-glow_1.6s_ease-in-out_infinite]" aria-hidden />
+          </div>
+          {/* reactions flowing in */}
+          {SPARKS.map((s, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="absolute -top-4 left-1/2 -ml-2.5 grid size-5 place-items-center rounded-full bg-white opacity-0 shadow-sm motion-safe:animate-[s2-capture_2.4s_ease-in-out_infinite]"
+              style={{ "--fx": `${s.fx}px`, "--fy": `${s.fy}px`, animationDelay: `${0.7 + s.delay}s` } as React.CSSProperties}
+            >
+              <s.icon className={cn("size-2.5", s.color)} />
+            </span>
+          ))}
         </div>
       </div>
     </div>
