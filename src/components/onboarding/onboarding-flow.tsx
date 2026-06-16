@@ -283,38 +283,35 @@ export function OnboardingFlow() {
           )}
 
           {step === "about" && (
-            <Section title="Tell us about you" subtitle="Your agent introduces itself with this, speaks for you, and qualifies buyers on your behalf.">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Your full name">
-                  <Input value={fullName} onChange={setFullName} placeholder="e.g. Rahul Sharma" />
-                </Field>
-                <Field label="Company or firm name" optional={business === "no"}>
-                  <Input value={company} onChange={setCompany} placeholder="e.g. Sharma Realtors" />
-                </Field>
-              </div>
-
-              <Field label="Are you a business?">
-                <div className="grid max-w-xs grid-cols-2 gap-3">
-                  <ChoiceButton selected={business === "yes"} onClick={() => setBusiness("yes")} icon={Building2} label="Yes" />
-                  <ChoiceButton selected={business === "no"} onClick={() => setBusiness("no")} icon={User} label="No" />
-                </div>
+            <Section title="Tell us about you" subtitle="Just a few details to tailor your setup.">
+              <Field label="Your full name">
+                <Input value={fullName} onChange={setFullName} placeholder="e.g. Rahul Sharma" />
               </Field>
 
-              {business === "yes" && (
-                <Field label="You are a...">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" style={{ animation: "fade-in-up 260ms cubic-bezier(0.23,1,0.32,1) both" }}>
-                    {TYPES.map((t) => (
-                      <SelectTile key={t.key} selected={type === t.key} onClick={() => setType(t.key)} icon={t.icon} label={t.label} />
-                    ))}
-                  </div>
-                </Field>
-              )}
+              <RadioGroup label="Are you a business?">
+                <div className="grid max-w-xs grid-cols-2 gap-3">
+                  <RadioPill name="business" checked={business === "yes"} onSelect={() => setBusiness("yes")} icon={Building2} label="Yes" />
+                  <RadioPill name="business" checked={business === "no"} onSelect={() => setBusiness("no")} icon={User} label="No" />
+                </div>
+              </RadioGroup>
 
-              {business === "yes" && type === "other" && (
-                <div style={{ animation: "fade-in-up 240ms cubic-bezier(0.23,1,0.32,1) both" }}>
-                  <Field label="Tell us what you do">
-                    <Input value={otherType} onChange={setOtherType} placeholder="e.g. Property management, PropTech, marketing agency" autoFocus />
+              {business === "yes" && (
+                <div className="space-y-4" style={{ animation: "fade-in-up 260ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                  <Field label="Company or firm name">
+                    <Input value={company} onChange={setCompany} placeholder="e.g. Sharma Realtors" />
                   </Field>
+                  <RadioGroup label="You are a...">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {TYPES.map((t) => (
+                        <RadioTile key={t.key} name="proftype" checked={type === t.key} onSelect={() => setType(t.key)} icon={t.icon} label={t.label} />
+                      ))}
+                    </div>
+                  </RadioGroup>
+                  {type === "other" && (
+                    <Field label="Tell us what you do">
+                      <Input value={otherType} onChange={setOtherType} placeholder="e.g. Property management, PropTech, marketing agency" autoFocus />
+                    </Field>
+                  )}
                 </div>
               )}
 
@@ -623,39 +620,49 @@ function CitySelect({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
-function SelectTile({ selected, onClick, icon: Icon, label }: { selected: boolean; onClick: () => void; icon: LucideIcon; label: string }) {
+/** A labelled single-select group. Built on native radios (inside RadioTile /
+ * RadioPill) so screen readers announce "radio, N of M" and arrow keys move
+ * between options for free. */
+function RadioGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={cn(
-        "flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center outline-none transition-all focus-visible:ring-2 focus-visible:ring-accent-blue/40",
-        selected ? "border-accent-blue bg-accent-blue/[0.05] ring-1 ring-accent-blue/30" : "border-black/10 bg-white hover:border-black/25"
-      )}
-    >
-      <span className={cn("grid size-9 place-items-center rounded-full transition-colors", selected ? "bg-accent-blue text-white" : "bg-black/[0.04] text-ink-muted")}>
-        <Icon className="size-4" />
-      </span>
-      <span className={cn("text-xs font-semibold", selected ? "text-ink" : "text-ink-muted")}>{label}</span>
-    </button>
+    <div role="radiogroup" aria-label={label}>
+      <p className="text-ink mb-1.5 text-sm font-medium">{label}</p>
+      {children}
+    </div>
   );
 }
 
-function ChoiceButton({ selected, onClick, icon: Icon, label }: { selected: boolean; onClick: () => void; icon: LucideIcon; label: string }) {
+// The radio is sr-only (still focusable) so the whole card is the click target;
+// has-[:focus-visible] surfaces the keyboard focus ring on the card.
+function RadioTile({ name, checked, onSelect, icon: Icon, label }: { name: string; checked: boolean; onSelect: () => void; icon: LucideIcon; label: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
+    <label
       className={cn(
-        "flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold outline-none transition-all focus-visible:ring-2 focus-visible:ring-accent-blue/40",
-        selected ? "border-accent-blue bg-accent-blue/[0.05] text-ink ring-1 ring-accent-blue/30" : "text-ink-muted border-black/10 bg-white hover:border-black/25"
+        "flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-blue/40",
+        checked ? "border-accent-blue bg-accent-blue/[0.05] ring-1 ring-accent-blue/30" : "border-black/10 bg-white hover:border-black/25"
       )}
     >
-      <Icon className={cn("size-4", selected ? "text-accent-blue" : "text-ink-muted")} />
+      <input type="radio" name={name} checked={checked} onChange={onSelect} className="sr-only" />
+      <span className={cn("grid size-9 place-items-center rounded-full transition-colors", checked ? "bg-accent-blue text-white" : "bg-black/[0.04] text-ink-muted")}>
+        <Icon className="size-4" />
+      </span>
+      <span className={cn("text-xs font-semibold", checked ? "text-ink" : "text-ink-muted")}>{label}</span>
+    </label>
+  );
+}
+
+function RadioPill({ name, checked, onSelect, icon: Icon, label }: { name: string; checked: boolean; onSelect: () => void; icon: LucideIcon; label: string }) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-blue/40",
+        checked ? "border-accent-blue bg-accent-blue/[0.05] text-ink ring-1 ring-accent-blue/30" : "text-ink-muted border-black/10 bg-white hover:border-black/25"
+      )}
+    >
+      <input type="radio" name={name} checked={checked} onChange={onSelect} className="sr-only" />
+      <Icon className={cn("size-4", checked ? "text-accent-blue" : "text-ink-muted")} />
       {label}
-    </button>
+    </label>
   );
 }
 
