@@ -30,19 +30,18 @@ type Step = (typeof STEPS)[number];
 const PROFILE_STEPS: Step[] = ["about", "reach", "rera", "projects"];
 const SHORT_STEPS: Step[] = ["phone", "otp", "done"];
 
-type ProfType = "builder" | "broker" | "channel" | "single";
+type ProfType = "builder" | "broker" | "channel";
 type Rera = "own" | "firm" | "none";
 
 const TYPES: { key: ProfType; label: string; icon: LucideIcon }[] = [
   { key: "builder", label: "Builder / Developer", icon: Building2 },
   { key: "broker", label: "Broker Firm", icon: Briefcase },
   { key: "channel", label: "Channel Partner", icon: Users },
-  { key: "single", label: "Single User", icon: User },
 ];
 
-// A single user (an individual realtor) skips the agency setup and goes straight
-// to the listings app.
-const SINGLE_USER_URL = "https://app.trythat.ai/listings";
+// A single user (an individual realtor) is not a business, so they skip the
+// agency setup and go straight to listing their property.
+const SINGLE_USER_URL = "https://app.trythat.ai/listings/add-property";
 
 const RERAS: { key: Rera; title: string; sub: string; icon: LucideIcon }[] = [
   { key: "own", title: "Own RERA", sub: "I have an individual RERA number", icon: ShieldCheck },
@@ -95,6 +94,7 @@ export function OnboardingFlow() {
   const [fullName, setFullName] = useState("");
   const [company, setCompany] = useState("");
   const [type, setType] = useState<ProfType | "">("");
+  const [business, setBusiness] = useState<"" | "yes" | "no">("");
   const [city, setCity] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [sameAsPrimary, setSameAsPrimary] = useState(true);
@@ -129,7 +129,7 @@ export function OnboardingFlow() {
   // A single user finishes onboarding by jumping to the listings app; everyone
   // else advances to the next step.
   const aboutContinue = () => {
-    if (type === "single") {
+    if (business === "no") {
       window.location.assign(SINGLE_USER_URL);
       return;
     }
@@ -171,7 +171,10 @@ export function OnboardingFlow() {
 
   const phoneOk = /^\d{10}$/.test(phone);
   const otpOk = otp.every((c) => c !== "");
-  const aboutOk = fullName.trim() !== "" && company.trim() !== "" && type !== "";
+  const aboutOk =
+    business !== "" &&
+    fullName.trim() !== "" &&
+    (business === "no" || (company.trim() !== "" && type !== ""));
   const reachOk = sameAsPrimary || /^\d{10}$/.test(whatsapp);
   const reraOk =
     rera === "none"
@@ -282,17 +285,35 @@ export function OnboardingFlow() {
                 <Field label="Your full name">
                   <Input value={fullName} onChange={setFullName} placeholder="e.g. Rahul Sharma" />
                 </Field>
-                <Field label="Company or firm name">
+                <Field label="Company or firm name" optional={business === "no"}>
                   <Input value={company} onChange={setCompany} placeholder="e.g. Sharma Realtors" />
                 </Field>
               </div>
-              <Field label="You are a...">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {TYPES.map((t) => (
-                    <SelectTile key={t.key} selected={type === t.key} onClick={() => setType(t.key)} icon={t.icon} label={t.label} />
-                  ))}
+
+              <Field label="Are you a business?">
+                <div className="grid max-w-xs grid-cols-2 gap-3">
+                  <ChoiceButton selected={business === "yes"} onClick={() => setBusiness("yes")} icon={Building2} label="Yes" />
+                  <ChoiceButton selected={business === "no"} onClick={() => setBusiness("no")} icon={User} label="No" />
                 </div>
               </Field>
+
+              {business === "yes" && (
+                <Field label="You are a...">
+                  <div className="grid grid-cols-3 gap-3" style={{ animation: "fade-in-up 260ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                    {TYPES.map((t) => (
+                      <SelectTile key={t.key} selected={type === t.key} onClick={() => setType(t.key)} icon={t.icon} label={t.label} />
+                    ))}
+                  </div>
+                </Field>
+              )}
+
+              {business === "no" && (
+                <div className="bg-accent-blue/[0.05] border-accent-blue/15 flex items-start gap-2.5 rounded-xl border p-3" style={{ animation: "fade-in-up 260ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                  <Sparkles className="text-accent-blue mt-0.5 size-4 shrink-0" />
+                  <p className="text-ink-muted text-xs">As a single user, Continue takes you straight to listing your property.</p>
+                </div>
+              )}
+
               <Button onClick={aboutContinue} disabled={!aboutOk} className="bg-brand-blue hover:bg-brand-blue-hover mt-1 h-12 w-full rounded-lg text-sm font-semibold text-white">
                 Continue <ArrowRight className="size-4" />
               </Button>
@@ -606,6 +627,23 @@ function SelectTile({ selected, onClick, icon: Icon, label }: { selected: boolea
         <Icon className="size-4" />
       </span>
       <span className={cn("text-xs font-semibold", selected ? "text-ink" : "text-ink-muted")}>{label}</span>
+    </button>
+  );
+}
+
+function ChoiceButton({ selected, onClick, icon: Icon, label }: { selected: boolean; onClick: () => void; icon: LucideIcon; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold outline-none transition-all focus-visible:ring-2 focus-visible:ring-accent-blue/40",
+        selected ? "border-accent-blue bg-accent-blue/[0.05] text-ink ring-1 ring-accent-blue/30" : "text-ink-muted border-black/10 bg-white hover:border-black/25"
+      )}
+    >
+      <Icon className={cn("size-4", selected ? "text-accent-blue" : "text-ink-muted")} />
+      {label}
     </button>
   );
 }
