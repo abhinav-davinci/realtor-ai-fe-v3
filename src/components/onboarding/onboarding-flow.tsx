@@ -97,6 +97,7 @@ export function OnboardingFlow() {
   const [company, setCompany] = useState("");
   const [type, setType] = useState<ProfType | "">("");
   const [business, setBusiness] = useState<"" | "yes" | "no">("");
+  const [otherType, setOtherType] = useState("");
   const [city, setCity] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [sameAsPrimary, setSameAsPrimary] = useState(true);
@@ -176,7 +177,7 @@ export function OnboardingFlow() {
   const aboutOk =
     business !== "" &&
     fullName.trim() !== "" &&
-    (business === "no" || (company.trim() !== "" && type !== ""));
+    (business === "no" || (company.trim() !== "" && type !== "" && (type !== "other" || otherType.trim() !== "")));
   const reachOk = sameAsPrimary || /^\d{10}$/.test(whatsapp);
   const reraOk =
     rera === "none"
@@ -307,6 +308,14 @@ export function OnboardingFlow() {
                     ))}
                   </div>
                 </Field>
+              )}
+
+              {business === "yes" && type === "other" && (
+                <div style={{ animation: "fade-in-up 240ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                  <Field label="Tell us what you do">
+                    <Input value={otherType} onChange={setOtherType} placeholder="e.g. Property management, PropTech, marketing agency" autoFocus />
+                  </Field>
+                </div>
               )}
 
               {business === "no" && (
