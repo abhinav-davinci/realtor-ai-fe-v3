@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   ShieldOff,
   Sparkles,
+  Store,
   User,
   Users,
   type LucideIcon,
@@ -30,13 +31,14 @@ type Step = (typeof STEPS)[number];
 const PROFILE_STEPS: Step[] = ["about", "reach", "rera", "projects"];
 const SHORT_STEPS: Step[] = ["phone", "otp", "done"];
 
-type ProfType = "builder" | "broker" | "channel";
+type ProfType = "builder" | "broker" | "channel" | "other";
 type Rera = "own" | "firm" | "none";
 
 const TYPES: { key: ProfType; label: string; icon: LucideIcon }[] = [
   { key: "builder", label: "Builder / Developer", icon: Building2 },
   { key: "broker", label: "Broker Firm", icon: Briefcase },
   { key: "channel", label: "Channel Partner", icon: Users },
+  { key: "other", label: "Other", icon: Store },
 ];
 
 // A single user (an individual realtor) is not a business, so they skip the
@@ -299,7 +301,7 @@ export function OnboardingFlow() {
 
               {business === "yes" && (
                 <Field label="You are a...">
-                  <div className="grid grid-cols-3 gap-3" style={{ animation: "fade-in-up 260ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" style={{ animation: "fade-in-up 260ms cubic-bezier(0.23,1,0.32,1) both" }}>
                     {TYPES.map((t) => (
                       <SelectTile key={t.key} selected={type === t.key} onClick={() => setType(t.key)} icon={t.icon} label={t.label} />
                     ))}
