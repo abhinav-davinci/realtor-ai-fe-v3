@@ -9,6 +9,7 @@ import {
   LineChart,
   TrendingUp,
   TriangleAlert,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -40,6 +41,7 @@ export const NAV: NavItem[] = [
   { label: "Platform Content", icon: Table2, href: "/platform-content" },
   { label: "My Content", icon: LineChart, href: "/my-content" },
   { label: "Analytics", icon: TrendingUp, href: "/analytics" },
+  { label: "Outreach", icon: Send, href: "/outreach" },
 ];
 
 /**
