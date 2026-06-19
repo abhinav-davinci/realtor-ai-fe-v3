@@ -18,6 +18,7 @@ import {
   threadsFor,
   type PlatformKey,
   type TabKey,
+  type WaTemplate,
 } from "@/lib/outreach";
 import { EASE_OUT, PlatformGlyph, StatusPill } from "./outreach-shared";
 import { OutreachInbox } from "./outreach-inbox";
@@ -35,6 +36,9 @@ export function Outreach() {
   // composer): the page header, connection card, and tabs hide to give the
   // editor the whole content area, and the panel's own header handles "back".
   const [focus, setFocus] = useState(false);
+  // "Use Template" hands a template to the Broadcasts tab, which opens the
+  // broadcast wizard pre-filled with it.
+  const [broadcastTemplate, setBroadcastTemplate] = useState<WaTemplate | null>(null);
 
   const platform = platformByKey(platformKey);
   const threads = threadsFor(platformKey);
@@ -44,6 +48,19 @@ export function Outreach() {
     setPlatformKey(key);
     setTab("inbox");
     setFocus(false);
+    setBroadcastTemplate(null);
+  }
+
+  function changeTab(t: TabKey) {
+    setTab(t);
+    setFocus(false);
+    setBroadcastTemplate(null);
+  }
+
+  function useTemplate(t: WaTemplate) {
+    setBroadcastTemplate(t);
+    setTab("broadcasts");
+    setFocus(true);
   }
 
   return (
@@ -65,7 +82,7 @@ export function Outreach() {
             <TabBar
               tabs={platform.tabs}
               active={tab}
-              onChange={setTab}
+              onChange={changeTab}
               unread={unread}
               // re-key so the underline re-measures when the platform's tab set changes
               key={platformKey}
@@ -86,9 +103,13 @@ export function Outreach() {
         ) : tab === "inbox" ? (
           <OutreachInbox key={platformKey} threads={threads} />
         ) : tab === "templates" ? (
-          <TemplatesPanel onFocus={setFocus} />
+          <TemplatesPanel onFocus={setFocus} onUseTemplate={useTemplate} />
         ) : tab === "broadcasts" ? (
-          <BroadcastsPanel />
+          <BroadcastsPanel
+            initialTemplate={broadcastTemplate}
+            onFocus={setFocus}
+            onConsumeTemplate={() => setBroadcastTemplate(null)}
+          />
         ) : tab === "contacts" ? (
           <ContactsPanel />
         ) : (

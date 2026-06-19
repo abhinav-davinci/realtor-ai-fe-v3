@@ -500,10 +500,13 @@ export interface Broadcast {
   id: string;
   name: string;
   template: string;
+  /** Total recipients. */
   audience: number;
+  sent: number;
   delivered: number;
   read: number;
   replied: number;
+  failed: number;
   status: BroadcastStatus;
   when: string;
 }
@@ -514,42 +517,50 @@ export const BROADCASTS: Broadcast[] = [
     name: "Baner launch invite",
     template: "new_listing_alert",
     audience: 1240,
+    sent: 1240,
     delivered: 1212,
     read: 968,
     replied: 142,
+    failed: 28,
     status: "Sent",
-    when: "Yesterday, 11:00 AM",
+    when: "18 Jun 2026",
   },
   {
     id: "b2",
     name: "Weekend open house",
     template: "site_visit_reminder",
     audience: 560,
+    sent: 340,
     delivered: 320,
     read: 180,
     replied: 24,
+    failed: 20,
     status: "Sending",
-    when: "Today, 10:30 AM",
+    when: "19 Jun 2026",
   },
   {
     id: "b3",
     name: "Kharadi price revision",
     template: "price_drop_update",
     audience: 880,
+    sent: 0,
     delivered: 0,
     read: 0,
     replied: 0,
+    failed: 0,
     status: "Scheduled",
-    when: "Sat, 9:00 AM",
+    when: "21 Jun 2026",
   },
   {
     id: "b4",
     name: "NRI investor list",
     template: "new_listing_alert",
     audience: 0,
+    sent: 0,
     delivered: 0,
     read: 0,
     replied: 0,
+    failed: 0,
     status: "Draft",
     when: "Not scheduled",
   },
@@ -628,6 +639,78 @@ export const CONTACTS: OutreachContact[] = [
     tags: ["3BHK"],
     lastContacted: "2 days ago",
     optedIn: true,
+  },
+  {
+    id: "ct7",
+    name: "Vikram Joshi",
+    initials: "VJ",
+    phone: "+91 98220 11763",
+    tags: ["Villa", "Koregaon Park"],
+    lastContacted: "2 days ago",
+    optedIn: true,
+  },
+  {
+    id: "ct8",
+    name: "Neha Reddy",
+    initials: "NR",
+    phone: "+91 99876 55021",
+    tags: ["2BHK", "Site visit"],
+    lastContacted: "3 days ago",
+    optedIn: true,
+  },
+  {
+    id: "ct9",
+    name: "Sameer Gupta",
+    initials: "SG",
+    phone: "+91 99300 88214",
+    tags: ["Investor"],
+    lastContacted: "3 days ago",
+    optedIn: false,
+  },
+  {
+    id: "ct10",
+    name: "Anjali Verma",
+    initials: "AV",
+    phone: "+91 98191 44520",
+    tags: ["3BHK", "Wakad"],
+    lastContacted: "4 days ago",
+    optedIn: true,
+  },
+  {
+    id: "ct11",
+    name: "Karan Singh",
+    initials: "KS",
+    phone: "+91 90040 22119",
+    tags: ["Office space"],
+    lastContacted: "5 days ago",
+    optedIn: true,
+  },
+  {
+    id: "ct12",
+    name: "Deepak Rao",
+    initials: "DR",
+    phone: "+91 99020 31188",
+    tags: ["Penthouse", "Boat Club"],
+    lastContacted: "1 week ago",
+    optedIn: true,
+  },
+  {
+    id: "ct13",
+    name: "Lata Kulkarni",
+    initials: "LK",
+    phone: "+91 98330 90112",
+    tags: ["2BHK"],
+    lastContacted: "1 week ago",
+    optedIn: true,
+  },
+  {
+    id: "ct14",
+    name: "Faisal Ahmed",
+    initials: "FA",
+    phone: "+91 98860 70245",
+    tags: ["3BHK", "Kharadi"],
+    lastContacted: "2 weeks ago",
+    optedIn: false,
   },
 ];
 

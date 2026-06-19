@@ -8,37 +8,28 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  BatteryFull,
   Braces,
   Building2,
   Check,
-  CheckCheck,
   ChevronDown,
-  ChevronLeft,
   ExternalLink,
   FilePlus2,
   FileText,
   Image as ImageIcon,
   Images,
   MessageSquare,
-  Mic,
-  MoreVertical,
-  Paperclip,
   Phone,
   Plus,
   Reply,
-  Signal,
-  Smile,
   Trash2,
   Upload,
   Video,
-  Wifi,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MOCK_LISTINGS } from "@/lib/mock-data";
 import type { TemplateButton, TemplateButtonKind, WaTemplate } from "@/lib/outreach";
-import { EASE_OUT, PlatformGlyph } from "./outreach-shared";
+import { EASE_OUT, PhonePreview, VARIABLES } from "./outreach-shared";
 
 /* ------------------------------- constants -------------------------------- */
 
@@ -52,15 +43,6 @@ const TYPES: { value: TypeValue; label: string; desc: string; icon: typeof Messa
   { value: "Video", label: "Video", desc: "MP4 file", icon: Video },
   { value: "Document", label: "Document", desc: "PDF only", icon: FileText, soon: true },
   { value: "Carousel", label: "Carousel", desc: "Multi card", icon: Images, soon: true },
-];
-
-const VARIABLES = [
-  { label: "First Name", token: "{{first_name}}", sample: "Ketan" },
-  { label: "Last Name", token: "{{last_name}}", sample: "Mehta" },
-  { label: "Full Name", token: "{{full_name}}", sample: "Ketan Mehta" },
-  { label: "Contact Name", token: "{{contact_name}}", sample: "Ketan" },
-  { label: "Project", token: "{{project}}", sample: "Skyline Vista" },
-  { label: "Price", token: "{{price}}", sample: "₹1.25 Cr" },
 ];
 
 const BUTTON_TYPES: {
@@ -80,13 +62,6 @@ interface DraftButton {
   kind: TemplateButtonKind;
   text: string;
   value: string;
-}
-
-/** Replace reserved variables with sample values so the preview reads like a real chat. */
-function renderVars(text: string): string {
-  let out = text;
-  for (const v of VARIABLES) out = out.split(v.token).join(v.sample);
-  return out;
 }
 
 function slugify(s: string): string {
@@ -388,12 +363,14 @@ export function TemplateComposer({
           <div className="sticky top-0">
             <p className="text-ink-muted mb-2.5 text-center text-xs font-medium">Live preview</p>
             <PhonePreview
-              type={type}
+              media={type === "Image" ? "image" : type === "Video" ? "video" : null}
               mediaUrl={mediaUrl}
               header={header}
               body={body}
               footer={footer}
-              buttons={buttons}
+              buttons={buttons
+                .filter((b) => b.text.trim())
+                .map((b) => ({ label: b.text, kind: b.kind }))}
             />
           </div>
         </aside>
@@ -786,147 +763,6 @@ function Picker({
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-/* ------------------------------ phone preview ----------------------------- */
-
-const BTN_ICON: Record<TemplateButtonKind, typeof Phone> = {
-  url: ExternalLink,
-  call: Phone,
-  reply: Reply,
-  copy: Reply,
-};
-
-function PhonePreview({
-  type,
-  mediaUrl,
-  header,
-  body,
-  footer,
-  buttons,
-}: {
-  type: TypeValue;
-  mediaUrl: string | null;
-  header: string;
-  body: string;
-  footer: string;
-  buttons: DraftButton[];
-}) {
-  const hasMedia = type !== "Text";
-  const empty = !header.trim() && !body.trim() && !hasMedia;
-  const namedButtons = buttons.filter((b) => b.text.trim());
-
-  return (
-    <div className="relative mx-auto w-[320px]">
-      {/* hardware side buttons */}
-      <span aria-hidden className="bg-ink/70 absolute -left-[2px] top-[120px] h-7 w-[3px] rounded-l" />
-      <span aria-hidden className="bg-ink/70 absolute -left-[2px] top-[164px] h-12 w-[3px] rounded-l" />
-      <span aria-hidden className="bg-ink/70 absolute -right-[2px] top-[140px] h-16 w-[3px] rounded-r" />
-
-      {/* device frame */}
-      <div className="bg-ink rounded-[2.9rem] p-2.5 shadow-2xl shadow-black/30 ring-1 ring-white/10">
-        <div
-          className="bg-wa-paper relative flex flex-col overflow-hidden rounded-[2.4rem]"
-          style={{ height: "min(640px, calc(100dvh - 15rem))", minHeight: 460 }}
-        >
-          {/* dynamic island */}
-          <div className="absolute top-2 left-1/2 z-20 h-[22px] w-24 -translate-x-1/2 rounded-full bg-black" />
-
-          {/* status bar */}
-          <div className="bg-wa-header flex shrink-0 items-center justify-between px-5 pt-2.5 pb-1 text-[11px] font-medium text-white/95">
-            <span className="tabular-nums">9:41</span>
-            <span className="flex items-center gap-1.5">
-              <Signal className="size-3" />
-              <Wifi className="size-3" />
-              <BatteryFull className="size-3.5" />
-            </span>
-          </div>
-
-          {/* chat header */}
-          <div className="bg-wa-header flex shrink-0 items-center gap-2.5 px-3 pt-1 pb-3 text-white">
-            <ChevronLeft className="size-5 shrink-0 opacity-90" />
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/15">
-              <PlatformGlyph platform="whatsapp" className="size-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm leading-tight font-semibold">Skyline Realty</p>
-              <p className="text-[11px] text-white/75">online</p>
-            </div>
-            <Video className="size-[18px] shrink-0 opacity-90" />
-            <Phone className="size-[17px] shrink-0 opacity-90" />
-            <MoreVertical className="size-[18px] shrink-0 opacity-90" />
-          </div>
-
-          {/* chat body */}
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3.5 py-4">
-            <div className="bg-gold/40 text-gold-foreground mx-auto mb-1 max-w-[88%] rounded-md px-2.5 py-1.5 text-center text-[10px] leading-snug shadow-sm">
-              Messages are end-to-end encrypted. No one outside this chat can read them.
-            </div>
-            {empty ? (
-              <div className="text-ink-muted max-w-[85%] rounded-xl rounded-tl-sm bg-white/80 px-3 py-2 text-[13px] shadow-sm">
-                Your message will appear here...
-                <span className="text-ink-muted/50 mt-1 block text-right text-[10px]">12:30</span>
-              </div>
-            ) : (
-              <div className="max-w-[86%]">
-                <div className="relative rounded-xl rounded-tl-sm bg-white p-1.5 shadow-sm">
-                  {hasMedia &&
-                    (type === "Image" && mediaUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={mediaUrl} alt="" className="mb-1.5 h-36 w-full rounded-lg object-cover" />
-                    ) : (
-                      <div className="text-ink-muted/40 mb-1.5 grid h-36 place-items-center rounded-lg bg-gradient-to-br from-black/[0.07] to-black/[0.03]">
-                        {type === "Video" ? <Video className="size-8" /> : <ImageIcon className="size-8" />}
-                      </div>
-                    ))}
-                  <div className="px-1.5 pb-0.5">
-                    {header.trim() && <p className="text-ink text-[13px] leading-snug font-bold">{renderVars(header)}</p>}
-                    {body.trim() && (
-                      <p className="text-ink/90 mt-0.5 text-[13px] leading-snug whitespace-pre-wrap">{renderVars(body)}</p>
-                    )}
-                    {footer.trim() && <p className="text-ink-muted/70 mt-1.5 text-[11px]">{renderVars(footer)}</p>}
-                    <p className="text-ink-muted/60 mt-1 flex items-center justify-end gap-1 text-[10px]">
-                      12:30
-                      <CheckCheck className="text-accent-blue size-3" />
-                    </p>
-                  </div>
-                </div>
-
-                {namedButtons.length > 0 && (
-                  <div className="mt-1 space-y-1">
-                    {namedButtons.map((b) => {
-                      const Icon = BTN_ICON[b.kind];
-                      return (
-                        <div
-                          key={b.id}
-                          className="text-accent-blue flex items-center justify-center gap-1.5 rounded-lg bg-white py-2 text-[13px] font-medium shadow-sm"
-                        >
-                          <Icon className="size-3.5" />
-                          {b.text}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* compose bar */}
-          <div className="bg-wa-paper flex shrink-0 items-center gap-2 px-2.5 pt-1 pb-3">
-            <div className="flex h-10 flex-1 items-center gap-2 rounded-full bg-white px-3 shadow-sm">
-              <Smile className="text-ink-muted/60 size-4.5 shrink-0" />
-              <span className="text-ink-muted/50 flex-1 truncate text-[13px]">Message</span>
-              <Paperclip className="text-ink-muted/60 size-4 shrink-0" />
-            </div>
-            <span className="bg-wa-header grid size-10 shrink-0 place-items-center rounded-full text-white shadow-sm">
-              <Mic className="size-4.5" />
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

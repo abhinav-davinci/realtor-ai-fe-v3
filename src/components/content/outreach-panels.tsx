@@ -11,6 +11,8 @@ import {
   Check,
   CheckCheck,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleCheck,
   Copy,
   ExternalLink,
@@ -37,6 +39,7 @@ import {
   CONTACTS,
   TEMPLATES,
   TEMPLATE_STATUS_TONE,
+  type Broadcast,
   type ChatFlow,
   type TemplateButtonKind,
   type TemplateStatus,
@@ -44,6 +47,7 @@ import {
 } from "@/lib/outreach";
 import { ConfirmDialog, EASE_OUT, inr, Monogram, StatusPill } from "./outreach-shared";
 import { TemplateComposer } from "./outreach-template-composer";
+import { BroadcastComposer } from "./outreach-broadcast-composer";
 
 /** Scroll wrapper shared by every panel so density matches the page. */
 function PanelScroll({ children }: { children: React.ReactNode }) {
@@ -105,7 +109,13 @@ const STATUS_OPTIONS = ["All Status", "Approved", "Pending", "Rejected"];
 const CATEGORY_OPTIONS = ["All Categories", "Marketing", "Utility", "Authentication"];
 const TYPE_OPTIONS = ["All Types", "Standard", "Media", "Interactive"];
 
-export function TemplatesPanel({ onFocus }: { onFocus?: (v: boolean) => void }) {
+export function TemplatesPanel({
+  onFocus,
+  onUseTemplate,
+}: {
+  onFocus?: (v: boolean) => void;
+  onUseTemplate?: (t: WaTemplate) => void;
+}) {
   const [composing, setComposing] = useState(false);
   const [templates, setTemplates] = useState(TEMPLATES);
   const [pendingDelete, setPendingDelete] = useState<WaTemplate | null>(null);
@@ -196,7 +206,13 @@ export function TemplatesPanel({ onFocus }: { onFocus?: (v: boolean) => void }) 
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {rows.map((t, i) => (
-            <TemplateCard key={t.id} t={t} index={i} onDelete={() => setPendingDelete(t)} />
+            <TemplateCard
+              key={t.id}
+              t={t}
+              index={i}
+              onDelete={() => setPendingDelete(t)}
+              onUse={() => onUseTemplate?.(t)}
+            />
           ))}
         </div>
       )}
@@ -313,7 +329,17 @@ const BTN_ICON: Record<TemplateButtonKind, React.ComponentType<{ className?: str
   copy: Copy,
 };
 
-function TemplateCard({ t, index, onDelete }: { t: WaTemplate; index: number; onDelete: () => void }) {
+function TemplateCard({
+  t,
+  index,
+  onDelete,
+  onUse,
+}: {
+  t: WaTemplate;
+  index: number;
+  onDelete: () => void;
+  onUse: () => void;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function copyMessage() {
@@ -412,7 +438,10 @@ function TemplateCard({ t, index, onDelete }: { t: WaTemplate; index: number; on
             </button>
           </div>
         </div>
-        <Button className="bg-brand-blue hover:bg-brand-blue-hover mt-2.5 h-9 w-full rounded-lg text-sm font-semibold text-white">
+        <Button
+          onClick={onUse}
+          className="bg-brand-blue hover:bg-brand-blue-hover mt-2.5 h-9 w-full rounded-lg text-sm font-semibold text-white"
+        >
           Use Template
         </Button>
       </div>
@@ -433,68 +462,234 @@ function HeaderStatus({ status }: { status: TemplateStatus }) {
 
 /* ------------------------------- broadcasts ------------------------------- */
 
-export function BroadcastsPanel() {
+export function BroadcastsPanel({
+  initialTemplate,
+  onFocus,
+  onConsumeTemplate,
+}: {
+  initialTemplate?: WaTemplate | null;
+  onFocus?: (v: boolean) => void;
+  onConsumeTemplate?: () => void;
+}) {
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>(BROADCASTS);
+  const [wizard, setWizard] = useState(!!initialTemplate);
+  const [wizardTemplate, setWizardTemplate] = useState<WaTemplate | null>(initialTemplate ?? null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All Statuses");
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [page, setPage] = useState(0);
+
+  function openWizard(tpl: WaTemplate | null) {
+    setWizardTemplate(tpl);
+    setWizard(true);
+    onFocus?.(true);
+  }
+  function closeWizard() {
+    setWizard(false);
+    setWizardTemplate(null);
+    onFocus?.(false);
+    onConsumeTemplate?.();
+  }
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return broadcasts.filter((b) => {
+      if (!statusFilter.startsWith("All") && b.status !== statusFilter) return false;
+      if (q && !`${b.name} ${b.template}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [broadcasts, query, statusFilter]);
+
+  const totals = useMemo(
+    () =>
+      filtered.reduce(
+        (a, b) => ({
+          audience: a.audience + b.audience,
+          sent: a.sent + b.sent,
+          delivered: a.delivered + b.delivered,
+          read: a.read + b.read,
+          failed: a.failed + b.failed,
+        }),
+        { audience: 0, sent: 0, delivered: 0, read: 0, failed: 0 }
+      ),
+    [filtered]
+  );
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
+  const safePage = Math.min(page, pageCount - 1);
+  const rows = filtered.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
+
+  if (wizard) {
+    return (
+      <BroadcastComposer
+        initialTemplate={wizardTemplate}
+        onBack={closeWizard}
+        onSave={(b) => {
+          setBroadcasts((prev) => [b, ...prev]);
+          closeWizard();
+        }}
+      />
+    );
+  }
+
   return (
     <PanelScroll>
-      <PanelHead
-        title="Broadcasts"
-        desc="Send a template to a list of contacts and track how it lands."
-        action={<PrimaryButton icon={Megaphone}>New Broadcast</PrimaryButton>}
-      />
-      <div className="space-y-3">
-        {BROADCASTS.map((b) => {
-          const readRate = b.audience > 0 ? Math.round((b.read / b.audience) * 100) : 0;
-          return (
-            <div key={b.id} className={cn(CARD, "p-4")}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-ink truncate text-sm font-semibold">{b.name}</p>
-                  <p className="text-ink-muted mt-0.5 truncate text-xs">
-                    <span className="font-mono">{b.template}</span>
-                    <span className="text-ink-muted/50"> · </span>
-                    {b.when}
-                  </p>
-                </div>
-                <StatusPill tone={BROADCAST_STATUS_TONE[b.status]} dot>
-                  {b.status}
-                </StatusPill>
-              </div>
+      {/* toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-64">
+          <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
+            placeholder="Search broadcasts..."
+            aria-label="Search broadcasts"
+            className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-3 pl-9 text-sm outline-none transition-colors"
+          />
+        </div>
+        <FilterSelect
+          label="status"
+          value={statusFilter}
+          options={["All Statuses", "Sent", "Sending", "Scheduled", "Draft"]}
+          onChange={(v) => {
+            setStatusFilter(v);
+            setPage(0);
+          }}
+        />
+        <div className="ml-auto">
+          <PrimaryButton icon={Megaphone} onClick={() => openWizard(null)}>
+            New Broadcast
+          </PrimaryButton>
+        </div>
+      </div>
 
-              <div className="mt-4 grid grid-cols-4 gap-3">
-                <Metric label="Audience" value={inr(b.audience)} />
-                <Metric label="Delivered" value={inr(b.delivered)} />
-                <Metric label="Read" value={inr(b.read)} />
-                <Metric label="Replied" value={inr(b.replied)} />
-              </div>
+      {/* stats strip */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl border border-black/[0.08] bg-white px-4 py-3 text-sm">
+        <Stat n={filtered.length} label="broadcasts" />
+        <Stat n={totals.audience} label="recipients" />
+        <Stat n={totals.sent} label="sent" tone="text-accent-blue" />
+        <Stat n={totals.delivered} label="delivered" tone="text-brand-green" />
+        <Stat n={totals.read} label="read" tone="text-brand-orange" />
+        <Stat n={totals.failed} label="failed" tone="text-red-500" />
+      </div>
 
-              {b.audience > 0 && (
-                <div className="mt-3">
-                  <div className="text-ink-muted mb-1 flex items-center justify-between text-[11px]">
-                    <span>Read rate</span>
-                    <span className="text-ink font-semibold">{readRate}%</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.07]">
-                    <div
-                      className="bg-brand-green h-full rounded-full transition-[width] duration-500"
-                      style={{ width: `${readRate}%` }}
-                    />
-                  </div>
-                </div>
+      {/* table */}
+      <div className={cn(CARD, "overflow-hidden")}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="text-ink-muted border-b border-black/[0.06] text-left text-xs">
+                <th className="px-4 py-3 font-medium">Broadcast</th>
+                <th className="px-4 py-3 font-medium">Template</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Total</th>
+                <th className="px-4 py-3 text-right font-medium">Sent</th>
+                <th className="px-4 py-3 text-right font-medium">Delivered</th>
+                <th className="px-4 py-3 text-right font-medium">Read</th>
+                <th className="px-4 py-3 text-right font-medium">Failed</th>
+                <th className="px-4 py-3 text-right font-medium whitespace-nowrap">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-ink-muted px-4 py-12 text-center">
+                    No broadcasts match your filters.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((b) => (
+                  <tr key={b.id} className="border-b border-black/[0.04] last:border-0 hover:bg-black/[0.02]">
+                    <td className="text-ink px-4 py-3 font-semibold">{b.name}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-ink-muted block truncate font-mono text-xs">{b.template}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusPill tone={BROADCAST_STATUS_TONE[b.status]} dot>
+                        {b.status}
+                      </StatusPill>
+                    </td>
+                    <td className="text-ink px-4 py-3 text-right font-semibold tabular-nums">{inr(b.audience)}</td>
+                    <td className="text-accent-blue px-4 py-3 text-right font-medium tabular-nums">{inr(b.sent)}</td>
+                    <td className="text-brand-green px-4 py-3 text-right font-medium tabular-nums">{inr(b.delivered)}</td>
+                    <td className="text-brand-orange px-4 py-3 text-right font-medium tabular-nums">{inr(b.read)}</td>
+                    <td
+                      className={cn(
+                        "px-4 py-3 text-right font-medium tabular-nums",
+                        b.failed > 0 ? "text-red-500" : "text-ink-muted"
+                      )}
+                    >
+                      {inr(b.failed)}
+                    </td>
+                    <td className="text-ink-muted px-4 py-3 text-right text-xs whitespace-nowrap">{b.when}</td>
+                  </tr>
+                ))
               )}
-            </div>
-          );
-        })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* pagination */}
+        <div className="text-ink-muted flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.06] px-4 py-2.5 text-xs">
+          <div className="flex items-center gap-2">
+            <span>
+              {filtered.length} broadcast{filtered.length === 1 ? "" : "s"}
+            </span>
+            <span className="text-ink-muted/40">·</span>
+            <span>Rows</span>
+            <select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setPage(0);
+              }}
+              aria-label="Rows per page"
+              className="text-ink h-7 rounded-md border border-black/12 bg-white px-1.5 text-xs outline-none"
+            >
+              {[10, 20, 50].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>
+              Page {safePage + 1} of {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              aria-label="Previous page"
+              className="text-ink grid size-7 place-items-center rounded-md border border-black/12 transition-colors hover:bg-black/[0.04] disabled:opacity-40"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={safePage >= pageCount - 1}
+              aria-label="Next page"
+              className="text-ink grid size-7 place-items-center rounded-md border border-black/12 transition-colors hover:bg-black/[0.04] disabled:opacity-40"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        </div>
       </div>
     </PanelScroll>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Stat({ n, label, tone = "text-ink" }: { n: number; label: string; tone?: string }) {
   return (
-    <div className="rounded-lg bg-black/[0.02] px-3 py-2">
-      <p className="text-ink-muted text-[11px]">{label}</p>
-      <p className="text-ink mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
-    </div>
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className={cn("text-base font-bold tabular-nums", tone)}>{inr(n)}</span>
+      <span className="text-ink-muted text-xs">{label}</span>
+    </span>
   );
 }
 
