@@ -175,34 +175,36 @@ export function TemplatesPanel({
   return (
     <PanelScroll>
       {/* filter toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <FilterSelect label="language" value={language} options={languageOptions} onChange={setLanguage} />
-        <FilterSelect label="status" value={status} options={STATUS_OPTIONS} onChange={setStatus} />
-        <FilterSelect label="category" value={category} options={CATEGORY_OPTIONS} onChange={setCategory} />
-        <FilterSelect label="type" value={type} options={TYPE_OPTIONS} onChange={setType} />
+      <div className="mb-4 flex flex-col gap-2.5 2xl:flex-row 2xl:items-center">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <FilterSelect label="language" value={language} options={languageOptions} onChange={setLanguage} />
+          <FilterSelect label="status" value={status} options={STATUS_OPTIONS} onChange={setStatus} />
+          <FilterSelect label="category" value={category} options={CATEGORY_OPTIONS} onChange={setCategory} />
+          <FilterSelect label="type" value={type} options={TYPE_OPTIONS} onChange={setType} />
 
-        <div className="relative w-full sm:w-52">
-          <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by content..."
-            aria-label="Search templates by content"
-            className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-8 pl-9 text-sm outline-none transition-colors"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label="Clear search"
-              className="text-ink-muted hover:bg-black/[0.05] hover:text-ink absolute top-1/2 right-1.5 grid size-6 -translate-y-1/2 place-items-center rounded-md transition-colors"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
+          <div className="relative w-full sm:w-52">
+            <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by content..."
+              aria-label="Search templates by content"
+              className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-8 pl-9 text-sm outline-none transition-colors"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="text-ink-muted hover:bg-black/[0.05] hover:text-ink absolute top-1/2 right-1.5 grid size-6 -translate-y-1/2 place-items-center rounded-md transition-colors"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex shrink-0 items-center justify-end gap-2">
           <SyncButton />
           <PrimaryButton icon={MessageSquarePlus} onClick={openComposer}>
             New Template
@@ -546,30 +548,32 @@ export function BroadcastsPanel({
   return (
     <PanelScroll>
       {/* toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-64">
-          <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
+      <div className="mb-4 flex flex-col gap-2.5 2xl:flex-row 2xl:items-center">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-64">
+            <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(0);
+              }}
+              placeholder="Search broadcasts..."
+              aria-label="Search broadcasts"
+              className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-3 pl-9 text-sm outline-none transition-colors"
+            />
+          </div>
+          <FilterSelect
+            label="status"
+            value={statusFilter}
+            options={["All Statuses", "Sent", "Sending", "Scheduled", "Draft"]}
+            onChange={(v) => {
+              setStatusFilter(v);
               setPage(0);
             }}
-            placeholder="Search broadcasts..."
-            aria-label="Search broadcasts"
-            className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-3 pl-9 text-sm outline-none transition-colors"
           />
         </div>
-        <FilterSelect
-          label="status"
-          value={statusFilter}
-          options={["All Statuses", "Sent", "Sending", "Scheduled", "Draft"]}
-          onChange={(v) => {
-            setStatusFilter(v);
-            setPage(0);
-          }}
-        />
-        <div className="ml-auto">
+        <div className="flex shrink-0 items-center justify-end gap-2">
           <PrimaryButton icon={Megaphone} onClick={() => openWizard(null)}>
             New Broadcast
           </PrimaryButton>
@@ -793,21 +797,23 @@ export function ContactsPanel() {
   return (
     <PanelScroll>
       {/* toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-64">
-          <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name or phone..."
-            aria-label="Search contacts"
-            className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-3 pl-9 text-sm outline-none transition-colors"
-          />
+      <div className="mb-4 flex flex-col gap-2.5 2xl:flex-row 2xl:items-center">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-64">
+            <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name or phone..."
+              aria-label="Search contacts"
+              className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-3 pl-9 text-sm outline-none transition-colors"
+            />
+          </div>
+          <FilterSelect label="tag" value={tagFilter} options={tagOptions} onChange={setTagFilter} />
         </div>
-        <FilterSelect label="tag" value={tagFilter} options={tagOptions} onChange={setTagFilter} />
 
         {someSelected ? (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex shrink-0 items-center justify-end gap-2">
             <span className="text-ink-muted text-sm">{selected.size} selected</span>
             <button
               type="button"
@@ -827,7 +833,7 @@ export function ContactsPanel() {
             </button>
           </div>
         ) : (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               onClick={() =>
