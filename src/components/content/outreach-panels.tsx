@@ -39,13 +39,17 @@ import { cn } from "@/lib/utils";
 import {
   BROADCASTS,
   BROADCAST_STATUS_TONE,
-  CHAT_FLOWS,
   CONTACTS,
   CONTACT_TAGS,
   TEMPLATES,
   TEMPLATE_STATUS_TONE,
+  deleteFlow,
+  flowSummary,
+  listFlows,
+  saveFlow,
+  seedFlowsIfEmpty,
   type Broadcast,
-  type ChatFlow,
+  type Flow,
   type OutreachContact,
   type TemplateButtonKind,
   type TemplateStatus,
@@ -54,6 +58,7 @@ import {
 import { ConfirmDialog, EASE_OUT, inr, Monogram, StatusPill } from "./outreach-shared";
 import { TemplateComposer } from "./outreach-template-composer";
 import { BroadcastComposer } from "./outreach-broadcast-composer";
+import { FlowComposer } from "./outreach-flow-composer";
 
 /** Scroll wrapper shared by every panel so density matches the page. */
 function PanelScroll({ children }: { children: React.ReactNode }) {
@@ -1185,44 +1190,117 @@ function TagEditor({ value, onChange }: { value: string[]; onChange: (tags: stri
 
 /* ------------------------------- chat flows ------------------------------- */
 
-export function FlowsPanel() {
-  const [flows, setFlows] = useState<ChatFlow[]>(CHAT_FLOWS);
+export function FlowsPanel({ onFocus }: { onFocus?: (v: boolean) => void }) {
+  const [flows, setFlows] = useState<Flow[]>([]);
+  const [composing, setComposing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Flow | null>(null);
+
+  useEffect(() => {
+    // Load flows from localStorage on mount (an external store; can't read it
+    // during SSR/render, so this sync is intentional).
+    seedFlowsIfEmpty();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFlows(listFlows());
+  }, []);
+
+  function openComposer(id: string | null) {
+    setEditingId(id);
+    setComposing(true);
+    onFocus?.(true);
+  }
+  function closeComposer() {
+    setComposing(false);
+    setEditingId(null);
+    onFocus?.(false);
+    setFlows(listFlows());
+  }
+
+  if (composing) {
+    return <FlowComposer flowId={editingId} onBack={closeComposer} onSaved={closeComposer} />;
+  }
+
   return (
     <PanelScroll>
       <PanelHead
         title="Chat flows"
         desc="Automations that reply or route a conversation before the AI takes over."
-        action={<PrimaryButton icon={Workflow}>New Flow</PrimaryButton>}
+        action={
+          <PrimaryButton icon={Workflow} onClick={() => openComposer(null)}>
+            New Flow
+          </PrimaryButton>
+        }
       />
-      <div className="space-y-3">
-        {flows.map((f) => (
-          <div key={f.id} className={cn(CARD, "flex items-center gap-4 p-4")}>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-ink truncate text-sm font-semibold">{f.name}</p>
-                {f.enabled && (
-                  <span className="text-brand-green inline-flex items-center gap-1 text-[11px] font-medium">
-                    <CircleCheck className="size-3" /> Active
-                  </span>
-                )}
+      {flows.length === 0 ? (
+        <div className={cn(CARD, "grid place-items-center p-12 text-center")}>
+          <p className="text-ink-muted text-sm">No chat flows yet. Create one to automate replies.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {flows.map((f) => {
+            const s = flowSummary(f);
+            return (
+              <div key={f.id} className={cn(CARD, "flex items-center gap-3 p-4")}>
+                <button type="button" onClick={() => openComposer(f.id)} className="min-w-0 flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <p className="text-ink truncate text-sm font-semibold">{f.name}</p>
+                    {f.enabled && (
+                      <span className="text-brand-green inline-flex items-center gap-1 text-[11px] font-medium">
+                        <CircleCheck className="size-3" /> Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-ink-muted mt-1 text-xs">
+                    <span className="text-ink font-medium">When</span> {s.trigger}
+                    <span className="text-ink-muted/50"> → </span>
+                    <span className="text-ink font-medium">do</span> {s.action}
+                  </p>
+                  <p className="text-ink-muted mt-1.5 text-[11px]">{inr(f.runs)} runs</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openComposer(f.id)}
+                  aria-label={`Edit ${f.name}`}
+                  className="text-ink-muted hover:text-accent-blue hover:bg-accent-blue/10 grid size-8 shrink-0 place-items-center rounded-lg transition-colors active:scale-95"
+                >
+                  <Pencil className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingDelete(f)}
+                  aria-label={`Delete ${f.name}`}
+                  className="text-ink-muted grid size-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-red-50 hover:text-red-500 active:scale-95"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+                <Toggle
+                  on={f.enabled}
+                  label={`Enable ${f.name}`}
+                  onChange={() => {
+                    saveFlow({ ...f, enabled: !f.enabled });
+                    setFlows(listFlows());
+                  }}
+                />
               </div>
-              <p className="text-ink-muted mt-1 text-xs">
-                <span className="text-ink font-medium">When</span> {f.trigger}
-                <span className="text-ink-muted/50"> → </span>
-                <span className="text-ink font-medium">do</span> {f.action}
-              </p>
-              <p className="text-ink-muted mt-1.5 text-[11px]">{inr(f.runs)} runs</p>
-            </div>
-            <Toggle
-              on={f.enabled}
-              label={`Enable ${f.name}`}
-              onChange={() =>
-                setFlows((prev) => prev.map((x) => (x.id === f.id ? { ...x, enabled: !x.enabled } : x)))
-              }
-            />
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this flow?"
+        message={pendingDelete ? `"${pendingDelete.name}" will be removed. This can't be undone.` : ""}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (pendingDelete) {
+            deleteFlow(pendingDelete.id);
+            setFlows(listFlows());
+          }
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </PanelScroll>
   );
 }

@@ -84,6 +84,9 @@
   --color-wa-header: #075e54;
   --color-wa-paper: #ece5dd;
 
+  /* Chat-flow "Ask question" node accent (no violet existed in the palette). */
+  --color-flow-violet: #7c4dff;
+
   /* Micro-interactions (from Figma prototype) */
   --animate-shimmer: shimmer 2.6s ease-in-out infinite;
   --animate-wiggle: wiggle 3.4s ease-in-out infinite;

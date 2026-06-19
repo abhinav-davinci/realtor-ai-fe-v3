@@ -113,7 +113,7 @@ export function Outreach() {
         ) : tab === "contacts" ? (
           <ContactsPanel />
         ) : (
-          <FlowsPanel />
+          <FlowsPanel onFocus={setFocus} />
         )}
       </div>
     </div>

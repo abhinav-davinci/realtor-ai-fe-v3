@@ -665,3 +665,305 @@ export const CHAT_FLOWS: ChatFlow[] = [
     runs: 96,
   },
 ];
+
+/* --------------------------- chat flow builder ---------------------------- */
+/**
+ * A flow is a TREE of nodes (single parent each). Branch nodes (question,
+ * condition) have several labeled branches; linear nodes (start, message,
+ * delay) have one; end has none. The builder auto-arranges and auto-connects
+ * from this shape, so the user never positions or wires nodes by hand.
+ * Design mode only: stored in localStorage (tt_chat_flows), like tt_agents.
+ */
+
+export type FlowNodeKind = "start" | "message" | "question" | "condition" | "delay" | "end";
+
+export interface FlowBranch {
+  id: string;
+  /** "" for a linear output; "Yes"/"No" for a condition; a reply option for a question. */
+  label: string;
+  /** Child node id, or null for an open "add step" slot. */
+  to: string | null;
+}
+
+export interface FlowNodeConfig {
+  // message
+  text?: string;
+  templateName?: string | null;
+  media?: "image" | "video" | null;
+  quickReplies?: string[];
+  // question
+  question?: string;
+  // condition (branches are fixed Yes / No)
+  matchType?: "contains" | "equals" | "starts_with";
+  keyword?: string;
+  // delay
+  delayValue?: number;
+  delayUnit?: "minutes" | "hours" | "days";
+}
+
+export interface FlowNode {
+  id: string;
+  kind: FlowNodeKind;
+  branches: FlowBranch[];
+  config: FlowNodeConfig;
+}
+
+export interface Flow {
+  id: string;
+  name: string;
+  enabled: boolean;
+  runs: number;
+  nodes: Record<string, FlowNode>;
+  rootId: string;
+  updatedAt: number;
+}
+
+export const FLOW_KIND_LABEL: Record<FlowNodeKind, string> = {
+  start: "Start",
+  message: "Send message",
+  question: "Ask question",
+  condition: "Condition",
+  delay: "Delay",
+  end: "End",
+};
+
+/** Kinds the user can add from the palette (everything except the fixed Start). */
+export const FLOW_PALETTE: FlowNodeKind[] = ["message", "question", "condition", "delay", "end"];
+
+let _nid = 0;
+function nid(prefix = "n"): string {
+  _nid += 1;
+  return `${prefix}-${_nid.toString(36)}-${Date.now().toString(36)}`;
+}
+
+function branch(label = ""): FlowBranch {
+  return { id: nid("b"), label, to: null };
+}
+
+/** A fresh node of a kind, with sensible default branches + config. */
+export function newFlowNode(kind: FlowNodeKind): FlowNode {
+  switch (kind) {
+    case "start":
+      return { id: nid(), kind, branches: [branch()], config: {} };
+    case "message":
+      return { id: nid(), kind, branches: [branch()], config: { text: "" } };
+    case "question":
+      return { id: nid(), kind, branches: [branch("Interested"), branch("Not now")], config: { question: "" } };
+    case "condition":
+      return { id: nid(), kind, branches: [branch("Yes"), branch("No")], config: { matchType: "contains", keyword: "" } };
+    case "delay":
+      return { id: nid(), kind, branches: [branch()], config: { delayValue: 1, delayUnit: "hours" } };
+    case "end":
+      return { id: nid(), kind, branches: [], config: {} };
+  }
+}
+
+/* ------------------------------- templates -------------------------------- */
+
+interface FlowSpec {
+  kind: FlowNodeKind;
+  config?: FlowNodeConfig;
+  next?: FlowSpec | null;
+  branches?: { label: string; next: FlowSpec | null }[];
+}
+
+function buildFlow(name: string, enabled: boolean, runs: number, spec: FlowSpec): Flow {
+  const nodes: Record<string, FlowNode> = {};
+  function add(s: FlowSpec): string {
+    const node = newFlowNode(s.kind);
+    if (s.config) node.config = { ...node.config, ...s.config };
+    if ((s.kind === "question" || s.kind === "condition") && s.branches) {
+      node.branches = s.branches.map((b) => ({ id: nid("b"), label: b.label, to: b.next ? add(b.next) : null }));
+    } else if (s.kind !== "end") {
+      node.branches = [{ id: nid("b"), label: "", to: s.next ? add(s.next) : null }];
+    }
+    nodes[node.id] = node;
+    return node.id;
+  }
+  const rootId = add(spec);
+  return { id: nid("flow"), name, enabled, runs, nodes, rootId, updatedAt: Date.now() };
+}
+
+export interface FlowTemplate {
+  key: string;
+  label: string;
+  desc: string;
+  build: () => Flow;
+}
+
+export const FLOW_TEMPLATES: FlowTemplate[] = [
+  {
+    key: "blank",
+    label: "Blank flow",
+    desc: "Start from scratch with just a trigger",
+    build: () => buildFlow("Untitled flow", false, 0, { kind: "start", next: null }),
+  },
+  {
+    key: "welcome",
+    label: "Welcome new lead",
+    desc: "Greet, qualify, and route the enquiry",
+    build: () =>
+      buildFlow("New enquiry welcome", true, 1840, {
+        kind: "start",
+        next: {
+          kind: "message",
+          config: { text: "Hi {{first_name}}, thanks for reaching out to Skyline Realty. I can help you find the right home." },
+          next: {
+            kind: "question",
+            config: { question: "What are you looking for?" },
+            branches: [
+              { label: "Buy", next: { kind: "message", config: { text: "Great. What is your budget and preferred area?" }, next: { kind: "end" } } },
+              { label: "Rent", next: { kind: "message", config: { text: "Sure. Share your budget and locality and I will send options." }, next: { kind: "end" } } },
+              { label: "Just browsing", next: { kind: "end" } },
+            ],
+          },
+        },
+      }),
+  },
+  {
+    key: "after-hours",
+    label: "After-hours auto-reply",
+    desc: "Hold the lead and book a morning callback",
+    build: () =>
+      buildFlow("After hours auto-reply", true, 612, {
+        kind: "start",
+        next: {
+          kind: "message",
+          config: { text: "Thanks for your message. Our team is offline right now and will get back to you in the morning." },
+          next: {
+            kind: "delay",
+            config: { delayValue: 10, delayUnit: "hours" },
+            next: {
+              kind: "message",
+              config: { text: "Good morning {{first_name}}. When is a good time to call you back today?" },
+              next: { kind: "end" },
+            },
+          },
+        },
+      }),
+  },
+  {
+    key: "site-visit",
+    label: "Site-visit confirmation",
+    desc: "Confirm or reschedule a booked visit",
+    build: () =>
+      buildFlow("Site visit confirmation", true, 388, {
+        kind: "start",
+        next: {
+          kind: "message",
+          config: { text: "Hi {{first_name}}, your site visit to Skyline Vista is booked for Sat at 11 AM." },
+          next: {
+            kind: "question",
+            config: { question: "Does that still work for you?" },
+            branches: [
+              { label: "Confirm", next: { kind: "message", config: { text: "Perfect, see you then. I will share the location pin shortly." }, next: { kind: "end" } } },
+              { label: "Reschedule", next: { kind: "message", config: { text: "No problem. Which day suits you better?" }, next: { kind: "end" } } },
+            ],
+          },
+        },
+      }),
+  },
+  {
+    key: "re-engage",
+    label: "Re-engage cold leads",
+    desc: "Win back leads who went quiet",
+    build: () =>
+      buildFlow("Re-engage cold leads", false, 96, {
+        kind: "start",
+        next: {
+          kind: "message",
+          config: { text: "Hi {{first_name}}, still looking for a home in Baner? A new 3 BHK just listed at ₹1.25 Cr." },
+          next: {
+            kind: "condition",
+            config: { matchType: "contains", keyword: "yes" },
+            branches: [
+              { label: "Yes", next: { kind: "message", config: { text: "Lovely. I will send the brochure and we can book a visit." }, next: { kind: "end" } } },
+              { label: "No", next: { kind: "end" } },
+            ],
+          },
+        },
+      }),
+  },
+];
+
+/* --------------------------------- store ---------------------------------- */
+
+const FLOWS_KEY = "tt_chat_flows";
+
+export function listFlows(): Flow[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(FLOWS_KEY);
+    return raw ? (JSON.parse(raw) as Flow[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getFlow(id: string): Flow | null {
+  return listFlows().find((f) => f.id === id) ?? null;
+}
+
+export function saveFlow(flow: Flow): void {
+  if (typeof window === "undefined") return;
+  const all = listFlows().filter((f) => f.id !== flow.id);
+  all.unshift({ ...flow, updatedAt: Date.now() });
+  try {
+    localStorage.setItem(FLOWS_KEY, JSON.stringify(all));
+  } catch {
+    /* quota or unavailable; ignore in design mode */
+  }
+}
+
+export function deleteFlow(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(FLOWS_KEY, JSON.stringify(listFlows().filter((f) => f.id !== id)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Seed the demo flows once, on first run, so the list is not empty. */
+export function seedFlowsIfEmpty(): void {
+  if (typeof window === "undefined") return;
+  if (listFlows().length > 0) return;
+  FLOW_TEMPLATES.filter((t) => t.key !== "blank").forEach((t) => saveFlow(t.build()));
+}
+
+/* ------------------------------ derived bits ------------------------------ */
+
+/** Trigger + action summary for the flow list card. */
+export function flowSummary(f: Flow): { trigger: string; action: string } {
+  const steps = Object.keys(f.nodes).length - 1; // exclude start
+  const root = f.nodes[f.rootId];
+  const firstId = root?.branches[0]?.to;
+  const first = firstId ? f.nodes[firstId] : null;
+  if (!first) return { trigger: "First message received", action: "No steps yet" };
+  const extra = steps - 1;
+  const action = `${FLOW_KIND_LABEL[first.kind]}${extra > 0 ? ` + ${extra} more step${extra === 1 ? "" : "s"}` : ""}`;
+  return { trigger: "First message received", action };
+}
+
+/** Problems with a single node (drives the validation dot + hints). */
+export function nodeIssues(n: FlowNode): string[] {
+  const out: string[] = [];
+  if (n.kind === "message" && !n.config.text?.trim() && !n.config.templateName) out.push("Add a message");
+  if (n.kind === "question") {
+    if (!n.config.question?.trim()) out.push("Add a question");
+    if (n.branches.length < 2) out.push("Add at least 2 reply options");
+  }
+  if (n.kind === "condition" && !n.config.keyword?.trim()) out.push("Add a keyword to match");
+  if (n.kind === "delay" && !(n.config.delayValue && n.config.delayValue > 0)) out.push("Set a wait time");
+  if ((n.kind === "question" || n.kind === "condition") && n.branches.some((b) => !b.to)) {
+    out.push("Connect each branch to a next step");
+  }
+  return out;
+}
+
+/** All node-level issues across the flow. */
+export function flowIssues(f: Flow): { nodeId: string; issues: string[] }[] {
+  return Object.values(f.nodes)
+    .map((n) => ({ nodeId: n.id, issues: nodeIssues(n) }))
+    .filter((x) => x.issues.length > 0);
+}
