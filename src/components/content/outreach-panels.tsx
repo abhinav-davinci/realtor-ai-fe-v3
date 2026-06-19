@@ -42,7 +42,7 @@ import {
   type TemplateStatus,
   type WaTemplate,
 } from "@/lib/outreach";
-import { EASE_OUT, inr, Monogram, StatusPill } from "./outreach-shared";
+import { ConfirmDialog, EASE_OUT, inr, Monogram, StatusPill } from "./outreach-shared";
 import { TemplateComposer } from "./outreach-template-composer";
 
 /** Scroll wrapper shared by every panel so density matches the page. */
@@ -108,6 +108,7 @@ const TYPE_OPTIONS = ["All Types", "Standard", "Media", "Interactive"];
 export function TemplatesPanel({ onFocus }: { onFocus?: (v: boolean) => void }) {
   const [composing, setComposing] = useState(false);
   const [templates, setTemplates] = useState(TEMPLATES);
+  const [pendingDelete, setPendingDelete] = useState<WaTemplate | null>(null);
   function openComposer() {
     setComposing(true);
     onFocus?.(true);
@@ -195,10 +196,27 @@ export function TemplatesPanel({ onFocus }: { onFocus?: (v: boolean) => void }) 
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {rows.map((t, i) => (
-            <TemplateCard key={t.id} t={t} index={i} />
+            <TemplateCard key={t.id} t={t} index={i} onDelete={() => setPendingDelete(t)} />
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this template?"
+        message={
+          pendingDelete
+            ? `"${pendingDelete.title}" will be removed. This can't be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          setTemplates((prev) => prev.filter((x) => x.id !== pendingDelete?.id));
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </PanelScroll>
   );
 }
@@ -295,7 +313,7 @@ const BTN_ICON: Record<TemplateButtonKind, React.ComponentType<{ className?: str
   copy: Copy,
 };
 
-function TemplateCard({ t, index }: { t: WaTemplate; index: number }) {
+function TemplateCard({ t, index, onDelete }: { t: WaTemplate; index: number; onDelete: () => void }) {
   const [copied, setCopied] = useState(false);
 
   async function copyMessage() {
@@ -386,8 +404,9 @@ function TemplateCard({ t, index }: { t: WaTemplate; index: number }) {
             </button>
             <button
               type="button"
-              aria-label="Delete template"
-              className="grid size-7 place-items-center rounded-md transition-colors hover:bg-red-50 hover:text-red-500"
+              onClick={onDelete}
+              aria-label={`Delete ${t.title}`}
+              className="grid size-7 place-items-center rounded-md transition-colors hover:bg-red-50 hover:text-red-500 active:scale-95"
             >
               <Trash2 className="size-3.5" />
             </button>
