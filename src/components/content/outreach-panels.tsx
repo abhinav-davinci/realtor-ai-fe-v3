@@ -290,14 +290,14 @@ function TemplateCard({ t, index }: { t: WaTemplate; index: number }) {
       </div>
 
       {/* whatsapp message preview */}
-      <div className="bg-wa-paper flex-1 px-3 py-2.5">
+      <div className="bg-wa-paper flex-1 px-3 py-3">
         <div className="relative ml-1.5 max-w-[94%]">
           {/* bubble tail */}
           <span aria-hidden className="absolute -left-1.5 top-2.5 size-3 rotate-45 rounded-[2px] bg-white" />
           <div className="relative rounded-xl rounded-tl-sm bg-white p-2 shadow-sm ring-1 ring-black/[0.03]">
             {t.hasMedia && (
-              <div className="text-ink-muted/40 mb-1.5 grid h-20 place-items-center rounded-lg bg-gradient-to-br from-black/[0.07] to-black/[0.03]">
-                <ImageIcon className="size-6" />
+              <div className="text-ink-muted/40 mb-1.5 grid h-28 place-items-center rounded-lg bg-gradient-to-br from-black/[0.07] to-black/[0.03]">
+                <ImageIcon className="size-7" />
               </div>
             )}
             <div className="px-1 pb-0.5">
