@@ -43,6 +43,7 @@ import {
   type WaTemplate,
 } from "@/lib/outreach";
 import { EASE_OUT, inr, Monogram, StatusPill } from "./outreach-shared";
+import { TemplateComposer } from "./outreach-template-composer";
 
 /** Scroll wrapper shared by every panel so density matches the page. */
 function PanelScroll({ children }: { children: React.ReactNode }) {
@@ -79,12 +80,17 @@ function PanelHead({
 function PrimaryButton({
   children,
   icon: Icon,
+  onClick,
 }: {
   children: React.ReactNode;
   icon: React.ComponentType<{ className?: string }>;
+  onClick?: () => void;
 }) {
   return (
-    <Button className="bg-brand-blue hover:bg-brand-blue-hover h-10 shrink-0 rounded-lg px-4 text-sm font-semibold text-white">
+    <Button
+      onClick={onClick}
+      className="bg-brand-blue hover:bg-brand-blue-hover h-10 shrink-0 rounded-lg px-4 text-sm font-semibold text-white"
+    >
       <Icon className="size-4" />
       {children}
     </Button>
@@ -100,9 +106,11 @@ const CATEGORY_OPTIONS = ["All Categories", "Marketing", "Utility", "Authenticat
 const TYPE_OPTIONS = ["All Types", "Standard", "Media", "Interactive"];
 
 export function TemplatesPanel() {
+  const [composing, setComposing] = useState(false);
+  const [templates, setTemplates] = useState(TEMPLATES);
   const languageOptions = useMemo(
-    () => ["All Languages", ...Array.from(new Set(TEMPLATES.map((t) => t.language)))],
-    []
+    () => ["All Languages", ...Array.from(new Set(templates.map((t) => t.language)))],
+    [templates]
   );
   const [language, setLanguage] = useState("All Languages");
   const [status, setStatus] = useState("All Status");
@@ -112,7 +120,7 @@ export function TemplatesPanel() {
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return TEMPLATES.filter((t) => {
+    return templates.filter((t) => {
       if (!language.startsWith("All") && t.language !== language) return false;
       if (!status.startsWith("All") && t.status !== status) return false;
       if (!category.startsWith("All") && t.category !== category) return false;
@@ -120,7 +128,19 @@ export function TemplatesPanel() {
       if (q && !`${t.title} ${t.name} ${t.heading ?? ""} ${t.body}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [language, status, category, type, query]);
+  }, [templates, language, status, category, type, query]);
+
+  if (composing) {
+    return (
+      <TemplateComposer
+        onBack={() => setComposing(false)}
+        onSave={(tpl) => {
+          setTemplates((prev) => [tpl, ...prev]);
+          setComposing(false);
+        }}
+      />
+    );
+  }
 
   return (
     <PanelScroll>
@@ -154,7 +174,9 @@ export function TemplatesPanel() {
 
         <div className="ml-auto flex items-center gap-2">
           <SyncButton />
-          <PrimaryButton icon={MessageSquarePlus}>New Template</PrimaryButton>
+          <PrimaryButton icon={MessageSquarePlus} onClick={() => setComposing(true)}>
+            New Template
+          </PrimaryButton>
         </div>
       </div>
 
