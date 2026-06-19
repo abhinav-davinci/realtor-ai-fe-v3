@@ -31,6 +31,10 @@ import {
 export function Outreach() {
   const [platformKey, setPlatformKey] = useState<PlatformKey>("whatsapp");
   const [tab, setTab] = useState<TabKey>("inbox");
+  // A panel can request a focused, full-height editor (e.g. the template
+  // composer): the page header, connection card, and tabs hide to give the
+  // editor the whole content area, and the panel's own header handles "back".
+  const [focus, setFocus] = useState(false);
 
   const platform = platformByKey(platformKey);
   const threads = threadsFor(platformKey);
@@ -39,42 +43,50 @@ export function Outreach() {
   function choosePlatform(key: PlatformKey) {
     setPlatformKey(key);
     setTab("inbox");
+    setFocus(false);
   }
 
   return (
     <div className="bg-white flex h-full flex-col overflow-hidden">
-      {/* header + connection card + tabs */}
-      <div className="shrink-0 px-4 pt-6 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-ink text-2xl font-bold">Outreach by Platform</h1>
-            <p className="text-ink-muted mt-1 text-sm">{platform.subtitle}</p>
+      {/* header + connection card + tabs (hidden in focused editor mode) */}
+      {!focus && (
+        <div className="shrink-0 px-4 pt-6 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-ink text-2xl font-bold">Outreach by Platform</h1>
+              <p className="text-ink-muted mt-1 text-sm">{platform.subtitle}</p>
+            </div>
+            <PlatformSelect value={platformKey} onChange={choosePlatform} />
           </div>
-          <PlatformSelect value={platformKey} onChange={choosePlatform} />
+
+          <ConnectionCard platform={platform} />
+
+          {platform.connected && (
+            <TabBar
+              tabs={platform.tabs}
+              active={tab}
+              onChange={setTab}
+              unread={unread}
+              // re-key so the underline re-measures when the platform's tab set changes
+              key={platformKey}
+            />
+          )}
         </div>
-
-        <ConnectionCard platform={platform} />
-
-        {platform.connected && (
-          <TabBar
-            tabs={platform.tabs}
-            active={tab}
-            onChange={setTab}
-            unread={unread}
-            // re-key so the underline re-measures when the platform's tab set changes
-            key={platformKey}
-          />
-        )}
-      </div>
+      )}
 
       {/* tab content */}
-      <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 pb-6 sm:px-6 lg:px-8">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col px-4 pb-6 sm:px-6 lg:px-8",
+          focus ? "pt-5" : "pt-4"
+        )}
+      >
         {!platform.connected ? (
           <ConnectState platform={platform} />
         ) : tab === "inbox" ? (
           <OutreachInbox key={platformKey} threads={threads} />
         ) : tab === "templates" ? (
-          <TemplatesPanel />
+          <TemplatesPanel onFocus={setFocus} />
         ) : tab === "broadcasts" ? (
           <BroadcastsPanel />
         ) : tab === "contacts" ? (

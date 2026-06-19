@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  BatteryFull,
   Braces,
   Building2,
   Check,
@@ -20,13 +21,18 @@ import {
   Image as ImageIcon,
   Images,
   MessageSquare,
+  Mic,
   MoreVertical,
+  Paperclip,
   Phone,
   Plus,
   Reply,
+  Signal,
+  Smile,
   Trash2,
   Upload,
   Video,
+  Wifi,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -209,24 +215,11 @@ export function TemplateComposer({
             <p className="text-ink-muted text-xs">Build a message once, send it to many.</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={save}
-          disabled={!canSave}
-          className={cn(
-            "inline-flex h-10 items-center gap-1.5 rounded-lg px-5 text-sm font-semibold transition-[background-color,transform] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
-            canSave
-              ? "bg-brand-green hover:bg-brand-green-hover text-white active:scale-[0.98]"
-              : "text-ink-muted cursor-not-allowed bg-black/[0.06]"
-          )}
-        >
-          <Check className="size-4" />
-          Save Template
-        </button>
+        <SaveButton canSave={canSave} onSave={save} className="h-10 px-5" />
       </div>
 
       {/* body: form + sticky preview */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto pt-5 pb-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 overflow-y-auto pt-5 pb-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* ------------------------------ form ------------------------------ */}
         <div className="min-w-0 space-y-5">
           {/* creation mode */}
@@ -248,7 +241,7 @@ export function TemplateComposer({
               />
             </div>
             {mode === "listing" && (
-              <div className="mt-3" style={{ animation: `fade-in-up 220ms ${EASE_OUT} both` }}>
+              <div style={{ animation: `fade-in-up 220ms ${EASE_OUT} both` }}>
                 <Picker
                   ariaLabel="Choose a property"
                   value={listingId}
@@ -378,6 +371,16 @@ export function TemplateComposer({
               )}
             </div>
           </Section>
+
+          {/* end-of-form save, so you can save without scrolling back up */}
+          <div className="pt-1">
+            <SaveButton canSave={canSave} onSave={save} className="h-11 w-full" />
+            {!canSave && (
+              <p className="text-ink-muted mt-2 text-center text-xs">
+                Add a template name and message body to save.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* ----------------------------- preview ---------------------------- */}
@@ -404,6 +407,35 @@ export function TemplateComposer({
 const INPUT =
   "text-ink placeholder:text-ink-muted/55 focus:border-accent-blue/50 h-11 w-full rounded-lg border border-black/15 bg-white px-3.5 text-sm outline-none transition-colors";
 
+/** Primary save action, reused in the composer top bar and at the end of the form. */
+function SaveButton({
+  canSave,
+  onSave,
+  className,
+}: {
+  canSave: boolean;
+  onSave: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSave}
+      disabled={!canSave}
+      className={cn(
+        "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-[background-color,transform] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
+        canSave
+          ? "bg-brand-green hover:bg-brand-green-hover text-white active:scale-[0.98]"
+          : "text-ink-muted cursor-not-allowed bg-black/[0.06]",
+        className
+      )}
+    >
+      <Check className="size-4" />
+      Save Template
+    </button>
+  );
+}
+
 function Section({
   label,
   hint,
@@ -419,7 +451,7 @@ function Section({
         <h3 className="text-ink-muted text-xs font-semibold tracking-wide uppercase">{label}</h3>
         {hint && <span className="text-ink-muted/70 text-xs normal-case">({hint})</span>}
       </div>
-      <div className="rounded-xl border border-black/[0.08] bg-white p-4 sm:p-5">{children}</div>
+      <div className="space-y-4 rounded-xl border border-black/[0.08] bg-white p-4 sm:p-5">{children}</div>
     </section>
   );
 }
@@ -439,7 +471,7 @@ function Field({
 }) {
   const overLimit = hint ? approachingLimit(hint) : false;
   return (
-    <div className="not-first:mt-4">
+    <div>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <label className="text-ink text-sm font-medium">
           {label}
@@ -787,73 +819,112 @@ function PhonePreview({
   const namedButtons = buttons.filter((b) => b.text.trim());
 
   return (
-    <div className="mx-auto w-[290px] rounded-[2.4rem] bg-ink p-2.5 shadow-xl shadow-black/20">
-      <div className="overflow-hidden rounded-[1.9rem] bg-wa-paper">
-        {/* chat header */}
-        <div className="bg-wa-header flex items-center gap-2 px-3 py-2.5 text-white">
-          <ChevronLeft className="size-4 shrink-0 opacity-90" />
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/15">
-            <PlatformGlyph platform="whatsapp" className="size-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold leading-tight">Skyline Realty</p>
-            <p className="text-[10px] text-white/70">online</p>
+    <div className="relative mx-auto w-[320px]">
+      {/* hardware side buttons */}
+      <span aria-hidden className="bg-ink/70 absolute -left-[2px] top-[120px] h-7 w-[3px] rounded-l" />
+      <span aria-hidden className="bg-ink/70 absolute -left-[2px] top-[164px] h-12 w-[3px] rounded-l" />
+      <span aria-hidden className="bg-ink/70 absolute -right-[2px] top-[140px] h-16 w-[3px] rounded-r" />
+
+      {/* device frame */}
+      <div className="bg-ink rounded-[2.9rem] p-2.5 shadow-2xl shadow-black/30 ring-1 ring-white/10">
+        <div
+          className="bg-wa-paper relative flex flex-col overflow-hidden rounded-[2.4rem]"
+          style={{ height: "min(640px, calc(100dvh - 15rem))", minHeight: 460 }}
+        >
+          {/* dynamic island */}
+          <div className="absolute top-2 left-1/2 z-20 h-[22px] w-24 -translate-x-1/2 rounded-full bg-black" />
+
+          {/* status bar */}
+          <div className="bg-wa-header flex shrink-0 items-center justify-between px-5 pt-2.5 pb-1 text-[11px] font-medium text-white/95">
+            <span className="tabular-nums">9:41</span>
+            <span className="flex items-center gap-1.5">
+              <Signal className="size-3" />
+              <Wifi className="size-3" />
+              <BatteryFull className="size-3.5" />
+            </span>
           </div>
-          <Phone className="size-4 shrink-0 opacity-90" />
-          <Video className="size-4 shrink-0 opacity-90" />
-          <MoreVertical className="size-4 shrink-0 opacity-90" />
-        </div>
 
-        {/* chat body */}
-        <div className="flex min-h-[320px] flex-col gap-2 px-3 py-4">
-          {empty ? (
-            <div className="max-w-[85%] rounded-xl rounded-tl-sm bg-white/70 px-3 py-2 text-[13px] text-ink-muted shadow-sm">
-              Your message will appear here...
-              <span className="text-ink-muted/50 mt-1 block text-right text-[10px]">12:30</span>
+          {/* chat header */}
+          <div className="bg-wa-header flex shrink-0 items-center gap-2.5 px-3 pt-1 pb-3 text-white">
+            <ChevronLeft className="size-5 shrink-0 opacity-90" />
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/15">
+              <PlatformGlyph platform="whatsapp" className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm leading-tight font-semibold">Skyline Realty</p>
+              <p className="text-[11px] text-white/75">online</p>
             </div>
-          ) : (
-            <div className="max-w-[88%]">
-              <div className="relative rounded-xl rounded-tl-sm bg-white p-1.5 shadow-sm">
-                {hasMedia &&
-                  (type === "Image" && mediaUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={mediaUrl} alt="" className="mb-1.5 h-28 w-full rounded-lg object-cover" />
-                  ) : (
-                    <div className="text-ink-muted/40 mb-1.5 grid h-28 place-items-center rounded-lg bg-gradient-to-br from-black/[0.07] to-black/[0.03]">
-                      {type === "Video" ? <Video className="size-7" /> : <ImageIcon className="size-7" />}
-                    </div>
-                  ))}
-                <div className="px-1.5 pb-0.5">
-                  {header.trim() && <p className="text-ink text-[13px] leading-snug font-bold">{renderVars(header)}</p>}
-                  {body.trim() && (
-                    <p className="text-ink/90 mt-0.5 text-[13px] leading-snug whitespace-pre-wrap">{renderVars(body)}</p>
-                  )}
-                  {footer.trim() && <p className="text-ink-muted/70 mt-1.5 text-[11px]">{renderVars(footer)}</p>}
-                  <p className="text-ink-muted/60 mt-1 flex items-center justify-end gap-1 text-[10px]">
-                    12:30
-                    <CheckCheck className="text-accent-blue size-3" />
-                  </p>
-                </div>
+            <Video className="size-[18px] shrink-0 opacity-90" />
+            <Phone className="size-[17px] shrink-0 opacity-90" />
+            <MoreVertical className="size-[18px] shrink-0 opacity-90" />
+          </div>
+
+          {/* chat body */}
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3.5 py-4">
+            <div className="bg-gold/40 text-gold-foreground mx-auto mb-1 max-w-[88%] rounded-md px-2.5 py-1.5 text-center text-[10px] leading-snug shadow-sm">
+              Messages are end-to-end encrypted. No one outside this chat can read them.
+            </div>
+            {empty ? (
+              <div className="text-ink-muted max-w-[85%] rounded-xl rounded-tl-sm bg-white/80 px-3 py-2 text-[13px] shadow-sm">
+                Your message will appear here...
+                <span className="text-ink-muted/50 mt-1 block text-right text-[10px]">12:30</span>
               </div>
-
-              {namedButtons.length > 0 && (
-                <div className="mt-1 space-y-1">
-                  {namedButtons.map((b) => {
-                    const Icon = BTN_ICON[b.kind];
-                    return (
-                      <div
-                        key={b.id}
-                        className="text-accent-blue flex items-center justify-center gap-1.5 rounded-lg bg-white py-1.5 text-[13px] font-medium shadow-sm"
-                      >
-                        <Icon className="size-3.5" />
-                        {b.text}
+            ) : (
+              <div className="max-w-[86%]">
+                <div className="relative rounded-xl rounded-tl-sm bg-white p-1.5 shadow-sm">
+                  {hasMedia &&
+                    (type === "Image" && mediaUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={mediaUrl} alt="" className="mb-1.5 h-36 w-full rounded-lg object-cover" />
+                    ) : (
+                      <div className="text-ink-muted/40 mb-1.5 grid h-36 place-items-center rounded-lg bg-gradient-to-br from-black/[0.07] to-black/[0.03]">
+                        {type === "Video" ? <Video className="size-8" /> : <ImageIcon className="size-8" />}
                       </div>
-                    );
-                  })}
+                    ))}
+                  <div className="px-1.5 pb-0.5">
+                    {header.trim() && <p className="text-ink text-[13px] leading-snug font-bold">{renderVars(header)}</p>}
+                    {body.trim() && (
+                      <p className="text-ink/90 mt-0.5 text-[13px] leading-snug whitespace-pre-wrap">{renderVars(body)}</p>
+                    )}
+                    {footer.trim() && <p className="text-ink-muted/70 mt-1.5 text-[11px]">{renderVars(footer)}</p>}
+                    <p className="text-ink-muted/60 mt-1 flex items-center justify-end gap-1 text-[10px]">
+                      12:30
+                      <CheckCheck className="text-accent-blue size-3" />
+                    </p>
+                  </div>
                 </div>
-              )}
+
+                {namedButtons.length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    {namedButtons.map((b) => {
+                      const Icon = BTN_ICON[b.kind];
+                      return (
+                        <div
+                          key={b.id}
+                          className="text-accent-blue flex items-center justify-center gap-1.5 rounded-lg bg-white py-2 text-[13px] font-medium shadow-sm"
+                        >
+                          <Icon className="size-3.5" />
+                          {b.text}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* compose bar */}
+          <div className="bg-wa-paper flex shrink-0 items-center gap-2 px-2.5 pt-1 pb-3">
+            <div className="flex h-10 flex-1 items-center gap-2 rounded-full bg-white px-3 shadow-sm">
+              <Smile className="text-ink-muted/60 size-4.5 shrink-0" />
+              <span className="text-ink-muted/50 flex-1 truncate text-[13px]">Message</span>
+              <Paperclip className="text-ink-muted/60 size-4 shrink-0" />
             </div>
-          )}
+            <span className="bg-wa-header grid size-10 shrink-0 place-items-center rounded-full text-white shadow-sm">
+              <Mic className="size-4.5" />
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -105,9 +105,17 @@ const STATUS_OPTIONS = ["All Status", "Approved", "Pending", "Rejected"];
 const CATEGORY_OPTIONS = ["All Categories", "Marketing", "Utility", "Authentication"];
 const TYPE_OPTIONS = ["All Types", "Standard", "Media", "Interactive"];
 
-export function TemplatesPanel() {
+export function TemplatesPanel({ onFocus }: { onFocus?: (v: boolean) => void }) {
   const [composing, setComposing] = useState(false);
   const [templates, setTemplates] = useState(TEMPLATES);
+  function openComposer() {
+    setComposing(true);
+    onFocus?.(true);
+  }
+  function closeComposer() {
+    setComposing(false);
+    onFocus?.(false);
+  }
   const languageOptions = useMemo(
     () => ["All Languages", ...Array.from(new Set(templates.map((t) => t.language)))],
     [templates]
@@ -133,10 +141,10 @@ export function TemplatesPanel() {
   if (composing) {
     return (
       <TemplateComposer
-        onBack={() => setComposing(false)}
+        onBack={closeComposer}
         onSave={(tpl) => {
           setTemplates((prev) => [tpl, ...prev]);
-          setComposing(false);
+          closeComposer();
         }}
       />
     );
@@ -174,7 +182,7 @@ export function TemplatesPanel() {
 
         <div className="ml-auto flex items-center gap-2">
           <SyncButton />
-          <PrimaryButton icon={MessageSquarePlus} onClick={() => setComposing(true)}>
+          <PrimaryButton icon={MessageSquarePlus} onClick={openComposer}>
             New Template
           </PrimaryButton>
         </div>
