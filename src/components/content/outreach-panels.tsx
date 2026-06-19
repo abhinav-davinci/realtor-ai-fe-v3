@@ -835,11 +835,11 @@ export function ContactsPanel() {
               className="text-ink inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]"
             >
               <Download className="size-4" />
-              Sample File
+              Download Sample
             </button>
             <label className="text-ink inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]">
               <Upload className="size-4" />
-              Import CSV/Excel
+              Import
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls"
