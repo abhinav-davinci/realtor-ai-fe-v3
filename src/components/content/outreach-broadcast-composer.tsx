@@ -6,7 +6,7 @@
  * "Use Template" or the Broadcasts tab "New Broadcast". Design mode only; on
  * send it builds a Broadcast and hands it back to the panel (no backend).
  */
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -271,16 +271,16 @@ export function BroadcastComposer({
 
 function Stepper({ step }: { step: number }) {
   return (
-    <div className="mx-auto flex max-w-md items-center">
+    <div className="flex items-center gap-2 sm:gap-3">
       {STEPS.map((s, i) => {
         const done = step > s.n;
         const active = step === s.n;
         return (
-          <div key={s.n} className={cn("flex items-center", i < STEPS.length - 1 && "flex-1")}>
-            <div className="flex flex-col items-center gap-1.5">
+          <Fragment key={s.n}>
+            <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  "grid size-8 place-items-center rounded-full text-sm font-semibold transition-colors duration-200",
+                  "grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold transition-colors duration-200",
                   done
                     ? "bg-brand-green text-white"
                     : active
@@ -292,22 +292,23 @@ function Stepper({ step }: { step: number }) {
               </span>
               <span
                 className={cn(
-                  "absolute mt-10 text-[11px] font-medium whitespace-nowrap transition-colors",
-                  active ? "text-ink" : "text-ink-muted"
+                  "text-[13px] font-medium whitespace-nowrap transition-colors",
+                  active ? "text-ink" : "text-ink-muted",
+                  !active && "hidden sm:inline"
                 )}
               >
                 {s.label}
               </span>
             </div>
             {i < STEPS.length - 1 && (
-              <span className="mx-2 h-0.5 flex-1 overflow-hidden rounded-full bg-black/10">
+              <span className="h-0.5 w-6 shrink-0 overflow-hidden rounded-full bg-black/10 sm:w-12">
                 <span
                   className="bg-brand-green block h-full rounded-full transition-[width] duration-300"
                   style={{ width: done ? "100%" : "0%", transitionTimingFunction: EASE_OUT }}
                 />
               </span>
             )}
-          </div>
+          </Fragment>
         );
       })}
     </div>
