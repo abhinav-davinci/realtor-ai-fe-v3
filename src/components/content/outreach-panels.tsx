@@ -8,11 +8,22 @@
  */
 import { useMemo, useState } from "react";
 import {
+  Check,
+  CheckCheck,
+  ChevronDown,
   CircleCheck,
+  Copy,
+  ExternalLink,
+  Globe,
+  Image as ImageIcon,
   Megaphone,
   MessageSquarePlus,
+  Phone,
   Plus,
+  Reply,
+  RotateCw,
   Search,
+  Trash2,
   Upload,
   Workflow,
   X,
@@ -27,6 +38,9 @@ import {
   TEMPLATES,
   TEMPLATE_STATUS_TONE,
   type ChatFlow,
+  type TemplateButtonKind,
+  type TemplateStatus,
+  type WaTemplate,
 } from "@/lib/outreach";
 import { EASE_OUT, inr, Monogram, StatusPill } from "./outreach-shared";
 
@@ -81,46 +95,290 @@ const CARD = "rounded-2xl border border-black/[0.08] bg-white";
 
 /* ------------------------------- templates -------------------------------- */
 
+const STATUS_OPTIONS = ["All Status", "Approved", "Pending", "Rejected"];
+const CATEGORY_OPTIONS = ["All Categories", "Marketing", "Utility", "Authentication"];
+const TYPE_OPTIONS = ["All Types", "Standard", "Media", "Interactive"];
+
 export function TemplatesPanel() {
+  const languageOptions = useMemo(
+    () => ["All Languages", ...Array.from(new Set(TEMPLATES.map((t) => t.language)))],
+    []
+  );
+  const [language, setLanguage] = useState("All Languages");
+  const [status, setStatus] = useState("All Status");
+  const [category, setCategory] = useState("All Categories");
+  const [type, setType] = useState("All Types");
+  const [query, setQuery] = useState("");
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return TEMPLATES.filter((t) => {
+      if (!language.startsWith("All") && t.language !== language) return false;
+      if (!status.startsWith("All") && t.status !== status) return false;
+      if (!category.startsWith("All") && t.category !== category) return false;
+      if (!type.startsWith("All") && t.kind !== type) return false;
+      if (q && !`${t.title} ${t.name} ${t.heading ?? ""} ${t.body}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [language, status, category, type, query]);
+
   return (
     <PanelScroll>
-      <PanelHead
-        title="Message templates"
-        desc="Pre-approved messages you can send outside the 24 hour window."
-        action={<PrimaryButton icon={MessageSquarePlus}>New Template</PrimaryButton>}
-      />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {TEMPLATES.map((t) => (
-          <div key={t.id} className={cn(CARD, "p-4 transition-shadow hover:shadow-sm")}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-ink truncate font-mono text-sm font-semibold">{t.name}</p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <span className="bg-tag text-tag-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
-                    {t.category}
+      {/* filter toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <FilterSelect label="language" value={language} options={languageOptions} onChange={setLanguage} />
+        <FilterSelect label="status" value={status} options={STATUS_OPTIONS} onChange={setStatus} />
+        <FilterSelect label="category" value={category} options={CATEGORY_OPTIONS} onChange={setCategory} />
+        <FilterSelect label="type" value={type} options={TYPE_OPTIONS} onChange={setType} />
+
+        <div className="relative w-full sm:w-52">
+          <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by content..."
+            aria-label="Search templates by content"
+            className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-8 pl-9 text-sm outline-none transition-colors"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+              className="text-ink-muted hover:bg-black/[0.05] hover:text-ink absolute top-1/2 right-1.5 grid size-6 -translate-y-1/2 place-items-center rounded-md transition-colors"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <SyncButton />
+          <PrimaryButton icon={MessageSquarePlus}>New Template</PrimaryButton>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className={cn(CARD, "grid place-items-center p-12 text-center")}>
+          <p className="text-ink-muted text-sm">No templates match these filters.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {rows.map((t, i) => (
+            <TemplateCard key={t.id} t={t} index={i} />
+          ))}
+        </div>
+      )}
+    </PanelScroll>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isAll = value.startsWith("All");
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Filter by ${label}`}
+        className={cn(
+          "flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40",
+          isAll
+            ? "text-ink-muted border-black/12 bg-white hover:border-black/25"
+            : "border-accent-blue/40 bg-accent-blue/[0.06] text-ink"
+        )}
+      >
+        {value}
+        <ChevronDown className={cn("size-3.5 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
+          <div
+            role="listbox"
+            className="absolute left-0 z-40 mt-2 min-w-[176px] overflow-hidden rounded-xl border border-black/[0.08] bg-white p-1 shadow-lg shadow-black/[0.08]"
+            style={{ animation: `scale-in 160ms ${EASE_OUT} both`, transformOrigin: "top left" }}
+          >
+            {options.map((opt) => {
+              const selected = opt === value;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    onChange(opt);
+                    setOpen(false);
+                  }}
+                  className="hover:bg-accent-blue/[0.06] flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm outline-none"
+                >
+                  <span className={cn("truncate", selected ? "text-ink font-medium" : "text-ink-muted")}>
+                    {opt}
                   </span>
-                  <span className="bg-tag text-tag-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
-                    {t.language}
-                  </span>
-                </div>
+                  {selected && <Check className="text-accent-blue size-4 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SyncButton() {
+  const [syncing, setSyncing] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (syncing) return;
+        setSyncing(true);
+        setTimeout(() => setSyncing(false), 900);
+      }}
+      className="text-ink inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-black/12 bg-white px-3 text-sm font-medium outline-none transition-colors hover:bg-black/[0.03] focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+    >
+      <RotateCw className={cn("size-4", syncing && "animate-spin")} />
+      {syncing ? "Syncing" : "Sync"}
+    </button>
+  );
+}
+
+const BTN_ICON: Record<TemplateButtonKind, React.ComponentType<{ className?: string }>> = {
+  url: ExternalLink,
+  call: Phone,
+  reply: Reply,
+  copy: Copy,
+};
+
+function TemplateCard({ t, index }: { t: WaTemplate; index: number }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(`${t.heading ? `${t.heading}\n\n` : ""}${t.body}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* clipboard blocked; ignore in design mode */
+    }
+  }
+
+  return (
+    <div
+      style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+      className="flex flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-sm transition-shadow hover:shadow-md motion-safe:opacity-0 motion-safe:animate-[fade-in-up_320ms_ease-out_both]"
+    >
+      {/* whatsapp header */}
+      <div className="bg-wa-header flex items-center justify-between gap-2 px-3.5 py-2">
+        <p className="truncate text-sm font-semibold text-white">{t.title}</p>
+        <HeaderStatus status={t.status} />
+      </div>
+
+      {/* whatsapp message preview */}
+      <div className="bg-wa-paper flex-1 px-3 py-2.5">
+        <div className="relative ml-1.5 max-w-[94%]">
+          {/* bubble tail */}
+          <span aria-hidden className="absolute -left-1.5 top-2.5 size-3 rotate-45 rounded-[2px] bg-white" />
+          <div className="relative rounded-xl rounded-tl-sm bg-white p-2 shadow-sm ring-1 ring-black/[0.03]">
+            {t.hasMedia && (
+              <div className="text-ink-muted/40 mb-1.5 grid h-20 place-items-center rounded-lg bg-gradient-to-br from-black/[0.07] to-black/[0.03]">
+                <ImageIcon className="size-6" />
               </div>
-              <StatusPill tone={TEMPLATE_STATUS_TONE[t.status]} dot>
-                {t.status}
-              </StatusPill>
-            </div>
-
-            <p className="text-ink-muted mt-3 line-clamp-2 rounded-lg bg-black/[0.02] px-3 py-2 text-sm">
-              {t.body}
-            </p>
-
-            <div className="text-ink-muted mt-3 flex items-center justify-between text-xs">
-              <span>{t.sent > 0 ? `${inr(t.sent)} sent` : "Not sent yet"}</span>
-              <span>Updated {t.updated}</span>
+            )}
+            <div className="px-1 pb-0.5">
+              {t.heading && <p className="text-ink text-[13px] leading-snug font-bold">{t.heading}</p>}
+              <p className="text-ink/90 mt-0.5 line-clamp-2 text-[13px] leading-snug">{t.body}</p>
+              <p className="text-ink-muted/60 mt-1 flex items-center justify-end gap-1 text-[10px]">
+                10:30 AM
+                <CheckCheck className="text-accent-blue size-3" />
+              </p>
             </div>
           </div>
-        ))}
+
+          {/* quick-reply / cta buttons */}
+          {t.buttons.length > 0 && (
+            <div className="mt-1.5 space-y-1">
+              {t.buttons.map((b) => {
+                const Icon = BTN_ICON[b.kind];
+                return (
+                  <div
+                    key={b.label}
+                    className="text-accent-blue flex items-center justify-center gap-1.5 rounded-lg bg-white py-1.5 text-[13px] font-medium shadow-sm ring-1 ring-black/[0.03]"
+                  >
+                    <Icon className="size-3.5" />
+                    {b.label}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </PanelScroll>
+
+      {/* footer: meta + actions */}
+      <div className="border-t border-black/[0.06] p-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="bg-tag text-tag-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
+              {t.category}
+            </span>
+            <span className="bg-brand-green/10 text-brand-green rounded-full px-2 py-0.5 text-[11px] font-medium">
+              {t.kind}
+            </span>
+          </div>
+          <div className="text-ink-muted flex items-center gap-1">
+            <span className="mr-0.5 inline-flex items-center gap-1 text-[11px]">
+              <Globe className="size-3" />
+              {t.language}
+            </span>
+            <button
+              type="button"
+              onClick={copyMessage}
+              aria-label="Copy message"
+              className="hover:text-ink grid size-7 place-items-center rounded-md transition-colors hover:bg-black/[0.05]"
+            >
+              {copied ? <Check className="text-brand-green size-3.5" /> : <Copy className="size-3.5" />}
+            </button>
+            <button
+              type="button"
+              aria-label="Delete template"
+              className="grid size-7 place-items-center rounded-md transition-colors hover:bg-red-50 hover:text-red-500"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        </div>
+        <Button className="bg-brand-blue hover:bg-brand-blue-hover mt-2.5 h-9 w-full rounded-lg text-sm font-semibold text-white">
+          Use Template
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function HeaderStatus({ status }: { status: TemplateStatus }) {
+  const tone = TEMPLATE_STATUS_TONE[status];
+  const dot = tone === "good" ? "bg-brand-green" : tone === "warm" ? "bg-brand-orange" : "bg-red-500";
+  return (
+    <span className="text-ink inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold">
+      <span className={cn("size-1.5 rounded-full", dot)} />
+      {status}
+    </span>
   );
 }
 

@@ -314,15 +314,34 @@ export function lastMessage(thread: OutreachThread): OutreachMessage | undefined
 /* ------------------------------- templates -------------------------------- */
 
 export type TemplateCategory = "Marketing" | "Utility" | "Authentication";
-export type TemplateStatus = "Approved" | "In review" | "Rejected";
+export type TemplateStatus = "Approved" | "Pending" | "Rejected";
+/** Template composition, used for the "All Types" filter. */
+export type TemplateKind = "Standard" | "Media" | "Interactive";
+/** What a quick-reply / call-to-action button does (drives its icon). */
+export type TemplateButtonKind = "url" | "call" | "reply" | "copy";
+
+export interface TemplateButton {
+  label: string;
+  kind: TemplateButtonKind;
+}
 
 export interface WaTemplate {
   id: string;
+  /** API-style name, e.g. new_property_launch. */
   name: string;
+  /** Human display name shown in the preview header. */
+  title: string;
   category: TemplateCategory;
+  kind: TemplateKind;
   language: string;
   status: TemplateStatus;
+  /** Whether the template carries a header image. */
+  hasMedia: boolean;
+  /** Bold first line of the message (optional). */
+  heading?: string;
+  /** Body rendered with sample values, so the preview reads like a real chat. */
   body: string;
+  buttons: TemplateButton[];
   /** How many times it has been sent. */
   sent: number;
   updated: string;
@@ -331,51 +350,137 @@ export interface WaTemplate {
 export const TEMPLATES: WaTemplate[] = [
   {
     id: "t1",
-    name: "new_listing_alert",
+    name: "new_property_launch",
+    title: "New Property Launch",
     category: "Marketing",
+    kind: "Media",
     language: "English",
     status: "Approved",
-    body: "Hi {{1}}, a new {{2}} just listed in {{3}} at {{4}}. Want me to send photos and the floor plan?",
+    hasMedia: true,
+    heading: "Skyline Vista is now live",
+    body: "Hi Ketan, 2 and 3 BHK homes at Baner IT Park start at ₹1.25 Cr. Early bird offers close on 31 Mar.",
+    buttons: [
+      { label: "View Brochure", kind: "url" },
+      { label: "Talk to Sales", kind: "call" },
+    ],
     sent: 1840,
     updated: "2 days ago",
   },
   {
     id: "t2",
-    name: "site_visit_reminder",
-    category: "Utility",
+    name: "special_launch_price",
+    title: "Special Offer",
+    category: "Marketing",
+    kind: "Media",
     language: "English",
     status: "Approved",
-    body: "Hi {{1}}, this is a reminder for your site visit on {{2}} at {{3}}. Reply 1 to confirm or 2 to reschedule.",
-    sent: 642,
+    hasMedia: true,
+    heading: "Limited time: pre-launch price",
+    body: "Hi Ketan, pre-launch pricing for Skyline Vista is open this week only. Save up to ₹4 L on select 3 BHK homes.",
+    buttons: [
+      { label: "Book Now", kind: "url" },
+      { label: "Schedule Call", kind: "call" },
+    ],
+    sent: 612,
     updated: "5 days ago",
   },
   {
     id: "t3",
-    name: "price_drop_update",
+    name: "special_offer_new",
+    title: "Special Offer New",
     category: "Marketing",
-    language: "Hindi",
-    status: "In review",
-    body: "नमस्ते {{1}}, {{2}} की कीमत अब {{3}} है। क्या मैं आपको विवरण भेजूं?",
+    kind: "Media",
+    language: "English",
+    status: "Pending",
+    hasMedia: true,
+    heading: "Festive launch pricing",
+    body: "Hi Ketan, this Diwali book a home at Skyline Vista and save on stamp duty. Offer valid till 5 Nov.",
+    buttons: [
+      { label: "Book Now", kind: "url" },
+      { label: "Schedule Call", kind: "call" },
+    ],
     sent: 0,
     updated: "6 hours ago",
   },
   {
     id: "t4",
-    name: "login_otp",
-    category: "Authentication",
+    name: "site_visit_invite",
+    title: "Site Visit Invite",
+    category: "Marketing",
+    kind: "Interactive",
     language: "English",
     status: "Approved",
-    body: "{{1}} is your verification code. It is valid for 10 minutes. Do not share it with anyone.",
+    hasMedia: false,
+    heading: "You're invited for a site visit 🏡",
+    body: "Hi Ketan, we'd love to show you around Baner IT Park, the home that fits what you're looking for. Does Sat, 25 Jan at 11 AM work?",
+    buttons: [
+      { label: "Confirm Visit", kind: "reply" },
+      { label: "Pick Another Time", kind: "reply" },
+    ],
+    sent: 388,
+    updated: "1 day ago",
+  },
+  {
+    id: "t5",
+    name: "site_visit_reminder",
+    title: "Site Visit Reminder",
+    category: "Utility",
+    kind: "Interactive",
+    language: "English",
+    status: "Approved",
+    hasMedia: false,
+    heading: "Your visit is confirmed",
+    body: "Hi Ketan, a reminder for your visit to Skyline Vista, Baner on Sat, 25 Jan at 11 AM. Reply to confirm or reschedule.",
+    buttons: [
+      { label: "Confirm", kind: "reply" },
+      { label: "Reschedule", kind: "reply" },
+    ],
+    sent: 642,
+    updated: "5 days ago",
+  },
+  {
+    id: "t6",
+    name: "price_drop_update",
+    title: "Price Update",
+    category: "Marketing",
+    kind: "Standard",
+    language: "Hindi",
+    status: "Pending",
+    hasMedia: false,
+    body: "नमस्ते केतन, स्काईलाइन विस्टा में 3 BHK की कीमत अब ₹1.4 करोड़ है। क्या मैं आपको विवरण भेजूं?",
+    buttons: [],
+    sent: 0,
+    updated: "6 hours ago",
+  },
+  {
+    id: "t7",
+    name: "login_otp",
+    title: "Login OTP",
+    category: "Authentication",
+    kind: "Standard",
+    language: "English",
+    status: "Approved",
+    hasMedia: false,
+    body: "123456 is your TryThat.ai verification code. It is valid for 10 minutes. Do not share it with anyone.",
+    buttons: [{ label: "Copy Code", kind: "copy" }],
     sent: 3120,
     updated: "1 week ago",
   },
   {
-    id: "t5",
+    id: "t8",
     name: "festive_offer_diwali",
+    title: "Diwali Offer",
     category: "Marketing",
+    kind: "Media",
     language: "English",
     status: "Rejected",
-    body: "Happy Diwali {{1}}. Book this week and save {{2}} on select homes. Limited units.",
+    hasMedia: true,
+    heading: "Happy Diwali, Ketan ✨",
+    body: "Celebrate the festival in a new home. Book this week and save ₹2 L on select homes at Skyline Vista. Limited units.",
+    buttons: [
+      { label: "Book Now", kind: "url" },
+      { label: "View Homes", kind: "url" },
+    ],
     sent: 0,
     updated: "3 days ago",
   },
@@ -383,7 +488,7 @@ export const TEMPLATES: WaTemplate[] = [
 
 export const TEMPLATE_STATUS_TONE: Record<TemplateStatus, "good" | "warm" | "cold"> = {
   Approved: "good",
-  "In review": "warm",
+  Pending: "warm",
   Rejected: "cold",
 };
 
