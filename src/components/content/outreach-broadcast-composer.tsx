@@ -6,7 +6,7 @@
  * "Use Template" or the Broadcasts tab "New Broadcast". Design mode only; on
  * send it builds a Broadcast and hands it back to the panel (no backend).
  */
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -1010,6 +1010,18 @@ function AddContactModal({
 
 /* -------------------------------- sent dialog ----------------------------- */
 
+// 8 directions for the "sent" particle burst.
+const SEND_PARTICLES = [
+  { px: 50, py: 0 },
+  { px: 35, py: 35 },
+  { px: 0, py: 50 },
+  { px: -35, py: 35 },
+  { px: -50, py: 0 },
+  { px: -35, py: -35 },
+  { px: 0, py: -50 },
+  { px: 35, py: -35 },
+];
+
 function SentDialog({
   count,
   scheduled,
@@ -1022,17 +1034,42 @@ function SentDialog({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true">
       <div className="bg-ink/40 absolute inset-0" style={{ animation: `fade-in 150ms ${EASE_OUT} both` }} aria-hidden />
-      <div className="modal-pop relative w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl shadow-black/25">
-        <span
-          className="bg-brand-green/10 text-brand-green mx-auto grid size-14 place-items-center rounded-full"
-          style={{ animation: `scale-in 280ms ${EASE_OUT} both` }}
+      <div className="modal-pop relative w-full max-w-sm overflow-hidden rounded-2xl bg-white p-6 text-center shadow-2xl shadow-black/25">
+        {/* icon with broadcasting radar rings + sent particles */}
+        <div className="relative mx-auto grid size-16 place-items-center">
+          {[0, 0.6, 1.2].map((d) => (
+            <span
+              key={d}
+              aria-hidden
+              className="border-brand-green/40 absolute inset-0 rounded-full border-2 motion-reduce:hidden motion-safe:animate-[broadcast-ring_1.8s_ease-out_infinite]"
+              style={{ animationDelay: `${d}s` }}
+            />
+          ))}
+          {SEND_PARTICLES.map((p, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="bg-brand-green absolute top-1/2 left-1/2 size-1.5 rounded-full motion-reduce:hidden motion-safe:animate-[send-particle_900ms_ease-out_both]"
+              style={{ "--px": `${p.px}px`, "--py": `${p.py}px`, animationDelay: `${200 + i * 18}ms` } as CSSProperties}
+            />
+          ))}
+          <span
+            className="bg-brand-green/10 text-brand-green relative grid size-16 place-items-center rounded-full motion-safe:animate-[success-pop_420ms_cubic-bezier(0.34,1.56,0.64,1)_both]"
+          >
+            <Check className="size-8 motion-safe:animate-[tick-pop_460ms_200ms_ease-out_both]" strokeWidth={2.5} />
+          </span>
+        </div>
+
+        <h2
+          className="text-ink mt-4 text-lg font-bold motion-safe:opacity-0 motion-safe:animate-[fade-in-up_360ms_ease-out_both]"
+          style={{ animationDelay: "140ms" }}
         >
-          <Check className="size-7" strokeWidth={2.5} />
-        </span>
-        <h2 className="text-ink mt-4 text-lg font-bold">
           {scheduled ? "Broadcast scheduled" : "Broadcast is on its way"}
         </h2>
-        <p className="text-ink-muted mt-1 text-sm">
+        <p
+          className="text-ink-muted mt-1 text-sm motion-safe:opacity-0 motion-safe:animate-[fade-in-up_360ms_ease-out_both]"
+          style={{ animationDelay: "210ms" }}
+        >
           {scheduled ? "It will go out at the time you set" : "Sending now"} to{" "}
           <span className="text-ink font-semibold">
             {count} contact{count === 1 ? "" : "s"}
@@ -1042,7 +1079,8 @@ function SentDialog({
         <button
           type="button"
           onClick={onDone}
-          className="bg-brand-green hover:bg-brand-green-hover mt-5 h-10 w-full rounded-lg text-sm font-semibold text-white transition-[background-color,transform] active:scale-[0.98]"
+          style={{ animationDelay: "290ms" }}
+          className="bg-brand-green hover:bg-brand-green-hover mt-5 h-10 w-full rounded-lg text-sm font-semibold text-white transition-[background-color,transform] outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40 active:scale-[0.98] motion-safe:opacity-0 motion-safe:animate-[fade-in-up_360ms_ease-out_both]"
         >
           Back to Broadcasts
         </button>
