@@ -6,7 +6,7 @@
  * src/lib/outreach.ts. The "New ..." / "Add ..." actions are the entry points a
  * developer wires to real editors later.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   CheckCheck,
@@ -15,11 +15,15 @@ import {
   ChevronRight,
   CircleCheck,
   Copy,
+  Download,
   ExternalLink,
+  FileDown,
   Globe,
   Image as ImageIcon,
   Megaphone,
   MessageSquarePlus,
+  Minus,
+  Pencil,
   Phone,
   Plus,
   Reply,
@@ -37,10 +41,12 @@ import {
   BROADCAST_STATUS_TONE,
   CHAT_FLOWS,
   CONTACTS,
+  CONTACT_TAGS,
   TEMPLATES,
   TEMPLATE_STATUS_TONE,
   type Broadcast,
   type ChatFlow,
+  type OutreachContact,
   type TemplateButtonKind,
   type TemplateStatus,
   type WaTemplate,
@@ -695,116 +701,485 @@ function Stat({ n, label, tone = "text-ink" }: { n: number; label: string; tone?
 
 /* -------------------------------- contacts -------------------------------- */
 
+const CONTACT_IMPORT_POOL = ["Rohan Shah", "Divya Menon", "Aman Kapoor", "Pooja Iyer", "Nikhil Rao"];
+
+function initialsOf(name: string): string {
+  return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+}
+
+function downloadCsv(filename: string, rows: string[][]) {
+  const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ContactsPanel() {
+  const [contacts, setContacts] = useState<OutreachContact[]>(CONTACTS);
   const [query, setQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState("All Tags");
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [editing, setEditing] = useState<OutreachContact | "new" | null>(null);
+  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
+
+  const tagOptions = useMemo(
+    () => ["All Tags", ...Array.from(new Set(contacts.flatMap((c) => c.tags)))],
+    [contacts]
+  );
+
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return CONTACTS;
-    return CONTACTS.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.phone.toLowerCase().includes(q) ||
-        c.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  }, [query]);
+    const digits = q.replace(/\D/g, "");
+    return contacts.filter((c) => {
+      if (tagFilter !== "All Tags" && !c.tags.includes(tagFilter)) return false;
+      if (!q) return true;
+      const phoneHit = digits.length >= 2 && c.phone.replace(/\D/g, "").includes(digits);
+      return c.name.toLowerCase().includes(q) || phoneHit || c.tags.some((t) => t.toLowerCase().includes(q));
+    });
+  }, [contacts, query, tagFilter]);
+
+  const allSelected = rows.length > 0 && rows.every((c) => selected.has(c.id));
+  const someSelected = selected.size > 0;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) rows.forEach((c) => next.delete(c.id));
+      else rows.forEach((c) => next.add(c.id));
+      return next;
+    });
+  }
+  function saveContact(c: OutreachContact) {
+    setContacts((prev) => (prev.some((x) => x.id === c.id) ? prev.map((x) => (x.id === c.id ? c : x)) : [c, ...prev]));
+    setEditing(null);
+  }
+  function deleteIds(ids: string[]) {
+    setContacts((prev) => prev.filter((c) => !ids.includes(c.id)));
+    setSelected(new Set());
+    setConfirmIds(null);
+  }
+  function importContacts() {
+    const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    setContacts((prev) => [
+      ...CONTACT_IMPORT_POOL.map((name, i) => ({
+        id: `imp-${Date.now()}-${i}`,
+        name,
+        initials: initialsOf(name),
+        phone: `+91 9${(800000000 + i * 173).toString().slice(0, 9)}`,
+        tags: ["Imported"],
+        source: "Import",
+        added: today,
+      })),
+      ...prev,
+    ]);
+  }
 
   return (
     <PanelScroll>
-      <PanelHead
-        title="Contacts"
-        desc="Everyone who has messaged you, with their interests and opt-in status."
-        action={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-medium"
-            >
-              <Upload className="size-4" />
-              Import
-            </Button>
-            <PrimaryButton icon={Plus}>Add Contact</PrimaryButton>
-          </div>
-        }
-      />
-
-      <div className="mb-3 max-w-sm">
-        <div className="relative">
+      {/* toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-64">
           <Search className="text-ink-muted/70 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, number, or tag"
+            placeholder="Search by name or phone..."
             aria-label="Search contacts"
-            className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-10 w-full rounded-lg border border-black/12 bg-white pr-9 pl-9 text-sm outline-none transition-colors"
+            className="text-ink placeholder:text-ink-muted/60 focus:border-accent-blue/50 h-9 w-full rounded-lg border border-black/12 bg-white pr-3 pl-9 text-sm outline-none transition-colors"
           />
-          {query && (
+        </div>
+        <FilterSelect label="tag" value={tagFilter} options={tagOptions} onChange={setTagFilter} />
+
+        {someSelected ? (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-ink-muted text-sm">{selected.size} selected</span>
             <button
               type="button"
-              onClick={() => setQuery("")}
-              aria-label="Clear search"
-              className="text-ink-muted hover:bg-black/[0.05] hover:text-ink absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded-md transition-colors"
+              onClick={() => setConfirmIds([...selected])}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/60 px-3 text-sm font-semibold text-red-500 transition-colors hover:bg-red-50 active:scale-[0.98]"
             >
-              <X className="size-3.5" />
+              <Trash2 className="size-4" />
+              Delete selected
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="text-ink-muted hover:text-ink hover:bg-black/[0.05] grid size-9 place-items-center rounded-lg transition-colors"
+              aria-label="Clear selection"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                downloadCsv("contacts-sample.csv", [
+                  ["name", "phone", "tags"],
+                  ["Ketan Mehta", "+919876543210", "Buyer;Hot lead"],
+                  ["Priya Nair", "+919812345678", "Tenant"],
+                ])
+              }
+              className="text-ink inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]"
+            >
+              <Download className="size-4" />
+              Sample File
+            </button>
+            <label className="text-ink inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]">
+              <Upload className="size-4" />
+              Import CSV/Excel
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) importContacts();
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                downloadCsv("contacts.csv", [
+                  ["name", "phone", "tags", "source", "added"],
+                  ...contacts.map((c) => [c.name, c.phone, c.tags.join(";"), c.source, c.added]),
+                ])
+              }
+              className="text-ink inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]"
+            >
+              <FileDown className="size-4" />
+              Export
+            </button>
+            <PrimaryButton icon={Plus} onClick={() => setEditing("new")}>
+              Add Contact
+            </PrimaryButton>
+          </div>
+        )}
+      </div>
+
+      {/* table */}
+      <div className={cn(CARD, "overflow-hidden")}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="text-ink-muted border-b border-black/[0.06] text-left text-xs">
+                <th className="w-12 px-4 py-3">
+                  <CheckBox
+                    checked={allSelected}
+                    indeterminate={someSelected && !allSelected}
+                    onChange={toggleAll}
+                    label="Select all"
+                  />
+                </th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Phone</th>
+                <th className="px-4 py-3 font-medium">Tags</th>
+                <th className="px-4 py-3 font-medium">Source</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">Added</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-ink-muted px-4 py-12 text-center">
+                    No contacts match your search.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((c) => {
+                  const on = selected.has(c.id);
+                  return (
+                    <tr
+                      key={c.id}
+                      className={cn(
+                        "group border-b border-black/[0.04] transition-colors last:border-0",
+                        on ? "bg-accent-blue/[0.05]" : "hover:bg-black/[0.02]"
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <CheckBox checked={on} onChange={() => toggle(c.id)} label={`Select ${c.name}`} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Monogram initials={c.initials} className="size-9" />
+                          <span className="text-ink font-medium">{c.name}</span>
+                        </div>
+                      </td>
+                      <td className="text-ink-muted px-4 py-3 tabular-nums">{c.phone}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1.5">
+                          {c.tags.map((t) => (
+                            <span key={t} className="bg-tag text-tag-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-ink-muted bg-black/[0.04] rounded-full px-2 py-0.5 text-[11px] font-medium">
+                          {c.source}
+                        </span>
+                      </td>
+                      <td className="text-ink-muted px-4 py-3 text-xs whitespace-nowrap">{c.added}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => setEditing(c)}
+                            aria-label={`Edit ${c.name}`}
+                            className="text-ink-muted hover:text-accent-blue grid size-7 place-items-center rounded-md transition-colors hover:bg-accent-blue/10 active:scale-95"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmIds([c.id])}
+                            aria-label={`Delete ${c.name}`}
+                            className="text-ink-muted grid size-7 place-items-center rounded-md transition-colors hover:bg-red-50 hover:text-red-500 active:scale-95"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-ink-muted border-t border-black/[0.06] px-4 py-2.5 text-xs">
+          {rows.length} contact{rows.length === 1 ? "" : "s"}
+          {rows.length !== contacts.length && ` of ${contacts.length}`}
         </div>
       </div>
 
-      <div className={cn(CARD, "overflow-hidden")}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-ink-muted border-b border-black/[0.06] text-left text-xs">
-              <th className="px-4 py-3 font-medium">Contact</th>
-              <th className="px-4 py-3 font-medium">Tags</th>
-              <th className="px-4 py-3 font-medium">Opt-in</th>
-              <th className="px-4 py-3 text-right font-medium">Last contacted</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-ink-muted px-4 py-10 text-center">
-                  No contacts match that search.
-                </td>
-              </tr>
-            ) : (
-              rows.map((c) => (
-                <tr key={c.id} className="border-b border-black/[0.04] last:border-0 hover:bg-black/[0.02]">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Monogram initials={c.initials} className="size-9" />
-                      <div className="min-w-0">
-                        <p className="text-ink truncate font-medium">{c.name}</p>
-                        <p className="text-ink-muted truncate text-xs">{c.phone}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {c.tags.map((t) => (
-                        <span key={t} className="bg-tag text-tag-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {c.optedIn ? (
-                      <StatusPill tone="good">Opted in</StatusPill>
-                    ) : (
-                      <StatusPill tone="neutral">Not opted in</StatusPill>
-                    )}
-                  </td>
-                  <td className="text-ink-muted px-4 py-3 text-right text-xs whitespace-nowrap">
-                    {c.lastContacted}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {editing && (
+        <ContactModal
+          contact={editing === "new" ? null : editing}
+          onClose={() => setEditing(null)}
+          onSave={saveContact}
+        />
+      )}
+      <ConfirmDialog
+        open={!!confirmIds}
+        title={confirmIds && confirmIds.length > 1 ? `Delete ${confirmIds.length} contacts?` : "Delete this contact?"}
+        message="They will be removed from your contacts. This can't be undone."
+        confirmLabel="Delete"
+        onConfirm={() => confirmIds && deleteIds(confirmIds)}
+        onCancel={() => setConfirmIds(null)}
+      />
     </PanelScroll>
+  );
+}
+
+function CheckBox({
+  checked,
+  indeterminate,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={label}
+      onClick={onChange}
+      className={cn(
+        "grid size-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40",
+        checked || indeterminate ? "bg-accent-blue border-accent-blue text-white" : "border-black/25 bg-white hover:border-black/40"
+      )}
+    >
+      {indeterminate ? <Minus className="size-3" strokeWidth={3} /> : checked ? <Check className="size-3" strokeWidth={3} /> : null}
+    </button>
+  );
+}
+
+function ContactModal({
+  contact,
+  onClose,
+  onSave,
+}: {
+  contact: OutreachContact | null;
+  onClose: () => void;
+  onSave: (c: OutreachContact) => void;
+}) {
+  const [name, setName] = useState(contact?.name ?? "");
+  const [phone, setPhone] = useState(contact?.phone ?? "");
+  const [tags, setTags] = useState<string[]>(contact?.tags ?? []);
+  const ok = phone.trim().length >= 6;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function save() {
+    if (!ok) return;
+    const display = name.trim() || phone.trim();
+    onSave({
+      id: contact?.id ?? `ct-${phone.replace(/\D/g, "")}`,
+      name: display,
+      initials: initialsOf(display),
+      phone: phone.trim(),
+      tags,
+      source: contact?.source ?? "Manual",
+      added: contact?.added ?? new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-ink/40 absolute inset-0" style={{ animation: `fade-in 150ms ${EASE_OUT} both` }} onClick={onClose} aria-hidden />
+      <div className="modal-pop relative w-full max-w-md rounded-2xl bg-white shadow-2xl shadow-black/25">
+        <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3.5">
+          <h2 className="text-ink text-base font-bold">{contact ? "Edit contact" : "Add contact"}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-ink-muted hover:bg-black/[0.05] hover:text-ink grid size-8 place-items-center rounded-lg transition-colors"
+          >
+            <X className="size-4.5" />
+          </button>
+        </div>
+        <div className="space-y-4 p-5">
+          <div>
+            <label className="text-ink mb-1.5 block text-sm font-medium">Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Ketan Mehta"
+              className="text-ink placeholder:text-ink-muted/55 focus:border-accent-blue/50 h-11 w-full rounded-lg border border-black/15 bg-white px-3.5 text-sm outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-ink mb-1.5 block text-sm font-medium">
+              Phone <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+              placeholder="+91 98765 43210"
+              className="text-ink placeholder:text-ink-muted/55 focus:border-accent-blue/50 h-11 w-full rounded-lg border border-black/15 bg-white px-3.5 text-sm outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-ink mb-1.5 block text-sm font-medium">Tags</label>
+            <TagEditor value={tags} onChange={setTags} />
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2.5 border-t border-black/[0.06] px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-ink h-10 rounded-lg border border-black/15 px-4 text-sm font-semibold transition-colors hover:bg-black/[0.04] active:scale-[0.98]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={!ok}
+            className={cn(
+              "h-10 rounded-lg px-4 text-sm font-semibold transition-[background-color,transform] duration-150",
+              ok ? "bg-brand-green hover:bg-brand-green-hover text-white active:scale-[0.98]" : "text-ink-muted cursor-not-allowed bg-black/[0.06]"
+            )}
+          >
+            {contact ? "Save Changes" : "Add Contact"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TagEditor({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) {
+  const [input, setInput] = useState("");
+  const suggestions = CONTACT_TAGS.filter((t) => !value.includes(t));
+
+  function add(tag: string) {
+    const t = tag.trim();
+    if (t && !value.includes(t)) onChange([...value, t]);
+    setInput("");
+  }
+
+  return (
+    <div>
+      <div className="focus-within:border-accent-blue/50 flex min-h-11 flex-wrap items-center gap-1.5 rounded-lg border border-black/15 bg-white p-2 transition-colors">
+        {value.map((t) => (
+          <span
+            key={t}
+            className="bg-accent-blue/10 text-accent-blue inline-flex items-center gap-1 rounded-full py-0.5 pr-1 pl-2 text-xs font-medium"
+            style={{ animation: `scale-in 140ms ${EASE_OUT} both` }}
+          >
+            {t}
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((x) => x !== t))}
+              aria-label={`Remove ${t}`}
+              className="hover:bg-accent-blue/20 grid size-4 place-items-center rounded-full transition-colors"
+            >
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === ",") && input.trim()) {
+              e.preventDefault();
+              add(input);
+            } else if (e.key === "Backspace" && !input && value.length) {
+              onChange(value.slice(0, -1));
+            }
+          }}
+          placeholder={value.length ? "" : "Type a tag and press Enter"}
+          className="text-ink placeholder:text-ink-muted/55 min-w-[120px] flex-1 bg-transparent text-sm outline-none"
+        />
+      </div>
+      {suggestions.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-ink-muted/70 text-[11px]">Suggested:</span>
+          {suggestions.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => add(t)}
+              className="text-ink-muted hover:border-accent-blue/40 hover:text-accent-blue inline-flex items-center gap-0.5 rounded-full border border-black/12 px-2 py-0.5 text-[11px] font-medium transition-colors active:scale-95"
+            >
+              <Plus className="size-2.5" />
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

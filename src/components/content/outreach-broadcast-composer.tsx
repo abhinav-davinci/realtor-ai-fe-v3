@@ -573,8 +573,8 @@ function CsvAction({ onImport }: { onImport: (list: OutreachContact[]) => void }
               initials: initials(name),
               phone: `+91 9${(800000000 + i * 137).toString().slice(0, 9)}`,
               tags: ["Imported"],
-              lastContacted: "Just imported",
-              optedIn: true,
+              source: "Import",
+              added: "Just now",
             }))
           );
           e.target.value = "";
@@ -991,8 +991,8 @@ function AddContactModal({
               initials: initials(display),
               phone: phone.trim(),
               tags: [],
-              lastContacted: "Just added",
-              optedIn: true,
+              source: "Manual",
+              added: "Just now",
             });
           }}
           disabled={!ok}

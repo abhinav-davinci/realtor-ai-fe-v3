@@ -581,137 +581,43 @@ export interface OutreachContact {
   initials: string;
   phone: string;
   tags: string[];
-  lastContacted: string;
-  optedIn: boolean;
+  /** How the contact entered the system: Manual, Import, WhatsApp, Broadcast. */
+  source: string;
+  /** Date the contact was added, e.g. "19 Jun 2026". */
+  added: string;
 }
 
+/** Common real-estate CRM tags offered as quick-add suggestions. */
+export const CONTACT_TAGS = [
+  "Buyer",
+  "Seller",
+  "Tenant",
+  "Landlord",
+  "Investor",
+  "NRI",
+  "Hot lead",
+  "Warm lead",
+  "Premium",
+  "Site visit",
+  "Loan needed",
+  "Follow-up",
+];
+
 export const CONTACTS: OutreachContact[] = [
-  {
-    id: "ct1",
-    name: "Ketan Mehta",
-    initials: "KM",
-    phone: "+91 98231 55012",
-    tags: ["Office space", "Baner"],
-    lastContacted: "10m ago",
-    optedIn: true,
-  },
-  {
-    id: "ct2",
-    name: "Rohit Jadhav",
-    initials: "RJ",
-    phone: "+91 99700 41288",
-    tags: ["3BHK", "Kharadi"],
-    lastContacted: "25m ago",
-    optedIn: true,
-  },
-  {
-    id: "ct3",
-    name: "Rahul Sharma",
-    initials: "RS",
-    phone: "+91 98190 27640",
-    tags: ["Office space"],
-    lastContacted: "1h ago",
-    optedIn: true,
-  },
-  {
-    id: "ct4",
-    name: "Meena Iyer",
-    initials: "MI",
-    phone: "+91 98860 77245",
-    tags: ["2BHK", "Wakad", "Ready to move"],
-    lastContacted: "3h ago",
-    optedIn: true,
-  },
-  {
-    id: "ct5",
-    name: "Imran Khan",
-    initials: "IK",
-    phone: "+91 99300 21884",
-    tags: ["Investor"],
-    lastContacted: "Yesterday",
-    optedIn: false,
-  },
-  {
-    id: "ct6",
-    name: "Priya Nair",
-    initials: "PN",
-    phone: "+91 97654 33120",
-    tags: ["3BHK"],
-    lastContacted: "2 days ago",
-    optedIn: true,
-  },
-  {
-    id: "ct7",
-    name: "Vikram Joshi",
-    initials: "VJ",
-    phone: "+91 98220 11763",
-    tags: ["Villa", "Koregaon Park"],
-    lastContacted: "2 days ago",
-    optedIn: true,
-  },
-  {
-    id: "ct8",
-    name: "Neha Reddy",
-    initials: "NR",
-    phone: "+91 99876 55021",
-    tags: ["2BHK", "Site visit"],
-    lastContacted: "3 days ago",
-    optedIn: true,
-  },
-  {
-    id: "ct9",
-    name: "Sameer Gupta",
-    initials: "SG",
-    phone: "+91 99300 88214",
-    tags: ["Investor"],
-    lastContacted: "3 days ago",
-    optedIn: false,
-  },
-  {
-    id: "ct10",
-    name: "Anjali Verma",
-    initials: "AV",
-    phone: "+91 98191 44520",
-    tags: ["3BHK", "Wakad"],
-    lastContacted: "4 days ago",
-    optedIn: true,
-  },
-  {
-    id: "ct11",
-    name: "Karan Singh",
-    initials: "KS",
-    phone: "+91 90040 22119",
-    tags: ["Office space"],
-    lastContacted: "5 days ago",
-    optedIn: true,
-  },
-  {
-    id: "ct12",
-    name: "Deepak Rao",
-    initials: "DR",
-    phone: "+91 99020 31188",
-    tags: ["Penthouse", "Boat Club"],
-    lastContacted: "1 week ago",
-    optedIn: true,
-  },
-  {
-    id: "ct13",
-    name: "Lata Kulkarni",
-    initials: "LK",
-    phone: "+91 98330 90112",
-    tags: ["2BHK"],
-    lastContacted: "1 week ago",
-    optedIn: true,
-  },
-  {
-    id: "ct14",
-    name: "Faisal Ahmed",
-    initials: "FA",
-    phone: "+91 98860 70245",
-    tags: ["3BHK", "Kharadi"],
-    lastContacted: "2 weeks ago",
-    optedIn: false,
-  },
+  { id: "ct1", name: "Ketan Mehta", initials: "KM", phone: "+91 98231 55012", tags: ["Buyer", "Office space"], source: "WhatsApp", added: "19 Jun 2026" },
+  { id: "ct2", name: "Rohit Jadhav", initials: "RJ", phone: "+91 99700 41288", tags: ["Buyer", "3BHK", "Hot lead"], source: "WhatsApp", added: "19 Jun 2026" },
+  { id: "ct3", name: "Rahul Sharma", initials: "RS", phone: "+91 98190 27640", tags: ["Tenant", "Office space"], source: "Manual", added: "18 Jun 2026" },
+  { id: "ct4", name: "Meena Iyer", initials: "MI", phone: "+91 98860 77245", tags: ["Buyer", "2BHK", "Ready to move"], source: "Import", added: "18 Jun 2026" },
+  { id: "ct5", name: "Imran Khan", initials: "IK", phone: "+91 99300 21884", tags: ["Investor", "Premium"], source: "Manual", added: "17 Jun 2026" },
+  { id: "ct6", name: "Priya Nair", initials: "PN", phone: "+91 97654 33120", tags: ["Buyer", "3BHK"], source: "Broadcast", added: "17 Jun 2026" },
+  { id: "ct7", name: "Vikram Joshi", initials: "VJ", phone: "+91 98220 11763", tags: ["Buyer", "Villa", "Premium"], source: "Manual", added: "16 Jun 2026" },
+  { id: "ct8", name: "Neha Reddy", initials: "NR", phone: "+91 99876 55021", tags: ["Tenant", "2BHK", "Site visit"], source: "WhatsApp", added: "16 Jun 2026" },
+  { id: "ct9", name: "Sameer Gupta", initials: "SG", phone: "+91 99300 88214", tags: ["Investor", "NRI"], source: "Import", added: "15 Jun 2026" },
+  { id: "ct10", name: "Anjali Verma", initials: "AV", phone: "+91 98191 44520", tags: ["Buyer", "3BHK", "Follow-up"], source: "Manual", added: "14 Jun 2026" },
+  { id: "ct11", name: "Karan Singh", initials: "KS", phone: "+91 90040 22119", tags: ["Tenant", "Office space"], source: "Manual", added: "13 Jun 2026" },
+  { id: "ct12", name: "Deepak Rao", initials: "DR", phone: "+91 99020 31188", tags: ["Buyer", "Penthouse", "Premium"], source: "Broadcast", added: "12 Jun 2026" },
+  { id: "ct13", name: "Lata Kulkarni", initials: "LK", phone: "+91 98330 90112", tags: ["Tenant", "2BHK"], source: "Import", added: "11 Jun 2026" },
+  { id: "ct14", name: "Faisal Ahmed", initials: "FA", phone: "+91 98860 70245", tags: ["Buyer", "3BHK", "Warm lead"], source: "Manual", added: "10 Jun 2026" },
 ];
 
 /* ------------------------------- chat flows ------------------------------- */
