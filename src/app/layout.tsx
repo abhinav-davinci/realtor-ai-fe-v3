@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth";
+import { AutoCallProvider } from "@/components/leads/auto-call-context";
+import { AutoCallOverlay } from "@/components/leads/auto-call-overlay";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -27,7 +29,12 @@ export default function RootLayout({
           attribute-only diffs on this element, not its children. */}
       <body className="bg-cream text-ink min-h-screen" suppressHydrationWarning>
         <AuthProvider>
-          <TooltipProvider delay={200}>{children}</TooltipProvider>
+          <TooltipProvider delay={200}>
+            <AutoCallProvider>
+              {children}
+              <AutoCallOverlay />
+            </AutoCallProvider>
+          </TooltipProvider>
         </AuthProvider>
       </body>
     </html>

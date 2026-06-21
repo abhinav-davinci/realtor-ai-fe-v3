@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Download, PhoneCall, Sparkles, Upload } from "lucide-react";
+import { ArrowRight, Download, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
 import { templateById, type TemplateId } from "@/lib/agents";
@@ -18,7 +18,7 @@ import { KpiStrip, SourcesPanel } from "./lead-sources";
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceChip } from "./source-icons";
 import { UploadLeadsModal } from "./upload-leads-modal";
-import { AutoCallModal } from "./auto-call-modal";
+import { AutoCallButton } from "./auto-call-context";
 
 const PREVIEW_COUNT = 6;
 
@@ -39,7 +39,6 @@ export function LeadIntelligence() {
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [autoCallOpen, setAutoCallOpen] = useState(false);
 
   const scoped = templateId ? allLeads.filter((l) => l.templateId === templateId) : allLeads;
   const recent = scoped.slice(0, PREVIEW_COUNT);
@@ -62,9 +61,7 @@ export function LeadIntelligence() {
           <Button onClick={() => setUploadOpen(true)} variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Upload className="size-4" /> Upload Leads
           </Button>
-          <Button onClick={() => setAutoCallOpen(true)} className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3.5 text-sm font-semibold text-white">
-            <PhoneCall className="size-4" /> Auto-call Hot Leads
-          </Button>
+          <AutoCallButton />
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Download className="size-4" /> Download All Leads
           </Button>
@@ -128,7 +125,6 @@ export function LeadIntelligence() {
       </div>
 
       {uploadOpen && <UploadLeadsModal onClose={() => setUploadOpen(false)} />}
-      {autoCallOpen && <AutoCallModal onClose={() => setAutoCallOpen(false)} />}
     </div>
   );
 }

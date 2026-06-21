@@ -29,10 +29,11 @@ import {
   TIER_ORDER,
   listScoredLeads,
   type LeadSource,
-  type ScoredLead,
   type Tier,
 } from "@/lib/lead-intelligence";
 import { SourceIcon } from "./source-icons";
+import { useAutoCall } from "./auto-call-context";
+import { buildCalls, callState, summarize, type Call, type CallOutcome, type CallState } from "./auto-call-run";
 
 /* --------------------------------- helpers -------------------------------- */
 
@@ -66,87 +67,21 @@ const INTENT_OPTS: { value: Tier | "all"; label: string }[] = [
   { value: "all", label: "Any intent" },
 ];
 
-/* ------------------------------ call-run model ---------------------------- */
-/*
- * Frontend-only simulation of a live auto-call run so the realtor can watch
- * calls dial out and connect in real time. Outcomes are weighted-random, fixed
- * once at the start of the run; the timeline is derived purely from `elapsed`
- * (a single ticking clock), so it pauses, stops, and cleans up cleanly.
- */
-
-type CallState = "queued" | "dialing" | "ringing" | "connected" | "done";
-type CallOutcome =
-  | "qualified"
-  | "interested"
-  | "callback"
-  | "not-interested"
-  | "no-answer"
-  | "voicemail"
-  | "busy";
-
-const OUTCOME_META: Record<CallOutcome, { label: string; connected: boolean; chip: string; icon: typeof Check }> = {
-  qualified: { label: "Qualified", connected: true, chip: "bg-brand-green/10 text-brand-green", icon: CheckCircle2 },
-  interested: { label: "Interested", connected: true, chip: "bg-accent-blue/10 text-accent-blue", icon: Check },
-  callback: { label: "Callback set", connected: true, chip: "bg-brand-orange/10 text-brand-orange", icon: PhoneOutgoing },
-  "not-interested": { label: "Not interested", connected: true, chip: "bg-black/[0.05] text-ink-muted", icon: Check },
-  "no-answer": { label: "No answer", connected: false, chip: "bg-black/[0.04] text-ink-muted", icon: PhoneMissed },
-  voicemail: { label: "Voicemail", connected: false, chip: "bg-black/[0.04] text-ink-muted", icon: Voicemail },
-  busy: { label: "Busy", connected: false, chip: "bg-black/[0.04] text-ink-muted", icon: PhoneOff },
+const OUTCOME_META: Record<CallOutcome, { label: string; chip: string; icon: typeof Check }> = {
+  qualified: { label: "Qualified", chip: "bg-brand-green/10 text-brand-green", icon: CheckCircle2 },
+  interested: { label: "Interested", chip: "bg-accent-blue/10 text-accent-blue", icon: Check },
+  callback: { label: "Callback set", chip: "bg-brand-orange/10 text-brand-orange", icon: PhoneOutgoing },
+  "not-interested": { label: "Not interested", chip: "bg-black/[0.05] text-ink-muted", icon: Check },
+  "no-answer": { label: "No answer", chip: "bg-black/[0.04] text-ink-muted", icon: PhoneMissed },
+  voicemail: { label: "Voicemail", chip: "bg-black/[0.04] text-ink-muted", icon: Voicemail },
+  busy: { label: "Busy", chip: "bg-black/[0.04] text-ink-muted", icon: PhoneOff },
 };
-
-interface Call {
-  key: string;
-  lead: ScoredLead;
-  startOffset: number;
-  ring: number;
-  talk: number;
-  answered: boolean;
-  outcome: CallOutcome;
-}
-
-const TICK = 100;
-const STAGGER = 1100;
-const DIAL_MS = 600;
-
-function weighted<T>(items: [T, number][]): T {
-  const total = items.reduce((s, [, w]) => s + w, 0);
-  let r = Math.random() * total;
-  for (const [v, w] of items) if ((r -= w) <= 0) return v;
-  return items[0][0];
-}
-
-function buildCalls(leads: ScoredLead[]): Call[] {
-  return leads.map((lead, i) => {
-    const answered = Math.random() < 0.62;
-    const outcome = answered
-      ? weighted<CallOutcome>([["qualified", 30], ["interested", 30], ["callback", 20], ["not-interested", 20]])
-      : weighted<CallOutcome>([["no-answer", 55], ["voicemail", 30], ["busy", 15]]);
-    return {
-      key: `${lead.id}-${i}`,
-      lead,
-      startOffset: i * STAGGER,
-      ring: 800 + Math.floor(Math.random() * 900),
-      talk: answered ? 1500 + Math.floor(Math.random() * 2200) : 0,
-      answered,
-      outcome,
-    };
-  });
-}
-
-function callState(c: Call, elapsed: number): CallState {
-  const local = elapsed - c.startOffset;
-  if (local < 0) return "queued";
-  if (local < DIAL_MS) return "dialing";
-  if (local < DIAL_MS + c.ring) return "ringing";
-  if (c.answered && local < DIAL_MS + c.ring + c.talk) return "connected";
-  return "done";
-}
-const callEnd = (c: Call) => c.startOffset + DIAL_MS + c.ring + c.talk;
 
 /* --------------------------------- modal ---------------------------------- */
 
-export function AutoCallModal({ onClose }: { onClose: () => void }) {
+export function AutoCallModal() {
   const router = useRouter();
+  const run = useAutoCall();
   const agents = useMemo(() => listAgents().filter((a) => a.channels.includes("voice")), []);
   const leads = useMemo(() => listScoredLeads(), []);
 
@@ -164,33 +99,12 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
   const [minScore, setMinScore] = useState("");
   const [advanced, setAdvanced] = useState(false);
 
-  // run state
-  const [phase, setPhase] = useState<"config" | "running">("config");
-  const [calls, setCalls] = useState<Call[]>([]);
-  const [elapsed, setElapsed] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [stopped, setStopped] = useState(false);
-
-  const total = calls.length;
-  const totalDur = useMemo(() => calls.reduce((m, c) => Math.max(m, callEnd(c)), 0), [calls]);
-  const complete = phase === "running" && (stopped || (total > 0 && elapsed >= totalDur));
-
-  // Esc closes from config or once the run is over; while a run is live it's
-  // guarded so a stray key doesn't lose the progress view (use Stop or the X).
+  // Esc minimizes the modal (the run, if any, keeps going behind the tracker).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && (phase !== "running" || complete)) onClose();
-    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && run.closeModal();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, phase, complete]);
-
-  // The run clock: advance `elapsed` until everything resolves.
-  useEffect(() => {
-    if (phase !== "running" || paused || stopped || complete) return;
-    const id = setInterval(() => setElapsed((e) => Math.min(totalDur, e + TICK)), TICK);
-    return () => clearInterval(id);
-  }, [phase, paused, stopped, complete, totalDur]);
+  }, [run]);
 
   const agent = agents.find((a) => a.id === agentId) ?? null;
   const minScoreNum = minScore.trim() === "" ? null : Number(minScore);
@@ -221,21 +135,11 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
 
   const canStart = !!agent && willCall > 0 && windowMin > 0;
 
-  function start() {
-    if (!canStart) return;
+  function startRun() {
+    if (!canStart || !agent) return;
+    const t = templateById(agent.templateId);
     const top = [...matches].sort((a, b) => b.score - a.score).slice(0, willCall);
-    setCalls(buildCalls(top));
-    setElapsed(0);
-    setPaused(false);
-    setStopped(false);
-    setPhase("running");
-  }
-  function resetRun() {
-    setPhase("config");
-    setCalls([]);
-    setElapsed(0);
-    setPaused(false);
-    setStopped(false);
+    run.start(buildCalls(top), { name: agent.name, gradient: t.gradient, icon: t.icon });
   }
 
   function toggleSource(s: LeadSource) {
@@ -247,22 +151,12 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
     });
   }
 
-  // Derived per-call states + roll-up counts for the live view.
-  const states = calls.map((c) => callState(c, elapsed));
-  const connected = states.filter((s, i) => s === "connected" || (s === "done" && calls[i].answered)).length;
-  const missed = calls.filter((c, i) => states[i] === "done" && !c.answered).length;
-  const active = states.filter((s) => s === "dialing" || s === "ringing").length;
-  const dialled = connected + missed + active;
-  const qualified = calls.filter((c, i) => states[i] === "done" && c.outcome === "qualified").length;
-  const resolvedCount = states.filter((s) => s === "done").length;
-  const rate = resolvedCount > 0 ? Math.round((connected / Math.max(connected + missed, 1)) * 100) : null;
-  const headerT = agent ? templateById(agent.templateId) : null;
+  // Running view: derive per-call states + roll-up counts from the shared clock.
+  const states = run.calls.map((c) => callState(c, run.elapsed));
+  const s = summarize(run.calls, run.elapsed);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={() => (phase !== "running" || complete) && onClose()}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => run.closeModal()}>
       <div
         role="dialog"
         aria-modal="true"
@@ -270,26 +164,26 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
         className="modal-pop flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {phase === "running" ? (
+        {run.active ? (
           /* ------------------------------ running --------------------------- */
           <>
             {/* header */}
             <div className="flex items-center gap-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
-              {headerT && <AgentOrb colors={headerT.gradient} size={40} icon={headerT.icon} speaking={connected > 0 && !complete} />}
+              {run.agent && <AgentOrb colors={run.agent.gradient} size={40} icon={run.agent.icon} speaking={s.connected > 0 && !run.complete} />}
               <div className="min-w-0 flex-1">
                 <h2 className="text-ink truncate text-lg font-bold">
-                  {complete ? (stopped ? "Run stopped" : "Run complete") : `${agent?.name} is calling`}
+                  {run.complete ? (run.stopped ? "Run stopped" : "Run complete") : `${run.agent?.name} is calling`}
                 </h2>
                 <p className="text-ink-muted text-xs">
-                  {complete
-                    ? `Dialled ${dialled} of ${total} · ${connected} connected · ${qualified} qualified`
-                    : `Dialling ${dialled} of ${total} · ${connected} connected`}
+                  {run.complete
+                    ? `Dialled ${s.dialled} of ${s.total} · ${s.connected} connected · ${s.qualified} qualified`
+                    : `Dialling ${s.dialled} of ${s.total} · ${s.connected} connected`}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={onClose}
-                aria-label="Close"
+                onClick={() => run.closeModal()}
+                aria-label={run.complete ? "Close" : "Minimize"}
                 className="text-ink-muted hover:text-ink hover:bg-black/[0.04] -mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg"
               >
                 <X className="size-5" />
@@ -299,9 +193,9 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
             {/* progress + stats */}
             <div className="space-y-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
               <div className="grid grid-cols-3 gap-2">
-                <StatTile label="Dialled" value={`${dialled}/${total}`} />
-                <StatTile label="Connected" value={connected} tone="green" />
-                <StatTile label="Qualified" value={qualified} tone="green" />
+                <StatTile label="Dialled" value={`${s.dialled}/${s.total}`} />
+                <StatTile label="Connected" value={s.connected} tone="green" />
+                <StatTile label="Qualified" value={s.qualified} tone="green" />
               </div>
 
               <div>
@@ -309,16 +203,13 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
                   role="progressbar"
                   aria-label="Calls completed"
                   aria-valuemin={0}
-                  aria-valuemax={total}
-                  aria-valuenow={resolvedCount}
+                  aria-valuemax={s.total}
+                  aria-valuenow={s.resolved}
                   className="flex h-2.5 w-full overflow-hidden rounded-full bg-black/[0.07]"
                 >
-                  <div className="bg-brand-green transition-[width] duration-500 ease-out" style={{ width: `${(connected / total) * 100}%` }} />
-                  <div className="bg-ink-muted/30 transition-[width] duration-500 ease-out" style={{ width: `${(missed / total) * 100}%` }} />
-                  <div
-                    className="bg-accent-blue/40 transition-[width] duration-300 ease-out motion-safe:animate-pulse"
-                    style={{ width: `${(active / total) * 100}%` }}
-                  />
+                  <div className="bg-brand-green transition-[width] duration-500 ease-out" style={{ width: `${(s.connected / s.total) * 100}%` }} />
+                  <div className="bg-ink-muted/30 transition-[width] duration-500 ease-out" style={{ width: `${(s.missed / s.total) * 100}%` }} />
+                  <div className="bg-accent-blue/40 transition-[width] duration-300 ease-out motion-safe:animate-pulse" style={{ width: `${(s.active / s.total) * 100}%` }} />
                 </div>
                 <div className="text-ink-muted mt-1.5 flex items-center justify-between text-[11px]">
                   <span className="inline-flex items-center gap-3">
@@ -329,32 +220,29 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
                       <span className="bg-ink-muted/30 size-2 rounded-full" /> Missed
                     </span>
                   </span>
-                  {rate != null && <span className="tabular-nums">{rate}% answered</span>}
+                  {s.rate != null && <span className="tabular-nums">{s.rate}% answered</span>}
                 </div>
               </div>
             </div>
 
             {/* live call list */}
             <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-5 py-3 sm:px-6">
-              {calls.map((c, i) => (
-                <CallRow key={c.key} call={c} state={states[i]} runOver={complete} />
+              {run.calls.map((c, i) => (
+                <CallRow key={c.key} call={c} state={states[i]} runOver={run.complete} />
               ))}
             </div>
 
             {/* footer */}
             <div className="flex items-center gap-2 border-t border-black/[0.06] px-5 py-4 sm:px-6">
-              {complete ? (
+              {run.complete ? (
                 <>
-                  <Button
-                    variant="outline"
-                    onClick={resetRun}
-                    className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold"
-                  >
+                  <Button variant="outline" onClick={() => run.clearRun()} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
                     New run
                   </Button>
                   <Button
                     onClick={() => {
-                      onClose();
+                      run.clearRun();
+                      run.closeModal();
                       router.push("/leads/all");
                     }}
                     className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
@@ -364,19 +252,19 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
                 </>
               ) : (
                 <>
-                  <p className="text-ink-muted hidden text-xs sm:block">You can keep working. Calls run in the background.</p>
+                  <p className="text-ink-muted hidden text-xs sm:block">Close this to keep the calls running in the background.</p>
                   <div className="ml-auto flex items-center gap-2">
                     <Button
                       variant="outline"
-                      onClick={() => setPaused((p) => !p)}
+                      onClick={() => (run.paused ? run.resume() : run.pause())}
                       className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold"
                     >
-                      {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
-                      {paused ? "Resume" : "Pause"}
+                      {run.paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+                      {run.paused ? "Resume" : "Pause"}
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => setStopped(true)}
+                      onClick={() => run.stop()}
                       className="h-10 rounded-lg border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50"
                     >
                       <Square className="size-4 fill-current" />
@@ -401,7 +289,7 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
                   <p className="text-ink-muted text-xs">Your AI voice agent dials your top leads, spread across a window.</p>
                 </div>
               </div>
-              <button type="button" onClick={onClose} aria-label="Close" className="text-ink-muted hover:text-ink hover:bg-black/[0.04] -mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg">
+              <button type="button" onClick={() => run.closeModal()} aria-label="Close" className="text-ink-muted hover:text-ink hover:bg-black/[0.04] -mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg">
                 <X className="size-5" />
               </button>
             </div>
@@ -418,7 +306,7 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
                       <Sparkles className="size-4" />
                     </span>
                     <p className="text-ink-muted min-w-0 flex-1 text-xs">No voice agent deployed yet. Build one to run auto-calls.</p>
-                    <button type="button" onClick={() => { onClose(); router.push("/ai-team"); }} className="text-accent-blue shrink-0 text-xs font-semibold whitespace-nowrap hover:underline">
+                    <button type="button" onClick={() => { run.closeModal(); router.push("/ai-team"); }} className="text-accent-blue shrink-0 text-xs font-semibold whitespace-nowrap hover:underline">
                       Build agent
                     </button>
                   </div>
@@ -472,21 +360,21 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
                   <div className="mt-3 space-y-4" style={{ animation: "fade-in-up 220ms cubic-bezier(0.23,1,0.32,1) both" }}>
                     <Labeled label="Lead sources">
                       <div className="flex flex-wrap gap-1.5">
-                        {SOURCE_ORDER.map((s) => {
-                          const on = sources.has(s);
+                        {SOURCE_ORDER.map((s2) => {
+                          const on = sources.has(s2);
                           return (
                             <button
-                              key={s}
+                              key={s2}
                               type="button"
-                              onClick={() => toggleSource(s)}
+                              onClick={() => toggleSource(s2)}
                               aria-pressed={on}
                               className={cn(
                                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold outline-none transition-colors",
                                 on ? "border-transparent bg-ink text-white" : "text-ink-muted border-black/10 hover:border-black/25"
                               )}
                             >
-                              <SourceIcon source={s} className="size-3.5" />
-                              {SOURCE_META[s].short}
+                              <SourceIcon source={s2} className="size-3.5" />
+                              {SOURCE_META[s2].short}
                             </button>
                           );
                         })}
@@ -532,10 +420,10 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
 
             {/* footer */}
             <div className="flex items-center justify-end gap-2 border-t border-black/[0.06] px-5 py-4 sm:px-6">
-              <Button variant="outline" onClick={onClose} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
+              <Button variant="outline" onClick={() => run.closeModal()} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
                 Cancel
               </Button>
-              <Button onClick={start} disabled={!canStart} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
+              <Button onClick={startRun} disabled={!canStart} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
                 <PhoneCall className="size-4" />
                 Start calls
               </Button>

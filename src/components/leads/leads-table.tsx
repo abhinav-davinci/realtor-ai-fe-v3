@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, Download, PhoneCall, Upload } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
@@ -27,7 +27,7 @@ import {
 import { EASE_OUT, FilterToggle, SearchBar, LeadDetail, type Filter } from "@/components/conversations/conversation-ui";
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceIcon } from "./source-icons";
-import { AutoCallModal } from "./auto-call-modal";
+import { AutoCallButton } from "./auto-call-context";
 import { UploadLeadsModal } from "./upload-leads-modal";
 
 export function LeadsTable() {
@@ -47,7 +47,6 @@ export function LeadsTable() {
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [autoCallOpen, setAutoCallOpen] = useState(false);
 
   const visible = useMemo(
     () =>
@@ -85,9 +84,7 @@ export function LeadsTable() {
           <Button onClick={() => setUploadOpen(true)} variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Upload className="size-4" /> Upload Leads
           </Button>
-          <Button onClick={() => setAutoCallOpen(true)} className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3.5 text-sm font-semibold text-white">
-            <PhoneCall className="size-4" /> Auto-call Hot Leads
-          </Button>
+          <AutoCallButton />
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Download className="size-4" /> Download All Leads
           </Button>
@@ -147,7 +144,6 @@ export function LeadsTable() {
       </div>
 
       {uploadOpen && <UploadLeadsModal onClose={() => setUploadOpen(false)} />}
-      {autoCallOpen && <AutoCallModal onClose={() => setAutoCallOpen(false)} />}
     </div>
   );
 }
