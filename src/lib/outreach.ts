@@ -23,7 +23,10 @@ export type TabKey =
   | "templates"
   | "broadcasts"
   | "contacts"
-  | "flows";
+  | "flows"
+  // Instagram is a publishing channel, not a chat inbox, so it has its own tabs.
+  | "compose"
+  | "posts";
 
 export interface OutreachPlatform {
   key: PlatformKey;
@@ -61,10 +64,10 @@ export const PLATFORMS: OutreachPlatform[] = [
   {
     key: "instagram",
     label: "Instagram",
-    connected: false,
-    handle: "@skyline.realty",
-    subtitle: "Reply to DMs and comments on your reels from one inbox.",
-    tabs: ["inbox", "contacts"],
+    connected: true,
+    handle: "@skylinerealty",
+    subtitle: "Publish reels and photo posts to your Instagram Business account.",
+    tabs: ["compose", "posts"],
   },
 ];
 
@@ -78,6 +81,8 @@ export const TAB_LABELS: Record<TabKey, string> = {
   broadcasts: "Broadcasts",
   contacts: "Contacts",
   flows: "Chat Flows",
+  compose: "Compose",
+  posts: "Posts",
 };
 
 /* --------------------------------- inbox ---------------------------------- */
@@ -966,4 +971,164 @@ export function flowIssues(f: Flow): { nodeId: string; issues: string[] }[] {
   return Object.values(f.nodes)
     .map((n) => ({ nodeId: n.id, issues: nodeIssues(n) }))
     .filter((x) => x.issues.length > 0);
+}
+
+/* ============================ instagram posts ============================= */
+/*
+ * The Instagram channel is a publishing studio (not a chat inbox): the realtor
+ * composes a reel or a photo post, previews it in a live phone mockup, and
+ * publishes (or schedules) it. Published + scheduled posts are kept locally,
+ * same pattern as the chat flows above. A developer wiring the backend would
+ * replace these readers with the Instagram Graph publish endpoints:
+ *   - create media container  POST /api/v1/orgs/{org}/channels/instagram/media
+ *   - publish container        POST /api/v1/orgs/{org}/channels/instagram/media/{id}/publish
+ *   - list published media     GET  /api/v1/orgs/{org}/channels/instagram/media
+ */
+
+export type IgPostKind = "reel" | "photo" | "carousel";
+export type IgPostStatus = "published" | "scheduled";
+
+export const IG_ACCOUNT = "@skylinerealty";
+
+export interface IgPost {
+  id: string;
+  kind: IgPostKind;
+  status: IgPostStatus;
+  caption: string;
+  /** Slide images. For a reel this holds the single cover frame. */
+  media: string[];
+  /** Reel video source (sample clip in design mode). */
+  videoUrl?: string | null;
+  account: string;
+  /** Published or scheduled time (ms epoch). */
+  at: number;
+  likes: number;
+  comments: number;
+  /** Reels only. */
+  views?: number;
+}
+
+const IG_POSTS_KEY = "tt_ig_posts";
+const IG_SEEDED_KEY = "tt_ig_seeded";
+
+// Self-contained seed media so this module stays independent of the mock layer.
+const IG_SEED_IMG = [
+  "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=900&q=80",
+  "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=900&q=80",
+];
+const IG_SEED_VIDEO =
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
+
+const DAY = 86_400_000;
+
+/** The starter posts shown the first time the Posts tab is opened. */
+function seedPosts(now: number): IgPost[] {
+  return [
+    {
+      id: "ig-seed-1",
+      kind: "reel",
+      status: "published",
+      caption:
+        "Step inside this 3 BHK in Raheja Vistas, NIBM. Floor-to-ceiling light and a view that does the selling for us.\n\n#PuneRealEstate #NIBM #3BHK #PropertyTour",
+      media: [IG_SEED_IMG[0]],
+      videoUrl: IG_SEED_VIDEO,
+      account: IG_ACCOUNT,
+      at: now - 2 * DAY,
+      likes: 1840,
+      comments: 96,
+      views: 24300,
+    },
+    {
+      id: "ig-seed-2",
+      kind: "carousel",
+      status: "published",
+      caption:
+        "Skyline Residence, Baner. Four bedrooms, two balconies, and a skyline you will not get tired of.\n\n#Baner #LuxuryHomes #Pune",
+      media: [IG_SEED_IMG[1], IG_SEED_IMG[4], IG_SEED_IMG[3]],
+      account: IG_ACCOUNT,
+      at: now - 5 * DAY,
+      likes: 1260,
+      comments: 54,
+    },
+    {
+      id: "ig-seed-3",
+      kind: "photo",
+      status: "published",
+      caption: "New listing in Wakad. A garden apartment that stays cool through summer. DM for a visit.\n\n#Wakad #Pune #ForRent",
+      media: [IG_SEED_IMG[2]],
+      account: IG_ACCOUNT,
+      at: now - 9 * DAY,
+      likes: 740,
+      comments: 23,
+    },
+    {
+      id: "ig-seed-4",
+      kind: "reel",
+      status: "scheduled",
+      caption: "Coming soon: a walkthrough of the Koregaon Park villa. Save this one.\n\n#KoregaonPark #Villa #Pune",
+      media: [IG_SEED_IMG[5]],
+      videoUrl: IG_SEED_VIDEO,
+      account: IG_ACCOUNT,
+      at: now + 2 * DAY,
+      likes: 0,
+      comments: 0,
+    },
+  ];
+}
+
+export function listIgPosts(): IgPost[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(IG_POSTS_KEY);
+    return raw ? (JSON.parse(raw) as IgPost[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveIgPost(post: IgPost): void {
+  if (typeof window === "undefined") return;
+  const all = listIgPosts().filter((p) => p.id !== post.id);
+  all.unshift(post);
+  try {
+    localStorage.setItem(IG_POSTS_KEY, JSON.stringify(all));
+  } catch {
+    /* quota or unavailable; ignore in design mode */
+  }
+}
+
+export function deleteIgPost(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(IG_POSTS_KEY, JSON.stringify(listIgPosts().filter((p) => p.id !== id)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Seed the demo posts exactly once (tracked by a sentinel, not by emptiness),
+ * so opening the studio shows a populated gallery even if the realtor has
+ * already published their own post first. Their posts stay on top.
+ */
+export function seedIgPosts(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (localStorage.getItem(IG_SEEDED_KEY)) return;
+    const existing = listIgPosts();
+    localStorage.setItem(IG_POSTS_KEY, JSON.stringify([...existing, ...seedPosts(Date.now())]));
+    localStorage.setItem(IG_SEEDED_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Reduce a kind + slide count to the post kind actually shown (carousel when >1). */
+export function igKindFor(base: "reel" | "photo", slides: number): IgPostKind {
+  if (base === "reel") return "reel";
+  return slides > 1 ? "carousel" : "photo";
 }

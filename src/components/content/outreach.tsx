@@ -22,6 +22,7 @@ import {
 } from "@/lib/outreach";
 import { EASE_OUT, PlatformGlyph, StatusPill } from "./outreach-shared";
 import { OutreachInbox } from "./outreach-inbox";
+import { InstagramStudio } from "./outreach-instagram";
 import {
   BroadcastsPanel,
   ContactsPanel,
@@ -39,14 +40,19 @@ export function Outreach() {
   // "Use Template" hands a template to the Broadcasts tab, which opens the
   // broadcast wizard pre-filled with it.
   const [broadcastTemplate, setBroadcastTemplate] = useState<WaTemplate | null>(null);
+  // Instagram connection is managed from inside the studio (the account selector),
+  // not a header card, so its connected state is local here.
+  const [igDisconnected, setIgDisconnected] = useState(false);
 
   const platform = platformByKey(platformKey);
+  const connected = platformKey === "instagram" ? !igDisconnected : platform.connected;
   const threads = threadsFor(platformKey);
   const unread = threads.reduce((n, t) => n + t.unread, 0);
 
   function choosePlatform(key: PlatformKey) {
     setPlatformKey(key);
-    setTab("inbox");
+    // Land on the platform's first tab (WhatsApp/Facebook -> Inbox, Instagram -> Compose).
+    setTab(platformByKey(key).tabs[0]);
     setFocus(false);
     setBroadcastTemplate(null);
   }
@@ -73,12 +79,19 @@ export function Outreach() {
               <h1 className="text-ink text-2xl font-bold">Outreach by Platform</h1>
               <p className="text-ink-muted mt-1 text-sm">{platform.subtitle}</p>
             </div>
-            <PlatformSelect value={platformKey} onChange={choosePlatform} />
+            <PlatformSelect value={platformKey} onChange={choosePlatform} igConnected={!igDisconnected} />
           </div>
 
-          <ConnectionCard platform={platform} />
+          {/* Instagram folds its connection + disconnect into the studio's account
+              selector (a destructive action shouldn't sit in the header), which also
+              frees this vertical space for the live preview. Other platforms keep the
+              connection card. */}
+          {platformKey !== "instagram" && <ConnectionCard platform={platform} />}
 
-          {platform.connected && (
+          {/* Instagram renders its own tabs inside the studio's left column (so the
+              live preview can take the full height beside them); other platforms use
+              the shared full-width tab bar here. */}
+          {platform.connected && platformKey !== "instagram" && (
             <TabBar
               tabs={platform.tabs}
               active={tab}
@@ -98,8 +111,13 @@ export function Outreach() {
           focus ? "pt-5" : "pt-4"
         )}
       >
-        {!platform.connected ? (
-          <ConnectState platform={platform} />
+        {!connected ? (
+          <ConnectState
+            platform={platform}
+            onConnect={platformKey === "instagram" ? () => setIgDisconnected(false) : undefined}
+          />
+        ) : platformKey === "instagram" ? (
+          <InstagramStudio tab={tab} onNavigate={changeTab} onDisconnect={() => setIgDisconnected(true)} />
         ) : tab === "inbox" ? (
           <OutreachInbox key={platformKey} threads={threads} />
         ) : tab === "templates" ? (
@@ -125,12 +143,16 @@ export function Outreach() {
 function PlatformSelect({
   value,
   onChange,
+  igConnected,
 }: {
   value: PlatformKey;
   onChange: (key: PlatformKey) => void;
+  /** Instagram's connection is managed locally, so its status can differ from the seed. */
+  igConnected: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const current = platformByKey(value);
+  const isConnected = (p: PlatformKey, seed: boolean) => (p === "instagram" ? igConnected : seed);
 
   return (
     <div className="flex items-center gap-3">
@@ -158,6 +180,7 @@ function PlatformSelect({
             >
               {PLATFORMS.map((p) => {
                 const selected = p.key === value;
+                const conn = isConnected(p.key, p.connected);
                 return (
                   <button
                     key={p.key}
@@ -173,8 +196,8 @@ function PlatformSelect({
                     <PlatformGlyph platform={p.key} className="size-5" />
                     <span className="min-w-0 flex-1">
                       <span className="text-ink block truncate text-sm font-medium">{p.label}</span>
-                      <span className={cn("block text-[11px]", p.connected ? "text-brand-green" : "text-ink-muted")}>
-                        {p.connected ? "Connected" : "Not connected"}
+                      <span className={cn("block text-[11px]", conn ? "text-brand-green" : "text-ink-muted")}>
+                        {conn ? "Connected" : "Not connected"}
                       </span>
                     </span>
                     {selected && <Check className="text-accent-blue size-4 shrink-0" />}
@@ -304,7 +327,18 @@ function TabBar({
 
 /* ----------------------------- connect state ------------------------------ */
 
-function ConnectState({ platform }: { platform: ReturnType<typeof platformByKey> }) {
+function ConnectState({
+  platform,
+  onConnect,
+}: {
+  platform: ReturnType<typeof platformByKey>;
+  /** When provided (Instagram), reconnect happens in place instead of routing away. */
+  onConnect?: () => void;
+}) {
+  const body =
+    platform.key === "instagram"
+      ? `Once ${platform.label} is connected, you can publish reels and photos from here.`
+      : `Once ${platform.label} is connected, your conversations and contacts show up here.`;
   return (
     <div
       className="grid flex-1 place-items-center rounded-2xl border border-dashed border-black/[0.12] bg-cream/40 p-10 text-center"
@@ -315,16 +349,25 @@ function ConnectState({ platform }: { platform: ReturnType<typeof platformByKey>
           <PlatformGlyph platform={platform.key} className="size-9" />
         </span>
         <h3 className="text-ink mt-4 text-lg font-bold">Connect {platform.label} to start</h3>
-        <p className="text-ink-muted mt-1 text-sm">
-          Once {platform.label} is connected, your conversations and contacts show up here.
-        </p>
-        <Link
-          href="/connect-platforms"
-          className="bg-brand-blue hover:bg-brand-blue-hover mt-5 inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold text-white transition-colors"
-        >
-          <Link2 className="size-4" />
-          Connect {platform.label}
-        </Link>
+        <p className="text-ink-muted mt-1 text-sm">{body}</p>
+        {onConnect ? (
+          <button
+            type="button"
+            onClick={onConnect}
+            className="bg-brand-blue hover:bg-brand-blue-hover mt-5 inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold text-white transition-colors active:scale-[0.99]"
+          >
+            <Link2 className="size-4" />
+            Connect {platform.label}
+          </button>
+        ) : (
+          <Link
+            href="/connect-platforms"
+            className="bg-brand-blue hover:bg-brand-blue-hover mt-5 inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold text-white transition-colors"
+          >
+            <Link2 className="size-4" />
+            Connect {platform.label}
+          </Link>
+        )}
       </div>
     </div>
   );
