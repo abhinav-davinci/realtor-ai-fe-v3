@@ -6,10 +6,16 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  Loader2,
+  Pause,
   PhoneCall,
+  PhoneMissed,
+  PhoneOff,
+  PhoneOutgoing,
+  Play,
   SlidersHorizontal,
   Sparkles,
+  Square,
+  Voicemail,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +29,7 @@ import {
   TIER_ORDER,
   listScoredLeads,
   type LeadSource,
+  type ScoredLead,
   type Tier,
 } from "@/lib/lead-intelligence";
 import { SourceIcon } from "./source-icons";
@@ -41,6 +48,9 @@ function minutesBetween(a: string, b: string): number {
   const [bh, bm] = b.split(":").map(Number);
   return bh * 60 + bm - (ah * 60 + am);
 }
+function initials(name: string): string {
+  return name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+}
 
 type Status = "new" | "retry" | "uncontacted" | "all";
 const STATUS_OPTS: { value: Status; label: string }[] = [
@@ -55,6 +65,83 @@ const INTENT_OPTS: { value: Tier | "all"; label: string }[] = [
   { value: "warm", label: "Warm and above" },
   { value: "all", label: "Any intent" },
 ];
+
+/* ------------------------------ call-run model ---------------------------- */
+/*
+ * Frontend-only simulation of a live auto-call run so the realtor can watch
+ * calls dial out and connect in real time. Outcomes are weighted-random, fixed
+ * once at the start of the run; the timeline is derived purely from `elapsed`
+ * (a single ticking clock), so it pauses, stops, and cleans up cleanly.
+ */
+
+type CallState = "queued" | "dialing" | "ringing" | "connected" | "done";
+type CallOutcome =
+  | "qualified"
+  | "interested"
+  | "callback"
+  | "not-interested"
+  | "no-answer"
+  | "voicemail"
+  | "busy";
+
+const OUTCOME_META: Record<CallOutcome, { label: string; connected: boolean; chip: string; icon: typeof Check }> = {
+  qualified: { label: "Qualified", connected: true, chip: "bg-brand-green/10 text-brand-green", icon: CheckCircle2 },
+  interested: { label: "Interested", connected: true, chip: "bg-accent-blue/10 text-accent-blue", icon: Check },
+  callback: { label: "Callback set", connected: true, chip: "bg-brand-orange/10 text-brand-orange", icon: PhoneOutgoing },
+  "not-interested": { label: "Not interested", connected: true, chip: "bg-black/[0.05] text-ink-muted", icon: Check },
+  "no-answer": { label: "No answer", connected: false, chip: "bg-black/[0.04] text-ink-muted", icon: PhoneMissed },
+  voicemail: { label: "Voicemail", connected: false, chip: "bg-black/[0.04] text-ink-muted", icon: Voicemail },
+  busy: { label: "Busy", connected: false, chip: "bg-black/[0.04] text-ink-muted", icon: PhoneOff },
+};
+
+interface Call {
+  key: string;
+  lead: ScoredLead;
+  startOffset: number;
+  ring: number;
+  talk: number;
+  answered: boolean;
+  outcome: CallOutcome;
+}
+
+const TICK = 100;
+const STAGGER = 1100;
+const DIAL_MS = 600;
+
+function weighted<T>(items: [T, number][]): T {
+  const total = items.reduce((s, [, w]) => s + w, 0);
+  let r = Math.random() * total;
+  for (const [v, w] of items) if ((r -= w) <= 0) return v;
+  return items[0][0];
+}
+
+function buildCalls(leads: ScoredLead[]): Call[] {
+  return leads.map((lead, i) => {
+    const answered = Math.random() < 0.62;
+    const outcome = answered
+      ? weighted<CallOutcome>([["qualified", 30], ["interested", 30], ["callback", 20], ["not-interested", 20]])
+      : weighted<CallOutcome>([["no-answer", 55], ["voicemail", 30], ["busy", 15]]);
+    return {
+      key: `${lead.id}-${i}`,
+      lead,
+      startOffset: i * STAGGER,
+      ring: 800 + Math.floor(Math.random() * 900),
+      talk: answered ? 1500 + Math.floor(Math.random() * 2200) : 0,
+      answered,
+      outcome,
+    };
+  });
+}
+
+function callState(c: Call, elapsed: number): CallState {
+  const local = elapsed - c.startOffset;
+  if (local < 0) return "queued";
+  if (local < DIAL_MS) return "dialing";
+  if (local < DIAL_MS + c.ring) return "ringing";
+  if (c.answered && local < DIAL_MS + c.ring + c.talk) return "connected";
+  return "done";
+}
+const callEnd = (c: Call) => c.startOffset + DIAL_MS + c.ring + c.talk;
 
 /* --------------------------------- modal ---------------------------------- */
 
@@ -76,14 +163,34 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
   const [sources, setSources] = useState<Set<LeadSource>>(() => new Set(SOURCE_ORDER));
   const [minScore, setMinScore] = useState("");
   const [advanced, setAdvanced] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [started, setStarted] = useState(false);
 
+  // run state
+  const [phase, setPhase] = useState<"config" | "running">("config");
+  const [calls, setCalls] = useState<Call[]>([]);
+  const [elapsed, setElapsed] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [stopped, setStopped] = useState(false);
+
+  const total = calls.length;
+  const totalDur = useMemo(() => calls.reduce((m, c) => Math.max(m, callEnd(c)), 0), [calls]);
+  const complete = phase === "running" && (stopped || (total > 0 && elapsed >= totalDur));
+
+  // Esc closes from config or once the run is over; while a run is live it's
+  // guarded so a stray key doesn't lose the progress view (use Stop or the X).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && (phase !== "running" || complete)) onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, phase, complete]);
+
+  // The run clock: advance `elapsed` until everything resolves.
+  useEffect(() => {
+    if (phase !== "running" || paused || stopped || complete) return;
+    const id = setInterval(() => setElapsed((e) => Math.min(totalDur, e + TICK)), TICK);
+    return () => clearInterval(id);
+  }, [phase, paused, stopped, complete, totalDur]);
 
   const agent = agents.find((a) => a.id === agentId) ?? null;
   const minScoreNum = minScore.trim() === "" ? null : Number(minScore);
@@ -116,11 +223,19 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
 
   function start() {
     if (!canStart) return;
-    setStarting(true);
-    setTimeout(() => {
-      setStarting(false);
-      setStarted(true);
-    }, 900);
+    const top = [...matches].sort((a, b) => b.score - a.score).slice(0, willCall);
+    setCalls(buildCalls(top));
+    setElapsed(0);
+    setPaused(false);
+    setStopped(false);
+    setPhase("running");
+  }
+  function resetRun() {
+    setPhase("config");
+    setCalls([]);
+    setElapsed(0);
+    setPaused(false);
+    setStopped(false);
   }
 
   function toggleSource(s: LeadSource) {
@@ -132,8 +247,22 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
     });
   }
 
+  // Derived per-call states + roll-up counts for the live view.
+  const states = calls.map((c) => callState(c, elapsed));
+  const connected = states.filter((s, i) => s === "connected" || (s === "done" && calls[i].answered)).length;
+  const missed = calls.filter((c, i) => states[i] === "done" && !c.answered).length;
+  const active = states.filter((s) => s === "dialing" || s === "ringing").length;
+  const dialled = connected + missed + active;
+  const qualified = calls.filter((c, i) => states[i] === "done" && c.outcome === "qualified").length;
+  const resolvedCount = states.filter((s) => s === "done").length;
+  const rate = resolvedCount > 0 ? Math.round((connected / Math.max(connected + missed, 1)) * 100) : null;
+  const headerT = agent ? templateById(agent.templateId) : null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={() => (phase !== "running" || complete) && onClose()}
+    >
       <div
         role="dialog"
         aria-modal="true"
@@ -141,23 +270,125 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
         className="modal-pop flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {started ? (
-          /* ----------------------------- started ---------------------------- */
-          <div className="p-6 text-center">
-            <span className="bg-brand-green/10 text-brand-green mx-auto grid size-16 place-items-center rounded-2xl motion-safe:animate-[tick-pop_460ms_cubic-bezier(0.23,1,0.32,1)_both]">
-              <CheckCircle2 className="size-9" />
-            </span>
-            <h2 className="text-ink mt-4 text-lg font-bold">Calls started</h2>
-            <p className="text-ink-muted mx-auto mt-1.5 max-w-sm text-sm">
-              {willCall === 1
-                ? `${agent?.name} is dialing your top lead now. Track it in your list.`
-                : `${agent?.name} is dialing ${willCall} leads, about one every ${pace} min. Track them in your list.`}
-            </p>
-            <Button onClick={onClose} className="bg-brand-green hover:bg-brand-green-hover mx-auto mt-5 h-11 w-full max-w-[220px] rounded-lg text-sm font-semibold text-white">
-              Done
-            </Button>
-          </div>
+        {phase === "running" ? (
+          /* ------------------------------ running --------------------------- */
+          <>
+            {/* header */}
+            <div className="flex items-center gap-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
+              {headerT && <AgentOrb colors={headerT.gradient} size={40} icon={headerT.icon} speaking={connected > 0 && !complete} />}
+              <div className="min-w-0 flex-1">
+                <h2 className="text-ink truncate text-lg font-bold">
+                  {complete ? (stopped ? "Run stopped" : "Run complete") : `${agent?.name} is calling`}
+                </h2>
+                <p className="text-ink-muted text-xs">
+                  {complete
+                    ? `Dialled ${dialled} of ${total} · ${connected} connected · ${qualified} qualified`
+                    : `Dialling ${dialled} of ${total} · ${connected} connected`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="text-ink-muted hover:text-ink hover:bg-black/[0.04] -mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* progress + stats */}
+            <div className="space-y-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
+              <div className="grid grid-cols-3 gap-2">
+                <StatTile label="Dialled" value={`${dialled}/${total}`} />
+                <StatTile label="Connected" value={connected} tone="green" />
+                <StatTile label="Qualified" value={qualified} tone="green" />
+              </div>
+
+              <div>
+                <div
+                  role="progressbar"
+                  aria-label="Calls completed"
+                  aria-valuemin={0}
+                  aria-valuemax={total}
+                  aria-valuenow={resolvedCount}
+                  className="flex h-2.5 w-full overflow-hidden rounded-full bg-black/[0.07]"
+                >
+                  <div className="bg-brand-green transition-[width] duration-500 ease-out" style={{ width: `${(connected / total) * 100}%` }} />
+                  <div className="bg-ink-muted/30 transition-[width] duration-500 ease-out" style={{ width: `${(missed / total) * 100}%` }} />
+                  <div
+                    className="bg-accent-blue/40 transition-[width] duration-300 ease-out motion-safe:animate-pulse"
+                    style={{ width: `${(active / total) * 100}%` }}
+                  />
+                </div>
+                <div className="text-ink-muted mt-1.5 flex items-center justify-between text-[11px]">
+                  <span className="inline-flex items-center gap-3">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="bg-brand-green size-2 rounded-full" /> Connected
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="bg-ink-muted/30 size-2 rounded-full" /> Missed
+                    </span>
+                  </span>
+                  {rate != null && <span className="tabular-nums">{rate}% answered</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* live call list */}
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-5 py-3 sm:px-6">
+              {calls.map((c, i) => (
+                <CallRow key={c.key} call={c} state={states[i]} runOver={complete} />
+              ))}
+            </div>
+
+            {/* footer */}
+            <div className="flex items-center gap-2 border-t border-black/[0.06] px-5 py-4 sm:px-6">
+              {complete ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={resetRun}
+                    className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold"
+                  >
+                    New run
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      onClose();
+                      router.push("/leads/all");
+                    }}
+                    className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                  >
+                    View leads
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-ink-muted hidden text-xs sm:block">You can keep working. Calls run in the background.</p>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setPaused((p) => !p)}
+                      className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold"
+                    >
+                      {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+                      {paused ? "Resume" : "Pause"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setStopped(true)}
+                      className="h-10 rounded-lg border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      <Square className="size-4 fill-current" />
+                      Stop
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
         ) : (
+          /* ------------------------------- config --------------------------- */
           <>
             {/* header */}
             <div className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
@@ -304,8 +535,8 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
               <Button variant="outline" onClick={onClose} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
                 Cancel
               </Button>
-              <Button onClick={start} disabled={!canStart || starting} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
-                {starting ? <Loader2 className="size-4 animate-spin" /> : <PhoneCall className="size-4" />}
+              <Button onClick={start} disabled={!canStart} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
+                <PhoneCall className="size-4" />
                 Start calls
               </Button>
             </div>
@@ -317,6 +548,101 @@ export function AutoCallModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ------------------------------- sub-pieces ------------------------------- */
+
+function StatTile({ label, value, tone }: { label: string; value: string | number; tone?: "green" }) {
+  return (
+    <div className="rounded-xl border border-black/[0.06] bg-black/[0.015] px-3 py-2 text-center">
+      <p className={cn("text-lg font-bold tabular-nums", tone === "green" ? "text-brand-green" : "text-ink")}>{value}</p>
+      <p className="text-ink-muted text-[11px]">{label}</p>
+    </div>
+  );
+}
+
+function CallRow({ call, state, runOver }: { call: Call; state: CallState; runOver: boolean }) {
+  const tier = TIER_META[call.lead.tier];
+  const active = state === "dialing" || state === "ringing" || state === "connected";
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
+        active ? "border-accent-blue/30 bg-accent-blue/[0.04]" : "border-black/[0.06]"
+      )}
+    >
+      <span className="text-ink relative grid size-9 shrink-0 place-items-center rounded-full bg-black/[0.04] text-xs font-semibold">
+        {initials(call.lead.name)}
+        <span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-white", tier.dot)} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-ink truncate text-sm font-medium">{call.lead.name}</span>
+          <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase", tier.badge)}>{tier.name}</span>
+        </div>
+        <div className="text-ink-muted mt-0.5 flex items-center gap-1.5 text-xs">
+          <SourceIcon source={call.lead.source} className="size-3 shrink-0" />
+          <span className="truncate">{call.lead.phone ?? SOURCE_META[call.lead.source].short}</span>
+        </div>
+      </div>
+      <StatusCell call={call} state={state} runOver={runOver} />
+    </div>
+  );
+}
+
+function StatusCell({ call, state, runOver }: { call: Call; state: CallState; runOver: boolean }) {
+  // When a run is stopped early, queued calls never ran and in-flight dials were
+  // cut off; label them plainly so the summary doesn't look mid-call.
+  if (runOver && state === "queued") {
+    return <span className="text-ink-muted/60 shrink-0 text-xs font-medium">Not called</span>;
+  }
+  if (runOver && (state === "dialing" || state === "ringing")) {
+    return <span className="text-ink-muted/60 shrink-0 text-xs font-medium">Cancelled</span>;
+  }
+  if (state === "queued") {
+    return (
+      <span className="text-ink-muted/70 inline-flex shrink-0 items-center gap-1.5 text-xs font-medium">
+        <span className="bg-ink-muted/30 size-1.5 rounded-full" />
+        Queued
+      </span>
+    );
+  }
+  if (state === "dialing") {
+    return (
+      <span className="text-accent-blue inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold">
+        <PhoneOutgoing className="size-3.5 motion-safe:animate-pulse" />
+        Dialling
+      </span>
+    );
+  }
+  if (state === "ringing") {
+    return (
+      <span className="text-accent-blue inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold">
+        <PhoneCall className="size-3.5 motion-safe:animate-pulse" />
+        Ringing
+      </span>
+    );
+  }
+  if (state === "connected") {
+    return (
+      <span className="text-brand-green inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold">
+        <span className="relative grid size-2 place-items-center">
+          <span className="bg-brand-green/40 absolute inset-0 rounded-full motion-safe:animate-ping" />
+          <span className="bg-brand-green size-2 rounded-full" />
+        </span>
+        Connected
+      </span>
+    );
+  }
+  const m = OUTCOME_META[call.outcome];
+  const Icon = m.icon;
+  return (
+    <span
+      className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", m.chip)}
+      style={{ animation: "fade-in-up 240ms cubic-bezier(0.23,1,0.32,1) both" }}
+    >
+      <Icon className="size-3" />
+      {m.label}
+    </span>
+  );
+}
 
 function Labeled({ label, optional, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
   return (
