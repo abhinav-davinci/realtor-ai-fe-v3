@@ -629,17 +629,15 @@ function InstagramComposer({ onNavigate, onDisconnect }: { onNavigate: (t: TabKe
         {/* ------------------------------ preview ------------------------------ */}
         <aside className="hidden min-h-0 lg:flex lg:flex-col lg:border-l lg:border-black/[0.07] lg:pb-6 lg:pl-8">
           <p className="text-ink-muted mb-2.5 shrink-0 text-center text-xs font-medium">Live preview</p>
-          <div className="flex min-h-0 flex-1 justify-center">
-            {/* fills the full column height; clamped so the phone keeps a natural ratio */}
-            <div className="h-full max-h-[880px] min-h-[480px]">
-              <IgPreview
-                kind={postType}
-                media={previewMedia}
-                hasVideo={postType === "reel" && reelReady}
-                caption={caption}
-                account={IG_ACCOUNT}
-              />
-            </div>
+          {/* the slot; IgPreview scales the phone to fill it at a real-phone ratio */}
+          <div className="min-h-0 flex-1">
+            <IgPreview
+              kind={postType}
+              media={previewMedia}
+              hasVideo={postType === "reel" && reelReady}
+              caption={caption}
+              account={IG_ACCOUNT}
+            />
           </div>
         </aside>
       </div>

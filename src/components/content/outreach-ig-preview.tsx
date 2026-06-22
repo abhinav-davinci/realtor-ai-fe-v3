@@ -6,7 +6,7 @@
  * Everything updates live as the composer changes the media, caption, or
  * account. Dark theme to match Instagram's reels + modern feed.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BatteryFull,
   Bookmark,
@@ -29,6 +29,12 @@ import { cn } from "@/lib/utils";
 import { InstagramGlyph } from "./brand-glyphs";
 
 export type IgPreviewKind = "reel" | "photo";
+
+// The phone is built at a fixed design size (a real iPhone's ~2.16:1 ratio) and
+// uniformly scaled to fit its slot, so it always looks like a phone instead of
+// stretching wide-and-short on a shorter laptop screen.
+const DESIGN_W = 344;
+const DESIGN_H = 744;
 
 /** 1840 -> "1,840"; 24300 -> "24.3K". */
 function compact(n: number): string {
@@ -54,13 +60,12 @@ function Avatar({ className }: { className?: string }) {
 }
 
 /**
- * The phone hardware: bezel, dynamic island, hardware keys. Fills the height of
- * its parent so the composer can size it to the available column (the parent
- * clamps min/max), which keeps the whole phone on screen without page scroll.
+ * The phone hardware: bezel, dynamic island, hardware keys. Fills the fixed
+ * design-size box it is rendered into (IgPreview scales that box to fit).
  */
 function PhoneShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative mx-auto flex h-full w-[344px] flex-col">
+    <div className="relative flex h-full w-full flex-col">
       <span aria-hidden className="bg-ink/70 absolute top-[120px] -left-[2px] h-7 w-[3px] rounded-l" />
       <span aria-hidden className="bg-ink/70 absolute top-[164px] -left-[2px] h-12 w-[3px] rounded-l" />
       <span aria-hidden className="bg-ink/70 absolute top-[140px] -right-[2px] h-16 w-[3px] rounded-r" />
@@ -122,11 +127,37 @@ export function IgPreview({
   likes?: number;
   comments?: number;
 }) {
-  return <PhoneShell>{kind === "reel" ? (
-    <ReelView media={media} hasVideo={hasVideo} caption={caption} account={account} likes={likes} comments={comments} />
-  ) : (
-    <PostView media={media} caption={caption} account={account} likes={likes} comments={comments} />
-  )}</PhoneShell>;
+  // Scale the design-size phone to the largest size that fits the slot, keeping
+  // its real-phone proportions (so it never looks compressed).
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = slotRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      const s = Math.min(height / DESIGN_H, width / DESIGN_W, 1);
+      if (s > 0) setScale(s);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={slotRef} className="flex h-full w-full items-center justify-center overflow-hidden">
+      <div style={{ width: DESIGN_W * scale, height: DESIGN_H * scale }}>
+        <div style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+          <PhoneShell>
+            {kind === "reel" ? (
+              <ReelView media={media} hasVideo={hasVideo} caption={caption} account={account} likes={likes} comments={comments} />
+            ) : (
+              <PostView media={media} caption={caption} account={account} likes={likes} comments={comments} />
+            )}
+          </PhoneShell>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* --------------------------------- reel ----------------------------------- */
