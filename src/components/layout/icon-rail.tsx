@@ -27,9 +27,9 @@ export interface RailItem {
 
 export const PRIMARY: RailItem[] = [
   { label: "Dashboard", icon: LayoutGrid },
+  { label: "AI Team", icon: Sparkles, href: "/ai-team" },
   { label: "Leads", icon: Radar, href: "/leads" },
   { label: "Content Studio", icon: Megaphone, href: "/" },
-  { label: "AI Team", icon: Sparkles, href: "/ai-team" },
   { label: "Insights", icon: LineChart },
   { label: "Build Workflow", icon: Spline },
 ];
