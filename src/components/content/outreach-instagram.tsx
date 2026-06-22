@@ -35,12 +35,13 @@ import type { ListingItem, VideoStatusResponse } from "@/lib/api";
 import {
   IG_ACCOUNT,
   igKindFor,
+  platformByKey,
   saveIgPost,
   seedIgPosts,
   type IgPost,
   type TabKey,
 } from "@/lib/outreach";
-import { EASE_OUT } from "./outreach-shared";
+import { ConnectionStrip, EASE_OUT } from "./outreach-shared";
 import { FacebookGlyph, InstagramGlyph } from "./brand-glyphs";
 import { IgPreview } from "./outreach-ig-preview";
 import { InstagramPosts } from "./outreach-ig-posts";
@@ -58,9 +59,11 @@ const HASHTAGS = [
 export function InstagramStudio({
   tab,
   onNavigate,
+  onDisconnect,
 }: {
   tab: TabKey;
   onNavigate: (t: TabKey) => void;
+  onDisconnect: () => void;
 }) {
   // Seed the demo gallery once, the moment the studio opens, so Posts is never
   // empty even if the realtor publishes before ever opening that tab.
@@ -68,12 +71,13 @@ export function InstagramStudio({
     seedIgPosts();
   }, []);
 
-  // Posts is a full-width gallery, so its tabs sit above it. Compose keeps its
-  // tabs inside the left column (see InstagramComposer) so the preview can take
-  // the full height of the right column.
+  // Posts is a full-width gallery, so the connection strip + tabs sit above it.
+  // Compose keeps them inside the left column (see InstagramComposer) so the
+  // preview owns the full height of the right column.
   if (tab === "posts") {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        <ConnectionStrip platform={platformByKey("instagram")} onDisconnect={onDisconnect} className="mb-5" />
         <IgTabs active="posts" onNavigate={onNavigate} />
         <div className="flex min-h-0 flex-1 flex-col pt-5">
           <InstagramPosts onNavigate={onNavigate} />
@@ -81,7 +85,7 @@ export function InstagramStudio({
       </div>
     );
   }
-  return <InstagramComposer onNavigate={onNavigate} />;
+  return <InstagramComposer onNavigate={onNavigate} onDisconnect={onDisconnect} />;
 }
 
 /** Compose / Posts tab bar (accent underline), matching the shell's tab style. */
@@ -142,7 +146,7 @@ function fmtDate(iso: string): string {
   return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function InstagramComposer({ onNavigate }: { onNavigate: (t: TabKey) => void }) {
+function InstagramComposer({ onNavigate, onDisconnect }: { onNavigate: (t: TabKey) => void; onDisconnect: () => void }) {
   const [postType, setPostType] = useState<PostType>("reel");
 
   // reel state
@@ -294,10 +298,11 @@ function InstagramComposer({ onNavigate }: { onNavigate: (t: TabKey) => void }) 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-8 lg:grid-cols-[minmax(0,1fr)_392px]">
-        {/* left column: tabs + post-type + the scrolling form. Keeping these in a
-            column (not full width) lets the preview take the full height beside it. */}
-        <div className="flex min-h-0 min-w-0 flex-col">
+      {/* split pane: every control on the left, the live preview owning the full
+          height on the right, divided by a vertical rule. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="flex min-h-0 min-w-0 flex-col lg:pr-8">
+          <ConnectionStrip platform={platformByKey("instagram")} onDisconnect={onDisconnect} className="mb-5 shrink-0" />
           <IgTabs active="compose" onNavigate={onNavigate} />
           <div className="shrink-0 pt-5 pb-4">
             <div className="inline-flex rounded-xl border border-black/[0.08] bg-black/[0.02] p-1">
@@ -622,11 +627,11 @@ function InstagramComposer({ onNavigate }: { onNavigate: (t: TabKey) => void }) 
         </div>
 
         {/* ------------------------------ preview ------------------------------ */}
-        <aside className="hidden min-h-0 lg:flex lg:flex-col lg:pb-6">
+        <aside className="hidden min-h-0 lg:flex lg:flex-col lg:border-l lg:border-black/[0.07] lg:pb-6 lg:pl-8">
           <p className="text-ink-muted mb-2.5 shrink-0 text-center text-xs font-medium">Live preview</p>
           <div className="flex min-h-0 flex-1 justify-center">
-            {/* fills the column height; clamped so the phone keeps a natural ratio */}
-            <div className="h-full max-h-[780px] min-h-[480px]">
+            {/* fills the full column height; clamped so the phone keeps a natural ratio */}
+            <div className="h-full max-h-[880px] min-h-[480px]">
               <IgPreview
                 kind={postType}
                 media={previewMedia}

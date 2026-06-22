@@ -5,7 +5,8 @@
  * secondary tab panels. Kept here (not in the shell) so none of those files
  * import each other in a cycle.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   BatteryFull,
   CheckCheck,
@@ -13,18 +14,22 @@ import {
   ExternalLink,
   Image as ImageIcon,
   Mic,
+  MoreHorizontal,
   MoreVertical,
   Paperclip,
   Phone,
   Reply,
+  Settings2,
   Signal,
   Smile,
   TriangleAlert,
+  Unplug,
   Video,
+  Wallet,
   Wifi,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PlatformKey, TemplateButtonKind } from "@/lib/outreach";
+import type { OutreachPlatform, PlatformKey, TemplateButtonKind } from "@/lib/outreach";
 import { FacebookGlyph, InstagramGlyph, WhatsappGlyph } from "./brand-glyphs";
 
 /** Strong ease-out used for every entrance / slide in this feature. */
@@ -191,6 +196,108 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ----------------------------- connection strip --------------------------- */
+
+/**
+ * Compact, consistent identity row for a connected platform: glyph, name, a
+ * "Connected" pill, and the balance/handle. Disconnect lives in a quiet "⋯"
+ * menu (with a confirm) rather than a prominent header button. The caller sets
+ * the outer margin via `className` (it's placed differently per layout — full
+ * width for the inbox platforms, in the left column for the Instagram studio).
+ */
+export function ConnectionStrip({
+  platform,
+  onDisconnect,
+  className,
+}: {
+  platform: OutreachPlatform;
+  onDisconnect: () => void;
+  className?: string;
+}) {
+  const [menu, setMenu] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+
+  return (
+    <div className={cn("flex items-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-2.5", className)}>
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-black/[0.03]">
+        <PlatformGlyph platform={platform.key} className="size-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-ink text-[15px] font-bold">{platform.label}</p>
+          <StatusPill tone="good" dot>
+            Connected
+          </StatusPill>
+          {platform.balance && (
+            <span className="text-ink-muted inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs font-medium">
+              <Wallet className="size-3.5" />
+              {platform.balance}
+            </span>
+          )}
+        </div>
+        <p className="text-ink-muted mt-0.5 text-[13px]">{platform.handle}</p>
+      </div>
+
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setMenu((o) => !o)}
+          aria-haspopup="menu"
+          aria-expanded={menu}
+          aria-label={`${platform.label} connection options`}
+          className="text-ink-muted hover:text-ink hover:bg-black/[0.05] grid size-9 place-items-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+        >
+          <MoreHorizontal className="size-5" />
+        </button>
+        {menu && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} aria-hidden />
+            <div
+              role="menu"
+              className="absolute right-0 z-40 mt-1.5 w-56 overflow-hidden rounded-xl border border-black/[0.08] bg-white p-1 shadow-lg shadow-black/[0.08]"
+              style={{ animation: `scale-in 150ms ${EASE_OUT} both`, transformOrigin: "top right" }}
+            >
+              <Link
+                href="/connect-platforms"
+                role="menuitem"
+                onClick={() => setMenu(false)}
+                className="text-ink hover:bg-accent-blue/[0.06] flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm outline-none"
+              >
+                <Settings2 className="text-ink-muted size-4" />
+                Manage connection
+              </Link>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  setConfirm(true);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-red-500 outline-none transition-colors hover:bg-red-50"
+              >
+                <Unplug className="size-4" />
+                Disconnect {platform.label}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirm}
+        title={`Disconnect ${platform.label}?`}
+        message={`You will stop receiving ${platform.label} activity here until you reconnect.`}
+        confirmLabel="Disconnect"
+        onConfirm={() => {
+          setConfirm(false);
+          onDisconnect();
+        }}
+        onCancel={() => setConfirm(false)}
+      />
     </div>
   );
 }

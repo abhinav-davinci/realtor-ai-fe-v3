@@ -60,7 +60,7 @@ function Avatar({ className }: { className?: string }) {
  */
 function PhoneShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative mx-auto flex h-full w-[332px] flex-col">
+    <div className="relative mx-auto flex h-full w-[344px] flex-col">
       <span aria-hidden className="bg-ink/70 absolute top-[120px] -left-[2px] h-7 w-[3px] rounded-l" />
       <span aria-hidden className="bg-ink/70 absolute top-[164px] -left-[2px] h-12 w-[3px] rounded-l" />
       <span aria-hidden className="bg-ink/70 absolute top-[140px] -right-[2px] h-16 w-[3px] rounded-r" />
