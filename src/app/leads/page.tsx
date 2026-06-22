@@ -1,10 +1,6 @@
-import { Suspense } from "react";
-import { LeadIntelligence } from "@/components/leads/lead-intelligence";
+import { redirect } from "next/navigation";
 
+// The Leads section opens on its Overview.
 export default function LeadsPage() {
-  return (
-    <Suspense>
-      <LeadIntelligence />
-    </Suspense>
-  );
+  redirect("/leads/overview");
 }

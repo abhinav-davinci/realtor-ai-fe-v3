@@ -30,10 +30,10 @@ export function ComingSoon({
           </span>
           <p className="text-ink-muted mt-3 text-sm">{description}</p>
           <Link
-            href="/leads"
+            href="/leads/overview"
             className="text-accent-blue mt-5 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
           >
-            Go to Lead Intelligence <ArrowRight className="size-4" />
+            Go to Overview <ArrowRight className="size-4" />
           </Link>
         </div>
       </div>

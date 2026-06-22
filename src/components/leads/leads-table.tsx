@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * The focused "all leads" repository, reached from the Lead Intelligence "View
- * all" CTA. Full-page list of every captured lead with search and the complete
- * filter set (source, intent tier, channel). Reuses the same ScoredLeadRow and
- * lead detail as the dashboard so the two stay visually identical.
+ * The "Lead Intelligence" page (also reached from the Overview "View all" CTA):
+ * a full-page list of every captured lead with search and the complete filter
+ * set (source, intent tier, channel). Reuses the same ScoredLeadRow and lead
+ * detail as the Overview dashboard so the two stay visually identical.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, Download, Upload } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Check, ChevronDown, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
@@ -31,7 +31,6 @@ import { AutoCallButton } from "./auto-call-context";
 import { UploadLeadsModal } from "./upload-leads-modal";
 
 export function LeadsTable() {
-  const router = useRouter();
   const params = useSearchParams();
   const templateParam = params.get("template");
   const templateId: TemplateId | null = ALL_TEMPLATE_IDS.includes(templateParam as TemplateId)
@@ -68,16 +67,8 @@ export function LeadsTable() {
     <div className="flex h-full flex-col overflow-y-auto">
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-black/[0.06] px-4 py-4 sm:px-6 lg:px-8">
-        <button
-          type="button"
-          onClick={() => router.push("/leads")}
-          aria-label="Back to Lead Intelligence"
-          className="text-ink-muted hover:text-ink hover:bg-black/[0.04] grid size-9 shrink-0 place-items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40"
-        >
-          <ArrowLeft className="size-5" />
-        </button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-ink text-xl font-bold">All leads</h1>
+          <h1 className="text-ink text-xl font-bold">Lead Intelligence</h1>
           <p className="text-ink-muted text-sm">{allLeads.length} leads · last 30 days</p>
         </div>
         <div className="flex items-center gap-2">

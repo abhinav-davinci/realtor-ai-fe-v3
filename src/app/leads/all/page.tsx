@@ -1,10 +1,6 @@
-import { Suspense } from "react";
-import { LeadsTable } from "@/components/leads/leads-table";
+import { redirect } from "next/navigation";
 
+// Lead Intelligence moved to /leads/intelligence; keep the old path working.
 export default function AllLeadsPage() {
-  return (
-    <Suspense>
-      <LeadsTable />
-    </Suspense>
-  );
+  redirect("/leads/intelligence");
 }

@@ -44,14 +44,14 @@ export function LeadIntelligence() {
   const recent = scoped.slice(0, PREVIEW_COUNT);
   const open = allLeads.find((l) => l.id === openId) ?? null;
 
-  const viewAll = () => router.push(`/leads/all${templateId ? `?template=${templateId}` : ""}`);
+  const viewAll = () => router.push(`/leads/intelligence${templateId ? `?template=${templateId}` : ""}`);
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-black/[0.06] px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
-          <h1 className="text-ink text-xl font-bold">Lead Intelligence</h1>
+          <h1 className="text-ink text-xl font-bold">Overview</h1>
           <p className="text-ink-muted text-sm">
             {summary.total.toLocaleString("en-IN")} leads across {sources.length} channels · last 30 days
             {templateId && <span> · {templateById(templateId).role}</span>}

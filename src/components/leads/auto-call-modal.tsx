@@ -243,7 +243,7 @@ export function AutoCallModal() {
                     onClick={() => {
                       run.clearRun();
                       run.closeModal();
-                      router.push("/leads/all");
+                      router.push("/leads/intelligence");
                     }}
                     className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
                   >

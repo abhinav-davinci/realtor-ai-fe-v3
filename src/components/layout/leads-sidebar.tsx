@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Radar, KanbanSquare, CalendarCheck, MessagesSquare, Headphones, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Contact, Radar, KanbanSquare, CalendarCheck, MessagesSquare, Headphones, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { listScoredLeads } from "@/lib/lead-intelligence";
@@ -17,7 +17,9 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { label: "Lead Intelligence", icon: Radar, href: "/leads", exact: true },
+  { label: "Overview", icon: LayoutDashboard, href: "/leads/overview" },
+  { label: "Contacts", icon: Contact, href: "/leads/contacts", soon: true },
+  { label: "Lead Intelligence", icon: Radar, href: "/leads/intelligence" },
   { label: "Sales Pipeline", icon: KanbanSquare, href: "/leads/pipeline", soon: true },
   { label: "Site Visits", icon: CalendarCheck, href: "/leads/site-visits", soon: true },
   { label: "Conversations", icon: MessagesSquare, href: "/leads/conversations", soon: true },
