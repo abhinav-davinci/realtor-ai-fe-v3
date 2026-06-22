@@ -97,8 +97,8 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The "Auto-call Hot Leads" trigger. Extracted so only this tiny button
- * subscribes to the (ticking) context, leaving the heavy lead pages untouched.
+ * The "Auto-call Leads" trigger. Extracted so only this tiny button subscribes
+ * to the (ticking) context, leaving the heavy lead pages untouched.
  */
 export function AutoCallButton({ className }: { className?: string }) {
   const { openModal } = useAutoCall();
@@ -107,7 +107,7 @@ export function AutoCallButton({ className }: { className?: string }) {
       onClick={openModal}
       className={cn("bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3.5 text-sm font-semibold text-white", className)}
     >
-      <PhoneCall className="size-4" /> Auto-call Hot Leads
+      <PhoneCall className="size-4" /> Auto-call Leads
     </Button>
   );
 }
