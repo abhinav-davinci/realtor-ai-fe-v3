@@ -25,7 +25,6 @@ import {
   Send,
   SlidersHorizontal,
   Sparkles,
-  Unplug,
   Upload,
   Video as VideoIcon,
   X,
@@ -41,7 +40,7 @@ import {
   type IgPost,
   type TabKey,
 } from "@/lib/outreach";
-import { ConfirmDialog, EASE_OUT, StatusPill } from "./outreach-shared";
+import { EASE_OUT } from "./outreach-shared";
 import { FacebookGlyph, InstagramGlyph } from "./brand-glyphs";
 import { IgPreview } from "./outreach-ig-preview";
 import { InstagramPosts } from "./outreach-ig-posts";
@@ -59,11 +58,9 @@ const HASHTAGS = [
 export function InstagramStudio({
   tab,
   onNavigate,
-  onDisconnect,
 }: {
   tab: TabKey;
   onNavigate: (t: TabKey) => void;
-  onDisconnect: () => void;
 }) {
   // Seed the demo gallery once, the moment the studio opens, so Posts is never
   // empty even if the realtor publishes before ever opening that tab.
@@ -84,7 +81,7 @@ export function InstagramStudio({
       </div>
     );
   }
-  return <InstagramComposer onNavigate={onNavigate} onDisconnect={onDisconnect} />;
+  return <InstagramComposer onNavigate={onNavigate} />;
 }
 
 /** Compose / Posts tab bar (accent underline), matching the shell's tab style. */
@@ -145,7 +142,7 @@ function fmtDate(iso: string): string {
   return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function InstagramComposer({ onNavigate, onDisconnect }: { onNavigate: (t: TabKey) => void; onDisconnect: () => void }) {
+function InstagramComposer({ onNavigate }: { onNavigate: (t: TabKey) => void }) {
   const [postType, setPostType] = useState<PostType>("reel");
 
   // reel state
@@ -297,7 +294,7 @@ function InstagramComposer({ onNavigate, onDisconnect }: { onNavigate: (t: TabKe
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-8 lg:grid-cols-[minmax(0,1fr)_392px]">
         {/* left column: tabs + post-type + the scrolling form. Keeping these in a
             column (not full width) lets the preview take the full height beside it. */}
         <div className="flex min-h-0 min-w-0 flex-col">
@@ -312,7 +309,7 @@ function InstagramComposer({ onNavigate, onDisconnect }: { onNavigate: (t: TabKe
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pb-6 lg:pr-1">
           {/* account */}
           <Section label="Instagram account">
-            <AccountSelect onDisconnect={onDisconnect} />
+            <AccountSelect />
           </Section>
 
           {/* media */}
@@ -629,7 +626,7 @@ function InstagramComposer({ onNavigate, onDisconnect }: { onNavigate: (t: TabKe
           <p className="text-ink-muted mb-2.5 shrink-0 text-center text-xs font-medium">Live preview</p>
           <div className="flex min-h-0 flex-1 justify-center">
             {/* fills the column height; clamped so the phone keeps a natural ratio */}
-            <div className="h-full max-h-[720px] min-h-[460px]">
+            <div className="h-full max-h-[780px] min-h-[480px]">
               <IgPreview
                 kind={postType}
                 media={previewMedia}
@@ -683,9 +680,10 @@ function TypeTab({ active, icon: Icon, label, onClick }: { active: boolean; icon
   );
 }
 
-function AccountSelect({ onDisconnect }: { onDisconnect: () => void }) {
+// Connection status + disconnect now live in the shell's connection strip, so
+// this selector just picks which account to publish from.
+function AccountSelect() {
   const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState(false);
 
   const avatar = (size: string) => (
     <span
@@ -703,18 +701,13 @@ function AccountSelect({ onDisconnect }: { onDisconnect: () => void }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
+        aria-haspopup="listbox"
         aria-expanded={open}
         className="hover:border-black/25 flex w-full items-center gap-3 rounded-lg border border-black/15 bg-white px-3.5 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40"
       >
         {avatar("size-9")}
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="text-ink truncate text-sm font-semibold">{IG_ACCOUNT}</span>
-            <StatusPill tone="good" dot>
-              Connected
-            </StatusPill>
-          </span>
+          <span className="text-ink block truncate text-sm font-semibold">{IG_ACCOUNT}</span>
           <span className="text-ink-muted block text-xs">Business account · 2,480 followers</span>
         </span>
         <ChevronDown className={cn("text-ink-muted size-4 shrink-0 transition-transform duration-200", open && "rotate-180")} />
@@ -724,46 +717,21 @@ function AccountSelect({ onDisconnect }: { onDisconnect: () => void }) {
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
           <div
-            role="menu"
+            role="listbox"
             className="absolute top-full right-0 left-0 z-40 mt-1.5 overflow-hidden rounded-xl border border-black/[0.08] bg-white p-1 shadow-lg shadow-black/[0.08]"
             style={{ animation: `scale-in 150ms ${EASE_OUT} both`, transformOrigin: "top" }}
           >
-            <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2">
+            <div role="option" aria-selected className="flex items-center gap-2.5 rounded-lg px-2.5 py-2">
               {avatar("size-8")}
               <span className="min-w-0 flex-1">
                 <span className="text-ink block truncate text-sm font-medium">{IG_ACCOUNT}</span>
-                <span className="text-ink-muted block text-[11px]">Connected via Meta Business</span>
+                <span className="text-ink-muted block text-[11px]">Business account · 2,480 followers</span>
               </span>
               <Check className="text-accent-blue size-4 shrink-0" />
             </div>
-            <div className="my-1 h-px bg-black/[0.06]" />
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                setConfirm(true);
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-red-500 outline-none transition-colors hover:bg-red-50"
-            >
-              <Unplug className="size-4" />
-              Disconnect account
-            </button>
           </div>
         </>
       )}
-
-      <ConfirmDialog
-        open={confirm}
-        title="Disconnect Instagram?"
-        message={`You will not be able to publish to ${IG_ACCOUNT} until you reconnect. Posts already published stay on Instagram.`}
-        confirmLabel="Disconnect"
-        onConfirm={() => {
-          setConfirm(false);
-          onDisconnect();
-        }}
-        onCancel={() => setConfirm(false)}
-      />
     </div>
   );
 }

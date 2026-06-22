@@ -8,8 +8,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Link2, Unplug, Wallet } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check, ChevronDown, Link2, MoreHorizontal, Settings2, Unplug, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   PLATFORMS,
@@ -20,7 +19,7 @@ import {
   type TabKey,
   type WaTemplate,
 } from "@/lib/outreach";
-import { EASE_OUT, PlatformGlyph, StatusPill } from "./outreach-shared";
+import { ConfirmDialog, EASE_OUT, PlatformGlyph, StatusPill } from "./outreach-shared";
 import { OutreachInbox } from "./outreach-inbox";
 import { InstagramStudio } from "./outreach-instagram";
 import {
@@ -34,20 +33,32 @@ export function Outreach() {
   const [platformKey, setPlatformKey] = useState<PlatformKey>("whatsapp");
   const [tab, setTab] = useState<TabKey>("inbox");
   // A panel can request a focused, full-height editor (e.g. the template
-  // composer): the page header, connection card, and tabs hide to give the
+  // composer): the page header, connection strip, and tabs hide to give the
   // editor the whole content area, and the panel's own header handles "back".
   const [focus, setFocus] = useState(false);
   // "Use Template" hands a template to the Broadcasts tab, which opens the
   // broadcast wizard pre-filled with it.
   const [broadcastTemplate, setBroadcastTemplate] = useState<WaTemplate | null>(null);
-  // Instagram connection is managed from inside the studio (the account selector),
-  // not a header card, so its connected state is local here.
-  const [igDisconnected, setIgDisconnected] = useState(false);
+  // Disconnect lives in the connection strip's menu (not a prominent button), and
+  // a disconnected platform falls back to the connect empty state. Tracked per
+  // platform so every channel behaves the same.
+  const [disconnected, setDisconnected] = useState<Set<PlatformKey>>(() => new Set());
 
   const platform = platformByKey(platformKey);
-  const connected = platformKey === "instagram" ? !igDisconnected : platform.connected;
+  const connected = platform.connected && !disconnected.has(platformKey);
   const threads = threadsFor(platformKey);
   const unread = threads.reduce((n, t) => n + t.unread, 0);
+
+  function disconnect(key: PlatformKey) {
+    setDisconnected((s) => new Set(s).add(key));
+  }
+  function reconnect(key: PlatformKey) {
+    setDisconnected((s) => {
+      const next = new Set(s);
+      next.delete(key);
+      return next;
+    });
+  }
 
   function choosePlatform(key: PlatformKey) {
     setPlatformKey(key);
@@ -71,7 +82,7 @@ export function Outreach() {
 
   return (
     <div className="bg-white flex h-full flex-col overflow-hidden">
-      {/* header + connection card + tabs (hidden in focused editor mode) */}
+      {/* header + connection strip + tabs (hidden in focused editor mode) */}
       {!focus && (
         <div className="shrink-0 px-4 pt-6 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -79,19 +90,17 @@ export function Outreach() {
               <h1 className="text-ink text-2xl font-bold">Outreach by Platform</h1>
               <p className="text-ink-muted mt-1 text-sm">{platform.subtitle}</p>
             </div>
-            <PlatformSelect value={platformKey} onChange={choosePlatform} igConnected={!igDisconnected} />
+            <PlatformSelect value={platformKey} onChange={choosePlatform} disconnected={disconnected} />
           </div>
 
-          {/* Instagram folds its connection + disconnect into the studio's account
-              selector (a destructive action shouldn't sit in the header), which also
-              frees this vertical space for the live preview. Other platforms keep the
-              connection card. */}
-          {platformKey !== "instagram" && <ConnectionCard platform={platform} />}
+          {/* One compact connection strip for every platform (no prominent
+              Disconnect button — it lives in the strip's menu). */}
+          {connected && <ConnectionStrip platform={platform} onDisconnect={() => disconnect(platformKey)} />}
 
           {/* Instagram renders its own tabs inside the studio's left column (so the
               live preview can take the full height beside them); other platforms use
               the shared full-width tab bar here. */}
-          {platform.connected && platformKey !== "instagram" && (
+          {connected && platformKey !== "instagram" && (
             <TabBar
               tabs={platform.tabs}
               active={tab}
@@ -112,12 +121,9 @@ export function Outreach() {
         )}
       >
         {!connected ? (
-          <ConnectState
-            platform={platform}
-            onConnect={platformKey === "instagram" ? () => setIgDisconnected(false) : undefined}
-          />
+          <ConnectState platform={platform} onConnect={() => reconnect(platformKey)} />
         ) : platformKey === "instagram" ? (
-          <InstagramStudio tab={tab} onNavigate={changeTab} onDisconnect={() => setIgDisconnected(true)} />
+          <InstagramStudio tab={tab} onNavigate={changeTab} />
         ) : tab === "inbox" ? (
           <OutreachInbox key={platformKey} threads={threads} />
         ) : tab === "templates" ? (
@@ -143,16 +149,15 @@ export function Outreach() {
 function PlatformSelect({
   value,
   onChange,
-  igConnected,
+  disconnected,
 }: {
   value: PlatformKey;
   onChange: (key: PlatformKey) => void;
-  /** Instagram's connection is managed locally, so its status can differ from the seed. */
-  igConnected: boolean;
+  /** Platforms the user has disconnected this session (status differs from the seed). */
+  disconnected: Set<PlatformKey>;
 }) {
   const [open, setOpen] = useState(false);
   const current = platformByKey(value);
-  const isConnected = (p: PlatformKey, seed: boolean) => (p === "instagram" ? igConnected : seed);
 
   return (
     <div className="flex items-center gap-3">
@@ -180,7 +185,7 @@ function PlatformSelect({
             >
               {PLATFORMS.map((p) => {
                 const selected = p.key === value;
-                const conn = isConnected(p.key, p.connected);
+                const conn = p.connected && !disconnected.has(p.key);
                 return (
                   <button
                     key={p.key}
@@ -212,52 +217,100 @@ function PlatformSelect({
   );
 }
 
-/* ----------------------------- connection card ---------------------------- */
+/* ---------------------------- connection strip ---------------------------- */
 
-function ConnectionCard({ platform }: { platform: ReturnType<typeof platformByKey> }) {
+/**
+ * Compact, consistent identity row shown for every connected platform: glyph,
+ * name, a "Connected" pill, and the balance/handle. Disconnect is tucked into a
+ * quiet "⋯" menu (with a confirm) rather than a prominent header button.
+ */
+function ConnectionStrip({
+  platform,
+  onDisconnect,
+}: {
+  platform: ReturnType<typeof platformByKey>;
+  onDisconnect: () => void;
+}) {
+  const [menu, setMenu] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+
   return (
-    <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-black/[0.08] bg-white px-5 py-4">
-      <div className="flex items-center gap-3.5">
-        <span className="grid size-12 shrink-0 place-items-center rounded-full bg-black/[0.03]">
-          <PlatformGlyph platform={platform.key} className="size-7" />
-        </span>
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <p className="text-ink text-lg font-bold">{platform.label}</p>
-            {platform.connected ? (
-              <StatusPill tone="good" dot>
-                Connected
-              </StatusPill>
-            ) : (
-              <StatusPill tone="warm" dot>
-                Not connected
-              </StatusPill>
-            )}
-            {platform.connected && platform.balance && (
-              <span className="text-ink-muted inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs font-medium">
-                <Wallet className="size-3.5" />
-                {platform.balance}
-              </span>
-            )}
-          </div>
-          <p className="text-ink-muted mt-0.5 text-sm">{platform.handle}</p>
+    <div className="mt-5 flex items-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-2.5">
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-black/[0.03]">
+        <PlatformGlyph platform={platform.key} className="size-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-ink text-[15px] font-bold">{platform.label}</p>
+          <StatusPill tone="good" dot>
+            Connected
+          </StatusPill>
+          {platform.balance && (
+            <span className="text-ink-muted inline-flex items-center gap-1.5 rounded-full bg-black/[0.04] px-2.5 py-0.5 text-xs font-medium">
+              <Wallet className="size-3.5" />
+              {platform.balance}
+            </span>
+          )}
         </div>
+        <p className="text-ink-muted mt-0.5 text-[13px]">{platform.handle}</p>
       </div>
 
-      {platform.connected ? (
-        <Button className="h-10 rounded-lg border border-red-200 bg-red-50/60 px-4 text-sm font-semibold text-red-500 hover:bg-red-50">
-          <Unplug className="size-4" />
-          Disconnect
-        </Button>
-      ) : (
-        <Link
-          href="/connect-platforms"
-          className="bg-brand-blue hover:bg-brand-blue-hover inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold text-white transition-colors"
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setMenu((o) => !o)}
+          aria-haspopup="menu"
+          aria-expanded={menu}
+          aria-label={`${platform.label} connection options`}
+          className="text-ink-muted hover:text-ink hover:bg-black/[0.05] grid size-9 place-items-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40"
         >
-          <Link2 className="size-4" />
-          Connect {platform.label}
-        </Link>
-      )}
+          <MoreHorizontal className="size-5" />
+        </button>
+        {menu && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} aria-hidden />
+            <div
+              role="menu"
+              className="absolute right-0 z-40 mt-1.5 w-56 overflow-hidden rounded-xl border border-black/[0.08] bg-white p-1 shadow-lg shadow-black/[0.08]"
+              style={{ animation: `scale-in 150ms ${EASE_OUT} both`, transformOrigin: "top right" }}
+            >
+              <Link
+                href="/connect-platforms"
+                role="menuitem"
+                onClick={() => setMenu(false)}
+                className="text-ink hover:bg-accent-blue/[0.06] flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm outline-none"
+              >
+                <Settings2 className="text-ink-muted size-4" />
+                Manage connection
+              </Link>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  setConfirm(true);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-red-500 outline-none transition-colors hover:bg-red-50"
+              >
+                <Unplug className="size-4" />
+                Disconnect {platform.label}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirm}
+        title={`Disconnect ${platform.label}?`}
+        message={`You will stop receiving ${platform.label} activity here until you reconnect.`}
+        confirmLabel="Disconnect"
+        onConfirm={() => {
+          setConfirm(false);
+          onDisconnect();
+        }}
+        onCancel={() => setConfirm(false)}
+      />
     </div>
   );
 }
