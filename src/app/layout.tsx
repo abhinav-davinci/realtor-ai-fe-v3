@@ -13,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TryThat.ai — For Realtors",
+  title: "TryThat.ai — Sellers",
   description: "Content Studio for real estate marketing.",
 };
 

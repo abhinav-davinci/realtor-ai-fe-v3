@@ -7,14 +7,10 @@ import { MobileNav } from "./mobile-nav";
 function Logo() {
   return (
     <div className="flex items-center gap-3">
-      <div className="text-ink flex items-center text-xl font-extrabold tracking-tight">
-        <span>TryThat</span>
-        <span className="ml-1 rounded-md bg-[#34528c] px-1.5 py-0.5 text-white">
-          .ai
-        </span>
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/trythat-logo.svg" alt="TryThat.ai — Real Estate SuperApp" className="h-8 w-auto shrink-0 lg:h-9" />
       <span className="hidden h-5 w-px bg-black/15 sm:block" />
-      <span className="text-ink-muted hidden text-sm font-medium sm:inline">For Realtors</span>
+      <span className="text-ink-muted hidden text-sm font-medium sm:inline">Sellers</span>
     </div>
   );
 }

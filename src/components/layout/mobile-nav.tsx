@@ -65,10 +65,8 @@ export function MobileNav() {
           >
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <div className="text-ink flex items-center text-xl font-extrabold tracking-tight">
-                <span>TryThat</span>
-                <span className="ml-1 rounded-md bg-[#34528c] px-1.5 py-0.5 text-white">.ai</span>
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/trythat-logo.svg" alt="TryThat.ai" className="h-7 w-auto" />
               <button
                 aria-label="Close"
                 onClick={() => setOpen(false)}
