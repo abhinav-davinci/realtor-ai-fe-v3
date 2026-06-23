@@ -50,7 +50,10 @@ export function ListsRail({
   // Take the top few, but display them in a stable order so chips don't reshuffle.
   const quick = useMemo(() => ranked.slice(0, VISIBLE).sort((a, b) => b.createdAt - a.createdAt), [ranked]);
   const quickIds = new Set(quick.map((l) => l.id));
-  const hasOverflow = lists.length > quick.length;
+  // Always offer the searchable "All lists" menu when any list exists, so there's
+  // a consistent place to browse/search/manage regardless of count (it also
+  // absorbs overflow as lists grow past the quick chips).
+  const showAllLists = lists.length > 0;
 
   const activeList = activeId === "all" ? null : lists.find((l) => l.id === activeId) ?? null;
   const activeHidden = !!activeList && !quickIds.has(activeList.id);
@@ -74,7 +77,7 @@ export function ListsRail({
         <Chip key={l.id} selected={activeId === l.id} onClick={() => pick(l.id)} label={l.name} count={l.contactIds.length} dot={l.color} />
       ))}
 
-      {hasOverflow && (
+      {showAllLists && (
         <div className="relative shrink-0">
           <button
             type="button"
