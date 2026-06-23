@@ -222,6 +222,30 @@ export function listsForContact(id: string, lists: ContactList[]): ContactList[]
   return lists.filter((l) => l.contactIds.includes(id));
 }
 
+/* ----------------------------- recently viewed ---------------------------- */
+
+const LIST_RECENTS_KEY = "tt_contact_list_recents";
+
+/** List ids the user has opened, most recent first (drives the quick chips). */
+export function recentListIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LIST_RECENTS_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+export function recordListView(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const next = [id, ...recentListIds().filter((x) => x !== id)].slice(0, 12);
+    localStorage.setItem(LIST_RECENTS_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
 /* ---------------------------- calling adapters ---------------------------- */
 
 const TIER_SCORE: Record<Tier, number> = { "very-hot": 88, hot: 70, warm: 52, light: 37, casual: 15 };

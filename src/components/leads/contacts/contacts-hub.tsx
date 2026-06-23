@@ -11,6 +11,8 @@ import {
   deleteContactList,
   listContactLists,
   listContacts,
+  recentListIds,
+  recordListView,
   removeContactsFromList,
   saveContact,
   saveContactList,
@@ -23,6 +25,7 @@ import { ContactModal } from "./contact-modal";
 import { UploadContactsModal } from "./upload-contacts-modal";
 import { ContactCallModal } from "./contact-call-modal";
 import { AddToListModal, ContactPickerModal, ListModal } from "./list-modals";
+import { ListsRail } from "./lists-rail";
 import { ConfirmDialog, FilterSelect, INPUT, listTint } from "./ui";
 
 type ListModalState = { mode: "create" | "rename"; list: ContactList | null; addIds?: string[] };
@@ -34,6 +37,7 @@ type ConfirmState =
 export function ContactsHub() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [lists, setLists] = useState<ContactList[]>([]);
+  const [recents, setRecents] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(() => {
@@ -47,6 +51,7 @@ export function ContactsHub() {
     /* eslint-disable react-hooks/set-state-in-effect */
     setContacts(listContacts());
     setLists(listContactLists());
+    setRecents(recentListIds());
     setReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -98,13 +103,6 @@ export function ContactsHub() {
     contacts.forEach((c) => c.tags.forEach((t) => set.add(t)));
     return [{ value: "all", label: "All tags" }, ...[...set].sort().map((t) => ({ value: t, label: t }))];
   }, [contacts]);
-  const listOptions = useMemo(
-    () => [
-      { value: "all", label: `All contacts (${contacts.length})` },
-      ...lists.map((l) => ({ value: l.id, label: `${l.name} (${l.contactIds.length})` })),
-    ],
-    [contacts.length, lists]
-  );
   const filtersOn = query.trim() !== "" || tagFilter !== "all";
 
   /* --------------------------------- actions -------------------------------- */
@@ -126,6 +124,15 @@ export function ContactsHub() {
     });
   }
   const clearSel = () => setSelected(new Set());
+
+  function selectList(id: string) {
+    setListFilter(id);
+    clearSel();
+    if (id !== "all") {
+      recordListView(id);
+      setRecents(recentListIds());
+    }
+  }
 
   function onSaveContact(c: Contact) {
     saveContact(c);
@@ -154,7 +161,7 @@ export function ContactsHub() {
     setListModal(null);
     setAddToList(null);
     reload();
-    if (wasCreate && !addIds) setListFilter(l.id);
+    if (wasCreate && !addIds) selectList(l.id);
   }
   function pickListFor(ids: string[], listId: string) {
     addContactsToList(listId, ids);
@@ -214,8 +221,20 @@ export function ContactsHub() {
 
       {hasContacts ? (
         <>
+          {/* lists rail: quick chips + searchable "all lists" menu */}
+          <div className="mt-6">
+            <ListsRail
+              lists={lists}
+              activeId={listFilter}
+              totalContacts={contacts.length}
+              recents={recents}
+              onSelect={selectList}
+              onCreate={() => setListModal({ mode: "create", list: null })}
+            />
+          </div>
+
           {/* toolbar */}
-          <div className="mt-6 flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
               <Search className="text-ink-muted/60 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
               <input
@@ -226,14 +245,6 @@ export function ContactsHub() {
               />
             </div>
             <FilterSelect label="Tags" value={tagFilter} options={tagOptions} onChange={setTagFilter} />
-            <FilterSelect label="List" value={listFilter} options={listOptions} onChange={(v) => { setListFilter(v); clearSel(); }} />
-            <button
-              type="button"
-              onClick={() => setListModal({ mode: "create", list: null })}
-              className="text-ink-muted hover:border-accent-blue/40 hover:text-accent-blue inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-black/20 px-3 text-sm font-semibold transition-colors"
-            >
-              <ListPlus className="size-4" /> Create list
-            </button>
           </div>
 
           {/* active-list management strip */}

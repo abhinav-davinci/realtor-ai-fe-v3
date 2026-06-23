@@ -161,6 +161,18 @@ export function listTint(color: string): string {
   return LIST_TINT[color] ?? "bg-black/[0.05] text-ink-muted";
 }
 
+const LIST_DOT: Record<string, string> = {
+  "accent-blue": "bg-accent-blue",
+  "brand-green": "bg-brand-green",
+  "brand-orange": "bg-brand-orange",
+  gold: "bg-gold",
+  red: "bg-red-500",
+};
+/** Solid swatch (for list chips/dots), as opposed to the tinted chip background. */
+export function listDot(color: string): string {
+  return LIST_DOT[color] ?? "bg-ink-muted/40";
+}
+
 export function ListChip({ name, color, onRemove }: { name: string; color: string; onRemove?: () => void }) {
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", listTint(color))}>
