@@ -3,11 +3,13 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   Calendar,
   Check,
   ChevronDown,
   FileSpreadsheet,
   ListChecks,
+  Loader2,
   PhoneCall,
   Send,
   Sparkles,
@@ -25,6 +27,7 @@ import {
   buildCallsFromContacts,
   contactIdFor,
   contactTierMeta,
+  initialsOf,
   listContactLists,
   listContacts,
   normPhone,
@@ -34,19 +37,13 @@ import {
   type ContactTier,
 } from "@/lib/contacts";
 import { useAutoCall } from "../auto-call-context";
-import { INPUT } from "./ui";
+import { INPUT, TagEditor } from "./ui";
 
 const DAY = 86_400_000;
 type Mode = "list" | "tier" | "upload";
-type Goal = "nurture" | "follow-up" | "re-engage" | "feedback";
+type ExtractState = "idle" | "extracting" | "ready" | "error";
 type Draft = Omit<Contact, "id" | "initials" | "addedAt">;
 
-const GOALS: { value: Goal; label: string }[] = [
-  { value: "nurture", label: "Nurture" },
-  { value: "follow-up", label: "Follow-up" },
-  { value: "re-engage", label: "Re-engage" },
-  { value: "feedback", label: "Feedback" },
-];
 const TIER_CHOICES: ContactTier[] = [...TIER_ORDER, "new"];
 
 function formatPhone(raw: string): string {
@@ -77,10 +74,14 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [uploadName, setUploadName] = useState("");
   const [uploadFile, setUploadFile] = useState<string | null>(null);
+  const [extract, setExtract] = useState<ExtractState>("idle");
+  const [extractError, setExtractError] = useState("");
+  const [sheetHasTags, setSheetHasTags] = useState(false);
+  const [uploadTags, setUploadTags] = useState<string[]>([]);
+  const [saveToBook, setSaveToBook] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
-  const [goal, setGoal] = useState<Goal>("nurture");
   const [skipDays, setSkipDays] = useState(0);
   const [maxCount, setMaxCount] = useState(25);
   const [advanced, setAdvanced] = useState(false);
@@ -113,7 +114,7 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
   const noAgent = agents.length === 0;
   const canStart =
     !!agent &&
-    (mode === "upload" ? drafts.length > 0 && uploadName.trim().length > 0 : willCall > 0) &&
+    (mode === "upload" ? drafts.length > 0 && (!saveToBook || uploadName.trim().length > 0) : willCall > 0) &&
     (!schedule || scheduleAt.trim().length > 0);
 
   const audienceLabel =
@@ -121,12 +122,15 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
       ? listId === "all" ? "all contacts" : lists.find((l) => l.id === listId)?.name ?? "list"
       : mode === "tier"
         ? (tierSel.size ? `${[...tierSel].map((t) => contactTierMeta(t).name).join(", ")} contacts` : "no tiers")
-        : uploadName.trim() || "new list";
-  const defaultName = `${GOALS.find((g) => g.value === goal)?.label} · ${audienceLabel} · ${todayLabel(now)}`;
+        : (saveToBook ? uploadName.trim() : "") || "the uploaded contacts";
+  const defaultName = `${audienceLabel} · ${todayLabel(now)}`;
 
   async function onPickFile(f: File | undefined) {
     if (!f) return;
     setUploadFile(f.name);
+    setExtract("extracting");
+    setDrafts([]);
+    setExtractError("");
     try {
       const XLSX = await import("xlsx");
       const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
@@ -135,22 +139,45 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
       const phoneCol = headers.findIndex((h) => /phone|mobile|number|contact/.test(h));
       const nameCol = headers.findIndex((h) => /name/.test(h));
       const tagsCol = headers.findIndex((h) => /tag/.test(h));
-      const byPhone = new Map<string, Draft>();
-      if (phoneCol >= 0) {
-        for (const r of aoa.slice(1)) {
-          const cell = String((r as unknown[])[phoneCol] ?? "");
-          const norm = normPhone(cell);
-          if (norm.length < 10 || byPhone.has(norm)) continue;
-          const nm = nameCol >= 0 ? String((r as unknown[])[nameCol] ?? "").trim() : "";
-          const tags = (tagsCol >= 0 ? String((r as unknown[])[tagsCol] ?? "") : "").split(/[;,]/).map((t) => t.trim()).filter(Boolean);
-          byPhone.set(norm, { name: nm || formatPhone(cell), phone: formatPhone(cell), tags, tier: "new", source: "Upload", lastContacted: null });
-        }
+      if (phoneCol < 0) {
+        setExtract("error");
+        setExtractError("We could not find a phone column. Check the sheet and try again.");
+        return;
       }
-      setDrafts([...byPhone.values()]);
-      if (!uploadName.trim()) setUploadName(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
+      const byPhone = new Map<string, Draft>();
+      for (const r of aoa.slice(1)) {
+        const cell = String((r as unknown[])[phoneCol] ?? "");
+        const norm = normPhone(cell);
+        if (norm.length < 10 || byPhone.has(norm)) continue;
+        const nm = nameCol >= 0 ? String((r as unknown[])[nameCol] ?? "").trim() : "";
+        const tags = (tagsCol >= 0 ? String((r as unknown[])[tagsCol] ?? "") : "").split(/[;,]/).map((t) => t.trim()).filter(Boolean);
+        byPhone.set(norm, { name: nm || formatPhone(cell), phone: formatPhone(cell), tags, tier: "new", source: "Upload", lastContacted: null });
+      }
+      const rows = [...byPhone.values()];
+      if (rows.length === 0) {
+        setExtract("error");
+        setExtractError("No valid phone numbers found in this file.");
+        return;
+      }
+      // A short, deliberate beat so the extraction reads as "AI is working".
+      window.setTimeout(() => {
+        setDrafts(rows);
+        setSheetHasTags(rows.some((d) => d.tags.length > 0));
+        if (!uploadName.trim()) setUploadName(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
+        setExtract("ready");
+      }, 850);
     } catch {
-      setDrafts([]);
+      setExtract("error");
+      setExtractError("We could not read that file. Please try again.");
     }
+  }
+
+  function resetUpload() {
+    setDrafts([]);
+    setUploadFile(null);
+    setExtract("idle");
+    setExtractError("");
+    setSheetHasTags(false);
   }
 
   function submit() {
@@ -161,13 +188,25 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
     }
     let pool: Contact[];
     if (mode === "upload") {
-      upsertMany(drafts);
-      const all = listContacts();
-      const ids = drafts.map((d) => contactIdFor(d.phone));
-      const newListId = `list-${Date.now()}`;
-      saveContactList({ id: newListId, name: uploadName.trim() || "Uploaded list", color: "accent-blue", contactIds: ids, createdAt: Date.now() });
-      addContactsToList(newListId, ids);
-      pool = all.filter((c) => ids.includes(c.id));
+      // Combine sheet tags with any custom tags the user added for this upload.
+      const tagged: Draft[] = drafts.map((d) => ({ ...d, tags: Array.from(new Set([...d.tags, ...uploadTags])) }));
+      const ids = tagged.map((d) => contactIdFor(d.phone));
+      if (saveToBook) {
+        upsertMany(tagged);
+        const newListId = `list-${Date.now()}`;
+        saveContactList({ id: newListId, name: uploadName.trim() || "Uploaded list", color: "accent-blue", contactIds: ids, createdAt: Date.now() });
+        addContactsToList(newListId, ids);
+        const all = listContacts();
+        pool = all.filter((c) => ids.includes(c.id));
+      } else {
+        // Call them this once without persisting to the master book.
+        pool = tagged.map((d) => ({
+          ...d,
+          id: contactIdFor(d.phone),
+          initials: initialsOf(d.name),
+          addedAt: now,
+        }));
+      }
     } else {
       pool = audience;
     }
@@ -184,16 +223,6 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="hidden"
-        onChange={(e) => {
-          onPickFile(e.target.files?.[0]);
-          e.target.value = "";
-        }}
-      />
       <div
         role="dialog"
         aria-modal="true"
@@ -201,6 +230,16 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
         className="modal-pop flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={(e) => {
+            onPickFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
         {scheduled ? (
           /* ---------------------------- scheduled --------------------------- */
           <div className="p-6 text-center">
@@ -308,44 +347,89 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
 
                 {mode === "upload" && (
                   <div className="space-y-3">
-                    <input value={uploadName} onChange={(e) => setUploadName(e.target.value)} placeholder="Name this list, e.g. Diwali outreach" className={INPUT} />
-                    <button
-                      type="button"
-                      onClick={() => fileRef.current?.click()}
-                      className="hover:border-accent-blue/50 hover:bg-accent-blue/[0.03] flex w-full items-center gap-3 rounded-xl border border-dashed border-black/15 px-3.5 py-3 text-left transition-colors"
-                    >
-                      <span className="bg-accent-blue/10 text-accent-blue grid size-9 shrink-0 place-items-center rounded-lg">
-                        {drafts.length ? <FileSpreadsheet className="size-4" /> : <Upload className="size-4" />}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="text-ink block truncate text-sm font-medium">{uploadFile ?? "Upload an Excel or CSV"}</span>
-                        <span className="text-ink-muted block text-xs">
-                          {drafts.length ? `${drafts.length} contacts found · merged into your book` : ".xlsx, .xls, .csv with a phone column"}
+                    {extract === "idle" && (
+                      <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="hover:border-accent-blue/50 hover:bg-accent-blue/[0.03] flex w-full items-center gap-3 rounded-xl border border-dashed border-black/15 px-3.5 py-3 text-left transition-colors"
+                      >
+                        <span className="bg-accent-blue/10 text-accent-blue grid size-9 shrink-0 place-items-center rounded-lg">
+                          <Upload className="size-4" />
                         </span>
-                      </span>
-                    </button>
+                        <span className="min-w-0 flex-1">
+                          <span className="text-ink block text-sm font-medium">Attach an Excel or CSV</span>
+                          <span className="text-ink-muted block text-xs">.xlsx, .xls, .csv with a phone column</span>
+                        </span>
+                      </button>
+                    )}
+
+                    {extract === "extracting" && (
+                      <div className="grid place-items-center rounded-xl border border-black/[0.08] bg-black/[0.015] py-7 text-center">
+                        <span className="bg-accent-blue/10 text-accent-blue grid size-10 place-items-center rounded-full">
+                          <Loader2 className="size-5 animate-spin" />
+                        </span>
+                        <p className="text-ink mt-2.5 text-sm font-semibold">Reading your file…</p>
+                        <p className="text-ink-muted mt-0.5 max-w-[80%] truncate text-xs">{uploadFile}</p>
+                      </div>
+                    )}
+
+                    {extract === "error" && (
+                      <div className="rounded-xl border border-red-200 bg-red-50/60 p-4 text-center" style={{ animation: "scale-in 180ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                        <span className="mx-auto grid size-10 place-items-center rounded-full bg-red-100 text-red-600">
+                          <AlertCircle className="size-5" />
+                        </span>
+                        <p className="text-ink mt-2.5 text-sm font-semibold">We could not read that file</p>
+                        <p className="text-ink-muted mx-auto mt-1 max-w-xs text-xs">{extractError}</p>
+                        <button type="button" onClick={resetUpload} className="text-accent-blue mt-2.5 text-xs font-semibold hover:underline">
+                          Choose another file
+                        </button>
+                      </div>
+                    )}
+
+                    {extract === "ready" && (
+                      <>
+                        <div
+                          className="border-brand-green/25 bg-brand-green/[0.06] flex items-center gap-3 rounded-xl border p-3.5"
+                          style={{ animation: "fade-in-up 220ms cubic-bezier(0.23,1,0.32,1) both" }}
+                        >
+                          <span className="bg-brand-green/15 text-brand-green grid size-10 shrink-0 place-items-center rounded-full motion-safe:animate-[success-pop_460ms_cubic-bezier(0.23,1,0.32,1)_both]">
+                            <FileSpreadsheet className="size-5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-ink text-sm font-bold">
+                              <span className="tabular-nums">{drafts.length}</span> contact{drafts.length === 1 ? "" : "s"} extracted
+                            </p>
+                            <p className="text-ink-muted truncate text-xs">
+                              {uploadFile}
+                              {sheetHasTags && " · tags detected"}
+                            </p>
+                          </div>
+                          <button type="button" onClick={resetUpload} className="text-ink-muted hover:text-ink shrink-0 text-xs font-semibold hover:underline">
+                            Replace
+                          </button>
+                        </div>
+
+                        {/* tags for this upload */}
+                        <div>
+                          <p className="text-ink mb-1.5 text-sm font-medium">Tags for these contacts</p>
+                          <TagEditor value={uploadTags} onChange={setUploadTags} />
+                          {sheetHasTags && <p className="text-ink-muted mt-1.5 text-xs">Tags already in your sheet are kept too.</p>}
+                        </div>
+
+                        {/* save to book */}
+                        <Switch
+                          checked={saveToBook}
+                          onChange={setSaveToBook}
+                          title="Save these to my contacts book"
+                          subtitle={saveToBook ? "Added to your book and updated after the call." : "Called this once, not saved to your book."}
+                        />
+                        {saveToBook && (
+                          <input value={uploadName} onChange={(e) => setUploadName(e.target.value)} placeholder="Name this list, e.g. Diwali outreach" className={INPUT} />
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
-              </Section>
-
-              {/* goal */}
-              <Section label="Call goal">
-                <div className="flex flex-wrap gap-2 rounded-xl bg-black/[0.03] p-1">
-                  {GOALS.map((g) => (
-                    <button
-                      key={g.value}
-                      type="button"
-                      onClick={() => setGoal(g.value)}
-                      aria-pressed={goal === g.value}
-                      className={cn(
-                        "flex-1 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors active:scale-[0.98]",
-                        goal === g.value ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-                      )}
-                    >
-                      {g.label}
-                    </button>
-                  ))}
-                </div>
               </Section>
 
               {/* advanced */}
@@ -439,6 +523,36 @@ function Labeled({ label, children }: { label: string; children: React.ReactNode
       <span className="text-ink mb-1.5 block text-sm font-medium">{label}</span>
       {children}
     </label>
+  );
+}
+
+function Switch({
+  checked,
+  onChange,
+  title,
+  subtitle,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center gap-3 rounded-xl border border-black/[0.1] bg-white p-3 text-left transition-colors hover:border-black/20"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="text-ink block text-sm font-medium">{title}</span>
+        <span className="text-ink-muted block text-xs">{subtitle}</span>
+      </span>
+      <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition-colors", checked ? "bg-brand-green" : "bg-black/15")}>
+        <span className={cn("absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-sm transition-transform", checked && "translate-x-4")} />
+      </span>
+    </button>
   );
 }
 
