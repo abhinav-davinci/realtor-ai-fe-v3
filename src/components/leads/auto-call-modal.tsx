@@ -172,7 +172,12 @@ export function AutoCallModal() {
     if (!canStart || !agent) return;
     const t = templateById(agent.templateId);
     const top = [...matches].sort((a, b) => b.score - a.score).slice(0, willCall);
-    run.start(buildCalls(top), { name: agent.name, gradient: t.gradient, icon: t.icon });
+    const sourceLabel = `Top ${willCall} ${intent === "all" ? "" : `${TIER_META[intent].name}+ `}leads`;
+    run.start(buildCalls(top), { name: agent.name, gradient: t.gradient, icon: t.icon }, {
+      kind: "leads",
+      sourceKind: "lead-filter",
+      sourceLabel,
+    });
   }
 
   function toggleSource(s: LeadSource) {

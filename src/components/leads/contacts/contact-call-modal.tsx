@@ -216,6 +216,8 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
     run.start(calls, { name: agent.name, gradient: t.gradient, icon: t.icon }, {
       sessionName: name.trim() || defaultName,
       kind: "contacts",
+      sourceLabel: audienceLabel,
+      sourceKind: mode,
       onComplete: (cs) => applyCallOutcomes(cs),
     });
     onClose();

@@ -11,6 +11,7 @@ import type { LucideIcon } from "lucide-react";
 import { PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { recordSession, type SourceKind } from "@/lib/call-sessions";
 import { runDuration, TICK, type Call } from "./auto-call-run";
 
 export interface AgentMeta {
@@ -21,11 +22,15 @@ export interface AgentMeta {
 
 export type RunKind = "leads" | "contacts";
 
-/** Optional per-run context: a named session, who started it, and a one-shot
- * completion hook (e.g. Contacts writes call outcomes back to its book). */
+/** Optional per-run context: a named session, who started it, what audience it
+ * targeted (for call history), and a one-shot completion hook (e.g. Contacts
+ * writes call outcomes back to its book). */
 export interface RunMeta {
   sessionName?: string;
   kind?: RunKind;
+  /** Human label of who was called, e.g. "Hot buyers", "Very Hot, Hot". */
+  sourceLabel?: string;
+  sourceKind?: SourceKind;
   onComplete?: (calls: Call[]) => void;
 }
 
@@ -69,6 +74,8 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
   const [meta, setMeta] = useState<RunMeta | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const firedRef = useRef(false);
+  const recordedRef = useRef(false);
+  const startedAtRef = useRef(0);
 
   const active = calls.length > 0;
   const totalDur = useMemo(() => runDuration(calls), [calls]);
@@ -90,6 +97,26 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     }
   }, [complete, calls, meta]);
 
+  // Persist the finished run to call history, exactly once, for BOTH leads and
+  // contacts runs (and stopped-early runs). Runs every tick but early-returns
+  // until the run completes; recordedRef makes it write once.
+  useEffect(() => {
+    if (!complete || recordedRef.current || !agent) return;
+    recordedRef.current = true;
+    recordSession({
+      calls,
+      elapsedMs: elapsed,
+      stopped,
+      startedAt: startedAtRef.current,
+      kind: meta?.kind ?? "leads",
+      sessionName: meta?.sessionName,
+      sourceLabel: meta?.sourceLabel,
+      sourceKind: meta?.sourceKind,
+      agentName: agent.name,
+      agentGradient: agent.gradient,
+    });
+  }, [complete, agent, calls, elapsed, meta, stopped]);
+
   const start = useCallback((c: Call[], ag: AgentMeta, m?: RunMeta) => {
     setCalls(c);
     setElapsed(0);
@@ -98,6 +125,8 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     setAgent(ag);
     setMeta(m ?? null);
     firedRef.current = false;
+    recordedRef.current = false;
+    startedAtRef.current = Date.now();
     setModalOpen(true);
   }, []);
   const pause = useCallback(() => setPaused(true), []);
@@ -111,6 +140,8 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     setAgent(null);
     setMeta(null);
     firedRef.current = false;
+    recordedRef.current = false;
+    startedAtRef.current = 0;
   }, []);
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
