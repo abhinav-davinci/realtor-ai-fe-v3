@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ListPlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContactList } from "@/lib/contacts";
@@ -33,6 +33,19 @@ export function ListsRail({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  // Escape closes the "All lists" menu (the backdrop also closes on outside click).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   // Rank by recency (recents first), newest-created as the tiebreak.
   const ranked = useMemo(() => {
@@ -70,7 +83,7 @@ export function ListsRail({
   }
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+    <div className="flex flex-wrap items-center gap-1.5">
       <Chip selected={activeId === "all"} onClick={() => pick("all")} label="All contacts" count={totalContacts} />
 
       {quick.map((l) => (
