@@ -32,7 +32,7 @@ import {
   takeOverLead,
   unseenPromotedCount,
 } from "@/lib/lead-promotion";
-import { EASE_OUT, FilterToggle, SearchBar, LeadDetail, type Filter } from "@/components/conversations/conversation-ui";
+import { EASE_OUT, SearchBar, LeadDetail } from "@/components/conversations/conversation-ui";
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceIcon } from "./source-icons";
 import { AutoCallButton } from "./auto-call-context";
@@ -61,7 +61,6 @@ export function LeadsTable() {
   const perSource = useMemo(() => sourceCounts(allLeads), [allLeads]);
 
   const [tier, setTier] = useState<Tier | "all">("all");
-  const [channel, setChannel] = useState<Filter>("both");
   const [source, setSource] = useState<LeadSource | "all">("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -77,17 +76,16 @@ export function LeadsTable() {
 
   const visible = useMemo(
     () =>
-      filterLeads(allLeads, { tab: "all", tier, channel, source, minScore: null, maxScore: null, query, templateId }),
-    [allLeads, tier, channel, source, query, templateId]
+      filterLeads(allLeads, { tab: "all", tier, channel: "both", source, minScore: null, maxScore: null, query, templateId }),
+    [allLeads, tier, source, query, templateId]
   );
 
   const open = allLeads.find((l) => l.id === openId) ?? null;
-  const filtered = tier !== "all" || channel !== "both" || source !== "all" || query.trim() !== "";
+  const filtered = tier !== "all" || source !== "all" || query.trim() !== "";
 
   function resetFilters() {
     setQuery("");
     setTier("all");
-    setChannel("both");
     setSource("all");
   }
 
@@ -150,7 +148,6 @@ export function LeadsTable() {
               <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={setOpenId} />
               <div className="flex flex-wrap items-center gap-2">
                 <TierFilter value={tier} onChange={setTier} />
-                <FilterToggle value={channel} onChange={setChannel} />
               </div>
             </div>
 
