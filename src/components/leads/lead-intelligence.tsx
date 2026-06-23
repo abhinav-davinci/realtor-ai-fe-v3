@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Download, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import {
   listScoredLeads,
   sourceBreakdown,
   type LeadSource,
+  type ScoredLead,
 } from "@/lib/lead-intelligence";
+import { LEADS_CHANGED_EVENT, listAllScoredLeads, takeOverLead } from "@/lib/lead-promotion";
 import { LeadDetail } from "@/components/conversations/conversation-ui";
 import { KpiStrip, SourcesPanel } from "./lead-sources";
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
@@ -32,7 +34,14 @@ export function LeadIntelligence() {
     ? (templateParam as TemplateId)
     : null;
 
-  const allLeads = useMemo(() => listScoredLeads(), []);
+  // Seed set first (SSR-safe), then merge promoted leads from localStorage.
+  const [allLeads, setAllLeads] = useState<ScoredLead[]>(() => listScoredLeads());
+  useEffect(() => {
+    const load = () => setAllLeads(listAllScoredLeads());
+    load();
+    window.addEventListener(LEADS_CHANGED_EVENT, load);
+    return () => window.removeEventListener(LEADS_CHANGED_EVENT, load);
+  }, []);
   const summary = useMemo(() => leadSummary(), []);
   const sources = useMemo(() => sourceBreakdown(), []);
   const best = useMemo(() => bestConvertingSource(), []);
@@ -71,7 +80,7 @@ export function LeadIntelligence() {
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
         {open ? (
           <div className="space-y-3">
-            <LeadScoreHeader lead={open} />
+            <LeadScoreHeader lead={open} onTakeOver={() => takeOverLead(open.id)} />
             <LeadDetail lead={open} agentName={open.agentRole} onBack={() => setOpenId(null)} />
           </div>
         ) : allLeads.length === 0 ? (

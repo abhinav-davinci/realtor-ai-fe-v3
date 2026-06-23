@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronDown,
+  Loader2,
   Pause,
   PhoneCall,
   PhoneMissed,
@@ -15,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Square,
+  TrendingUp,
   Voicemail,
   X,
 } from "lucide-react";
@@ -31,6 +34,7 @@ import {
   type LeadSource,
   type Tier,
 } from "@/lib/lead-intelligence";
+import { promotableCount, promoteCallsToLeads } from "@/lib/lead-promotion";
 import { SourceIcon } from "./source-icons";
 import { useAutoCall } from "./auto-call-context";
 import { buildCalls, callState, summarize, type Call, type CallOutcome, type CallState } from "./auto-call-run";
@@ -99,12 +103,41 @@ export function AutoCallModal() {
   const [minScore, setMinScore] = useState("");
   const [advanced, setAdvanced] = useState(false);
 
+  // Promote interested contacts into Lead Intelligence (contacts runs only).
+  const [promoteState, setPromoteState] = useState<"idle" | "sending" | "done">("idle");
+  const [promotedCount, setPromotedCount] = useState(0);
+
   // Esc minimizes the modal (the run, if any, keeps going behind the tracker).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && run.closeModal();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [run]);
+
+  // Reset the transfer card whenever we're not on a finished run (e.g. a new run).
+  useEffect(() => {
+    if (!run.complete) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPromoteState("idle");
+      setPromotedCount(0);
+    }
+  }, [run.complete]);
+
+  const winners = useMemo(
+    () => (run.complete ? run.calls.filter((c) => c.answered && (c.outcome === "qualified" || c.outcome === "interested" || c.outcome === "callback")) : []),
+    [run.complete, run.calls]
+  );
+
+  function sendToLeadIntelligence() {
+    if (promoteState !== "idle") return;
+    setPromoteState("sending");
+    const n = promotableCount(run.calls);
+    window.setTimeout(() => {
+      promoteCallsToLeads(run.calls, run.agent?.name ?? "Your agent");
+      setPromotedCount(n);
+      setPromoteState("done");
+    }, 780);
+  }
 
   const agent = agents.find((a) => a.id === agentId) ?? null;
   const minScoreNum = minScore.trim() === "" ? null : Number(minScore);
@@ -229,6 +262,13 @@ export function AutoCallModal() {
               </div>
             </div>
 
+            {/* promote interested contacts → Lead Intelligence */}
+            {run.complete && run.kind === "contacts" && winners.length > 0 && (
+              <div className="border-b border-black/[0.06] px-5 py-4 sm:px-6">
+                <LeadTransfer winners={winners} state={promoteState} count={promotedCount} onSend={sendToLeadIntelligence} />
+              </div>
+            )}
+
             {/* live call list */}
             <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-5 py-3 sm:px-6">
               {run.calls.map((c, i) => (
@@ -244,16 +284,29 @@ export function AutoCallModal() {
                     <Button variant="outline" onClick={() => { run.clearRun(); run.closeModal(); }} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
                       Done
                     </Button>
-                    <Button
-                      onClick={() => {
-                        run.clearRun();
-                        run.closeModal();
-                        router.push("/leads/contacts");
-                      }}
-                      className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
-                    >
-                      View contacts
-                    </Button>
+                    {promoteState === "done" ? (
+                      <Button
+                        onClick={() => {
+                          run.clearRun();
+                          run.closeModal();
+                          router.push("/leads/intelligence");
+                        }}
+                        className="bg-brand-blue hover:bg-brand-blue-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                      >
+                        View in Lead Intelligence <ArrowUpRight className="size-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => {
+                          run.clearRun();
+                          run.closeModal();
+                          router.push("/leads/contacts");
+                        }}
+                        className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                      >
+                        View contacts
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -464,6 +517,83 @@ function StatTile({ label, value, tone }: { label: string; value: string | numbe
     <div className="rounded-xl border border-black/[0.06] bg-black/[0.015] px-3 py-2 text-center">
       <p className={cn("text-lg font-bold tabular-nums", tone === "green" ? "text-brand-green" : "text-ink")}>{value}</p>
       <p className="text-ink-muted text-[11px]">{label}</p>
+    </div>
+  );
+}
+
+/** The delightful "send interested contacts to Lead Intelligence" moment shown
+ * on a finished contacts run: idle (offer) → sending → done (status banner). */
+function LeadTransfer({
+  winners,
+  state,
+  count,
+  onSend,
+}: {
+  winners: Call[];
+  state: "idle" | "sending" | "done";
+  count: number;
+  onSend: () => void;
+}) {
+  const n = winners.length;
+  const shown = winners.slice(0, 4);
+  const extra = n - shown.length;
+
+  if (state === "done") {
+    return (
+      <div
+        className="border-brand-green/25 bg-brand-green/[0.06] flex items-center gap-3 rounded-xl border p-3.5"
+        style={{ animation: "fade-in-up 240ms cubic-bezier(0.23,1,0.32,1) both" }}
+      >
+        <span className="bg-brand-green/15 text-brand-green grid size-10 shrink-0 place-items-center rounded-full motion-safe:animate-[success-pop_460ms_cubic-bezier(0.23,1,0.32,1)_both]">
+          <CheckCircle2 className="size-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-ink text-sm font-bold">
+            {count} {count === 1 ? "lead" : "leads"} added to Lead Intelligence
+          </p>
+          <p className="text-ink-muted text-xs">Open a lead to read the call and take it over.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const sending = state === "sending";
+  return (
+    <div className="border-accent-blue/20 bg-accent-blue/[0.05] rounded-xl border p-3.5">
+      <div className="flex items-center gap-3">
+        <span className="bg-accent-blue/12 text-accent-blue grid size-10 shrink-0 place-items-center rounded-full">
+          {sending ? <Loader2 className="size-5 animate-spin" /> : <TrendingUp className="size-5" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-ink text-sm font-bold">{sending ? "Adding to Lead Intelligence…" : `${n} showed interest`}</p>
+          <p className="text-ink-muted text-xs">
+            {sending ? "Scoring and attaching the call transcript." : "Send them to Lead Intelligence to read the call and take over."}
+          </p>
+        </div>
+        <div className="hidden shrink-0 items-center sm:flex">
+          {shown.map((c, i) => (
+            <span
+              key={c.key}
+              className={cn("text-ink grid size-8 place-items-center rounded-full bg-white text-[11px] font-semibold shadow-sm ring-2 ring-white", i > 0 && "-ml-2")}
+              style={{ animation: `scale-in 220ms cubic-bezier(0.23,1,0.32,1) ${i * 50}ms both` }}
+            >
+              {initials(c.lead.name)}
+            </span>
+          ))}
+          {extra > 0 && (
+            <span className="text-ink-muted -ml-2 grid size-8 place-items-center rounded-full bg-black/[0.06] text-[11px] font-semibold ring-2 ring-white">+{extra}</span>
+          )}
+        </div>
+      </div>
+      {!sending && (
+        <button
+          type="button"
+          onClick={onSend}
+          className="bg-brand-blue hover:bg-brand-blue-hover mt-3 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-white transition-transform active:scale-[0.98] sm:w-auto sm:px-4"
+        >
+          <ArrowUpRight className="size-4" /> Add {n} to Lead Intelligence
+        </button>
+      )}
     </div>
   );
 }

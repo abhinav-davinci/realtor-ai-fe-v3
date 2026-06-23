@@ -38,6 +38,14 @@ export interface ScoredLead extends Lead {
   status: LeadStatus;
   /** Origin platform (deterministic, design mode). */
   source: LeadSource;
+  /** Set when the lead was created by promoting an AI calling outcome. */
+  promotedFromAiCall?: boolean;
+  /** Epoch ms the lead was promoted (drives the "new leads" banner + sort). */
+  promotedAt?: number;
+  /** Who is working the lead: the AI agent (default) or a human after take-over. */
+  owner?: "ai" | "human";
+  /** Epoch ms a human took the lead over. */
+  handoffAt?: number;
 }
 
 /* --------------------------------- tiers ---------------------------------- */
