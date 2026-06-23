@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ListPlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LIST_COLORS, type Contact, type ContactList } from "@/lib/contacts";
-import { CheckBox, INPUT, listTint, ModalShell, Monogram } from "./ui";
+import { CheckMark, INPUT, listTint, ModalShell, Monogram } from "./ui";
 
 /* ----------------------------- create / rename ---------------------------- */
 
@@ -204,9 +204,11 @@ export function ContactPickerModal({
               key={c.id}
               type="button"
               onClick={() => toggle(c.id)}
+              aria-pressed={sel.has(c.id)}
+              aria-label={`Select ${c.name}`}
               className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors", sel.has(c.id) ? "bg-accent-blue/[0.06]" : "hover:bg-black/[0.02]")}
             >
-              <CheckBox checked={sel.has(c.id)} onChange={() => toggle(c.id)} label={`Select ${c.name}`} />
+              <CheckMark checked={sel.has(c.id)} />
               <Monogram initials={c.initials} tier={c.tier} className="size-8" />
               <span className="text-ink min-w-0 flex-1 truncate text-sm font-medium">{c.name}</span>
               <span className="text-ink-muted text-xs tabular-nums">{c.phone}</span>

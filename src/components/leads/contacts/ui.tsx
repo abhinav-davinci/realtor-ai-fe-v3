@@ -58,6 +58,20 @@ export function CheckBox({
   );
 }
 
+/** Presentational checkbox (no button) for when the whole row is the control. */
+export function CheckMark({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={cn(
+        "grid size-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors",
+        checked ? "bg-accent-blue border-accent-blue text-white" : "border-black/25 bg-white"
+      )}
+    >
+      {checked ? <Check className="size-3" strokeWidth={3} /> : null}
+    </span>
+  );
+}
+
 /* ------------------------------- tier badge ------------------------------- */
 
 export function TierBadge({ tier }: { tier: ContactTier }) {
