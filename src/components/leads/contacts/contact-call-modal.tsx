@@ -8,12 +8,12 @@ import {
   Check,
   ChevronDown,
   FileSpreadsheet,
+  Gauge,
   ListChecks,
   Loader2,
   PhoneCall,
   Send,
   Sparkles,
-  Thermometer,
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -302,7 +302,7 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
               <Section label="Who to call" hint={`${matchCount} match${matchCount === 1 ? "" : "es"}`}>
                 <div className="flex flex-wrap gap-2 rounded-xl bg-black/[0.03] p-1">
                   <ModeTab active={mode === "list"} icon={ListChecks} label="A list" onClick={() => setMode("list")} />
-                  <ModeTab active={mode === "tier"} icon={Thermometer} label="By temperature" onClick={() => setMode("tier")} />
+                  <ModeTab active={mode === "tier"} icon={Gauge} label="By intent" onClick={() => setMode("tier")} />
                   <ModeTab active={mode === "upload"} icon={Upload} label="Upload" onClick={() => setMode("upload")} />
                 </div>
 
