@@ -232,7 +232,7 @@ export function ContactsHub() {
               onClick={() => setListModal({ mode: "create", list: null })}
               className="text-ink-muted hover:border-accent-blue/40 hover:text-accent-blue inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-black/20 px-3 text-sm font-semibold transition-colors"
             >
-              <ListPlus className="size-4" /> New list
+              <ListPlus className="size-4" /> Create list
             </button>
           </div>
 

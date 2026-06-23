@@ -34,7 +34,7 @@ export function ListModal({
 
   return (
     <ModalShell
-      title={list ? "Rename list" : "New list"}
+      title={list ? "Rename list" : "Create list"}
       onClose={onClose}
       footer={
         <>
