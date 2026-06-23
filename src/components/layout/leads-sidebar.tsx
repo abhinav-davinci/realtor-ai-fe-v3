@@ -18,7 +18,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { label: "Overview", icon: LayoutDashboard, href: "/leads/overview" },
-  { label: "Contacts", icon: Contact, href: "/leads/contacts", soon: true },
+  { label: "Contacts", icon: Contact, href: "/leads/contacts" },
   { label: "Lead Intelligence", icon: Radar, href: "/leads/intelligence" },
   { label: "Sales Pipeline", icon: KanbanSquare, href: "/leads/pipeline", soon: true },
   { label: "Site Visits", icon: CalendarCheck, href: "/leads/site-visits", soon: true },

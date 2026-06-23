@@ -172,7 +172,11 @@ export function AutoCallModal() {
               {run.agent && <AgentOrb colors={run.agent.gradient} size={40} icon={run.agent.icon} speaking={s.connected > 0 && !run.complete} />}
               <div className="min-w-0 flex-1">
                 <h2 className="text-ink truncate text-lg font-bold">
-                  {run.complete ? (run.stopped ? "Run stopped" : "Run complete") : `${run.agent?.name} is calling`}
+                  {run.complete
+                    ? run.stopped
+                      ? "Run stopped"
+                      : "Run complete"
+                    : (run.sessionName ?? `${run.agent?.name} is calling`)}
                 </h2>
                 <p className="text-ink-muted text-xs">
                   {run.complete
@@ -235,21 +239,39 @@ export function AutoCallModal() {
             {/* footer */}
             <div className="flex items-center gap-2 border-t border-black/[0.06] px-5 py-4 sm:px-6">
               {run.complete ? (
-                <>
-                  <Button variant="outline" onClick={() => run.clearRun()} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
-                    New run
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      run.clearRun();
-                      run.closeModal();
-                      router.push("/leads/intelligence");
-                    }}
-                    className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
-                  >
-                    View leads
-                  </Button>
-                </>
+                run.kind === "contacts" ? (
+                  <>
+                    <Button variant="outline" onClick={() => { run.clearRun(); run.closeModal(); }} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
+                      Done
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        run.clearRun();
+                        run.closeModal();
+                        router.push("/leads/contacts");
+                      }}
+                      className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                    >
+                      View contacts
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={() => run.clearRun()} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
+                      New run
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        run.clearRun();
+                        run.closeModal();
+                        router.push("/leads/intelligence");
+                      }}
+                      className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                    >
+                      View leads
+                    </Button>
+                  </>
+                )
               ) : (
                 <>
                   <p className="text-ink-muted hidden text-xs sm:block">Close this to keep the calls running in the background.</p>

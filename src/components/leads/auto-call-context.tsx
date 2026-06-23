@@ -6,7 +6,7 @@
  * user navigates to another page. The provider owns the single ticking clock;
  * the modal and the floating tracker are consumers rendered by AutoCallOverlay.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,16 @@ export interface AgentMeta {
   icon?: LucideIcon;
 }
 
+export type RunKind = "leads" | "contacts";
+
+/** Optional per-run context: a named session, who started it, and a one-shot
+ * completion hook (e.g. Contacts writes call outcomes back to its book). */
+export interface RunMeta {
+  sessionName?: string;
+  kind?: RunKind;
+  onComplete?: (calls: Call[]) => void;
+}
+
 interface AutoCallValue {
   calls: Call[];
   elapsed: number;
@@ -29,7 +39,10 @@ interface AutoCallValue {
   complete: boolean;
   agent: AgentMeta | null;
   modalOpen: boolean;
-  start: (calls: Call[], agent: AgentMeta) => void;
+  /** Run label shown in the header (null for the default leads run). */
+  sessionName: string | null;
+  kind: RunKind;
+  start: (calls: Call[], agent: AgentMeta, meta?: RunMeta) => void;
   pause: () => void;
   resume: () => void;
   stop: () => void;
@@ -53,7 +66,9 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
   const [paused, setPaused] = useState(false);
   const [stopped, setStopped] = useState(false);
   const [agent, setAgent] = useState<AgentMeta | null>(null);
+  const [meta, setMeta] = useState<RunMeta | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const firedRef = useRef(false);
 
   const active = calls.length > 0;
   const totalDur = useMemo(() => runDuration(calls), [calls]);
@@ -67,12 +82,22 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [active, paused, stopped, complete, totalDur]);
 
-  const start = useCallback((c: Call[], ag: AgentMeta) => {
+  // Fire the run's completion hook exactly once (e.g. sync outcomes to Contacts).
+  useEffect(() => {
+    if (complete && !firedRef.current) {
+      firedRef.current = true;
+      meta?.onComplete?.(calls);
+    }
+  }, [complete, calls, meta]);
+
+  const start = useCallback((c: Call[], ag: AgentMeta, m?: RunMeta) => {
     setCalls(c);
     setElapsed(0);
     setPaused(false);
     setStopped(false);
     setAgent(ag);
+    setMeta(m ?? null);
+    firedRef.current = false;
     setModalOpen(true);
   }, []);
   const pause = useCallback(() => setPaused(true), []);
@@ -84,13 +109,20 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     setPaused(false);
     setStopped(false);
     setAgent(null);
+    setMeta(null);
+    firedRef.current = false;
   }, []);
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
 
   const value = useMemo<AutoCallValue>(
-    () => ({ calls, elapsed, paused, stopped, active, complete, agent, modalOpen, start, pause, resume, stop, clearRun, openModal, closeModal }),
-    [calls, elapsed, paused, stopped, active, complete, agent, modalOpen, start, pause, resume, stop, clearRun, openModal, closeModal]
+    () => ({
+      calls, elapsed, paused, stopped, active, complete, agent, modalOpen,
+      sessionName: meta?.sessionName ?? null,
+      kind: meta?.kind ?? "leads",
+      start, pause, resume, stop, clearRun, openModal, closeModal,
+    }),
+    [calls, elapsed, paused, stopped, active, complete, agent, modalOpen, meta, start, pause, resume, stop, clearRun, openModal, closeModal]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -1,0 +1,544 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Calendar,
+  Check,
+  ChevronDown,
+  FileSpreadsheet,
+  ListChecks,
+  PhoneCall,
+  Send,
+  Sparkles,
+  Thermometer,
+  Upload,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { listAgents, templateById, voiceById, type AgentConfig } from "@/lib/agents";
+import { AgentOrb } from "@/components/ai-team/agent-ui";
+import { TIER_ORDER } from "@/lib/lead-intelligence";
+import {
+  addContactsToList,
+  applyCallOutcomes,
+  buildCallsFromContacts,
+  contactIdFor,
+  contactTierMeta,
+  listContactLists,
+  listContacts,
+  normPhone,
+  saveContactList,
+  upsertMany,
+  type Contact,
+  type ContactTier,
+} from "@/lib/contacts";
+import { useAutoCall } from "../auto-call-context";
+import { INPUT } from "./ui";
+
+const DAY = 86_400_000;
+type Mode = "list" | "tier" | "upload";
+type Goal = "nurture" | "follow-up" | "re-engage" | "feedback";
+type Draft = Omit<Contact, "id" | "initials" | "addedAt">;
+
+const GOALS: { value: Goal; label: string }[] = [
+  { value: "nurture", label: "Nurture" },
+  { value: "follow-up", label: "Follow-up" },
+  { value: "re-engage", label: "Re-engage" },
+  { value: "feedback", label: "Feedback" },
+];
+const TIER_CHOICES: ContactTier[] = [...TIER_ORDER, "new"];
+
+function formatPhone(raw: string): string {
+  const d = normPhone(raw);
+  return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : raw.trim();
+}
+function todayLabel(now: number): string {
+  return new Date(now).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+function defaultScheduleValue(): string {
+  const d = new Date(Date.now() + DAY);
+  d.setHours(10, 0, 0, 0);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+export function ContactCallModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const run = useAutoCall();
+  const agents = useMemo(() => listAgents().filter((a) => a.channels.includes("voice")), []);
+  const allContacts = useMemo(() => listContacts(), []);
+  const lists = useMemo(() => listContactLists(), []);
+
+  const [agentId, setAgentId] = useState<string | null>(agents[0]?.id ?? null);
+  const [mode, setMode] = useState<Mode>(lists.length ? "list" : "tier");
+  const [listId, setListId] = useState<string>(lists[0]?.id ?? "all");
+  const [tierSel, setTierSel] = useState<Set<ContactTier>>(() => new Set<ContactTier>(["very-hot", "hot"]));
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadFile, setUploadFile] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [name, setName] = useState("");
+  const [goal, setGoal] = useState<Goal>("nurture");
+  const [skipDays, setSkipDays] = useState(0);
+  const [maxCount, setMaxCount] = useState(25);
+  const [advanced, setAdvanced] = useState(false);
+  const [schedule, setSchedule] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState(defaultScheduleValue);
+  const [scheduled, setScheduled] = useState(false);
+  // A run-stable "now" so recency filters and the default name don't drift on re-render.
+  const [now] = useState(() => Date.now());
+
+  const agent = agents.find((a) => a.id === agentId) ?? null;
+
+  // Resolve the audience (before the count cap) for the live match count.
+  const audience = useMemo<Contact[]>(() => {
+    let base: Contact[];
+    if (mode === "list") {
+      base = listId === "all" ? allContacts : (lists.find((l) => l.id === listId)?.contactIds ?? [])
+        .map((id) => allContacts.find((c) => c.id === id))
+        .filter((c): c is Contact => !!c);
+    } else if (mode === "tier") {
+      base = allContacts.filter((c) => tierSel.has(c.tier));
+    } else {
+      base = []; // upload mode resolves at start
+    }
+    if (skipDays > 0) base = base.filter((c) => !(c.lastContacted && now - c.lastContacted < skipDays * DAY));
+    return base;
+  }, [mode, listId, tierSel, allContacts, lists, skipDays, now]);
+
+  const matchCount = mode === "upload" ? drafts.length : audience.length;
+  const willCall = Math.min(maxCount, matchCount);
+  const noAgent = agents.length === 0;
+  const canStart =
+    !!agent &&
+    (mode === "upload" ? drafts.length > 0 && uploadName.trim().length > 0 : willCall > 0) &&
+    (!schedule || scheduleAt.trim().length > 0);
+
+  const audienceLabel =
+    mode === "list"
+      ? listId === "all" ? "all contacts" : lists.find((l) => l.id === listId)?.name ?? "list"
+      : mode === "tier"
+        ? (tierSel.size ? `${[...tierSel].map((t) => contactTierMeta(t).name).join(", ")} contacts` : "no tiers")
+        : uploadName.trim() || "new list";
+  const defaultName = `${GOALS.find((g) => g.value === goal)?.label} · ${audienceLabel} · ${todayLabel(now)}`;
+
+  async function onPickFile(f: File | undefined) {
+    if (!f) return;
+    setUploadFile(f.name);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+      const aoa = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", blankrows: false });
+      const headers = (aoa[0] as unknown[] | undefined)?.map((h) => String(h).toLowerCase().trim()) ?? [];
+      const phoneCol = headers.findIndex((h) => /phone|mobile|number|contact/.test(h));
+      const nameCol = headers.findIndex((h) => /name/.test(h));
+      const tagsCol = headers.findIndex((h) => /tag/.test(h));
+      const byPhone = new Map<string, Draft>();
+      if (phoneCol >= 0) {
+        for (const r of aoa.slice(1)) {
+          const cell = String((r as unknown[])[phoneCol] ?? "");
+          const norm = normPhone(cell);
+          if (norm.length < 10 || byPhone.has(norm)) continue;
+          const nm = nameCol >= 0 ? String((r as unknown[])[nameCol] ?? "").trim() : "";
+          const tags = (tagsCol >= 0 ? String((r as unknown[])[tagsCol] ?? "") : "").split(/[;,]/).map((t) => t.trim()).filter(Boolean);
+          byPhone.set(norm, { name: nm || formatPhone(cell), phone: formatPhone(cell), tags, tier: "new", source: "Upload", lastContacted: null });
+        }
+      }
+      setDrafts([...byPhone.values()]);
+      if (!uploadName.trim()) setUploadName(f.name.replace(/\.(xlsx|xls|csv)$/i, ""));
+    } catch {
+      setDrafts([]);
+    }
+  }
+
+  function submit() {
+    if (!canStart || !agent) return;
+    if (schedule) {
+      setScheduled(true);
+      return;
+    }
+    let pool: Contact[];
+    if (mode === "upload") {
+      upsertMany(drafts);
+      const all = listContacts();
+      const ids = drafts.map((d) => contactIdFor(d.phone));
+      const newListId = `list-${Date.now()}`;
+      saveContactList({ id: newListId, name: uploadName.trim() || "Uploaded list", color: "accent-blue", contactIds: ids, createdAt: Date.now() });
+      addContactsToList(newListId, ids);
+      pool = all.filter((c) => ids.includes(c.id));
+    } else {
+      pool = audience;
+    }
+    const top = pool.slice(0, maxCount);
+    const calls = buildCallsFromContacts(top);
+    const t = templateById(agent.templateId);
+    run.start(calls, { name: agent.name, gradient: t.gradient, icon: t.icon }, {
+      sessionName: name.trim() || defaultName,
+      kind: "contacts",
+      onComplete: (cs) => applyCallOutcomes(cs),
+    });
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={(e) => {
+          onPickFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Start AI calling"
+        className="modal-pop flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {scheduled ? (
+          /* ---------------------------- scheduled --------------------------- */
+          <div className="p-6 text-center">
+            <span className="bg-accent-blue/10 text-accent-blue mx-auto grid size-16 place-items-center rounded-2xl motion-safe:animate-[tick-pop_460ms_cubic-bezier(0.23,1,0.32,1)_both]">
+              <Calendar className="size-8" />
+            </span>
+            <h2 className="text-ink mt-4 text-lg font-bold">Session scheduled</h2>
+            <p className="text-ink-muted mx-auto mt-1.5 max-w-sm text-sm">
+              {agent?.name} will call {willCall} contact{willCall === 1 ? "" : "s"} from{" "}
+              <span className="text-ink font-medium">{audienceLabel}</span> at{" "}
+              {new Date(scheduleAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })}.
+            </p>
+            <Button onClick={onClose} className="bg-brand-blue hover:bg-brand-blue-hover mx-auto mt-5 h-11 w-full max-w-[220px] rounded-lg text-sm font-semibold text-white">
+              Done
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* header */}
+            <div className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-5 py-4 sm:px-6">
+              <div className="flex items-center gap-2.5">
+                <span className="bg-accent-blue/10 text-accent-blue grid size-9 place-items-center rounded-lg">
+                  <PhoneCall className="size-5" />
+                </span>
+                <div>
+                  <h2 className="text-ink text-lg font-bold">Start AI calling</h2>
+                  <p className="text-ink-muted text-xs">Your AI agent calls a set of contacts and updates their status.</p>
+                </div>
+              </div>
+              <Button variant="ghost" onClick={onClose} aria-label="Close" className="text-ink-muted hover:text-ink -mt-1 -mr-1 size-8 rounded-lg p-0">
+                <ChevronDown className="hidden" />
+                <span aria-hidden className="text-xl leading-none">×</span>
+              </Button>
+            </div>
+
+            <div className="space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+              {/* agent */}
+              <Section label="Which agent makes the calls?">
+                {noAgent ? (
+                  <div className="flex items-center gap-3 rounded-xl border border-dashed border-black/15 bg-black/[0.015] p-3.5">
+                    <span className="bg-accent-blue/10 text-accent-blue grid size-9 shrink-0 place-items-center rounded-lg">
+                      <Sparkles className="size-4" />
+                    </span>
+                    <p className="text-ink-muted min-w-0 flex-1 text-xs">No voice agent deployed yet. Build one to start calling.</p>
+                    <button type="button" onClick={() => { onClose(); router.push("/ai-team"); }} className="text-accent-blue shrink-0 text-xs font-semibold whitespace-nowrap hover:underline">
+                      Build agent
+                    </button>
+                  </div>
+                ) : (
+                  <AgentSelect agents={agents} value={agent!} onChange={(a) => setAgentId(a.id)} />
+                )}
+              </Section>
+
+              {/* session name */}
+              <Section label="Session name">
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder={defaultName} className={INPUT} />
+              </Section>
+
+              {/* who to call */}
+              <Section label="Who to call" hint={`${matchCount} match${matchCount === 1 ? "" : "es"}`}>
+                <div className="flex flex-wrap gap-2 rounded-xl bg-black/[0.03] p-1">
+                  <ModeTab active={mode === "list"} icon={ListChecks} label="A list" onClick={() => setMode("list")} />
+                  <ModeTab active={mode === "tier"} icon={Thermometer} label="By temperature" onClick={() => setMode("tier")} />
+                  <ModeTab active={mode === "upload"} icon={Upload} label="Upload" onClick={() => setMode("upload")} />
+                </div>
+
+                {mode === "list" && (
+                  <NativeSelect
+                    value={listId}
+                    onChange={setListId}
+                    options={[{ value: "all", label: `All contacts (${allContacts.length})` }, ...lists.map((l) => ({ value: l.id, label: `${l.name} (${l.contactIds.length})` }))]}
+                  />
+                )}
+
+                {mode === "tier" && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {TIER_CHOICES.map((t) => {
+                      const on = tierSel.has(t);
+                      const m = contactTierMeta(t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() =>
+                            setTierSel((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(t)) next.delete(t);
+                              else next.add(t);
+                              return next;
+                            })
+                          }
+                          aria-pressed={on}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors",
+                            on ? "border-transparent bg-ink text-white" : "text-ink-muted border-black/12 hover:border-black/25"
+                          )}
+                        >
+                          <span className={cn("size-2 rounded-full", m.dot)} />
+                          {m.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {mode === "upload" && (
+                  <div className="space-y-3">
+                    <input value={uploadName} onChange={(e) => setUploadName(e.target.value)} placeholder="Name this list, e.g. Diwali outreach" className={INPUT} />
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="hover:border-accent-blue/50 hover:bg-accent-blue/[0.03] flex w-full items-center gap-3 rounded-xl border border-dashed border-black/15 px-3.5 py-3 text-left transition-colors"
+                    >
+                      <span className="bg-accent-blue/10 text-accent-blue grid size-9 shrink-0 place-items-center rounded-lg">
+                        {drafts.length ? <FileSpreadsheet className="size-4" /> : <Upload className="size-4" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="text-ink block truncate text-sm font-medium">{uploadFile ?? "Upload an Excel or CSV"}</span>
+                        <span className="text-ink-muted block text-xs">
+                          {drafts.length ? `${drafts.length} contacts found · merged into your book` : ".xlsx, .xls, .csv with a phone column"}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </Section>
+
+              {/* goal */}
+              <Section label="Call goal">
+                <div className="flex flex-wrap gap-2 rounded-xl bg-black/[0.03] p-1">
+                  {GOALS.map((g) => (
+                    <button
+                      key={g.value}
+                      type="button"
+                      onClick={() => setGoal(g.value)}
+                      aria-pressed={goal === g.value}
+                      className={cn(
+                        "flex-1 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors active:scale-[0.98]",
+                        goal === g.value ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+                      )}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </Section>
+
+              {/* advanced */}
+              <section>
+                <button type="button" onClick={() => setAdvanced((a) => !a)} className="text-ink inline-flex items-center gap-1.5 text-sm font-semibold">
+                  More options
+                  <ChevronDown className={cn("text-ink-muted size-4 transition-transform", advanced && "rotate-180")} />
+                </button>
+                {advanced && (
+                  <div className="mt-3 space-y-4 rounded-xl border border-black/[0.08] bg-white p-4" style={{ animation: "fade-in-up 200ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                    <Labeled label="How many to call">
+                      <input type="number" min={1} value={maxCount} onChange={(e) => setMaxCount(Math.max(1, Number(e.target.value) || 1))} className={cn(INPUT, "w-28")} />
+                    </Labeled>
+                    <Labeled label="Skip contacts reached recently">
+                      <NativeSelect
+                        value={String(skipDays)}
+                        onChange={(v) => setSkipDays(Number(v))}
+                        options={[
+                          { value: "0", label: "Don't skip" },
+                          { value: "3", label: "Skip if called in last 3 days" },
+                          { value: "7", label: "Skip if called in last 7 days" },
+                          { value: "30", label: "Skip if called in last 30 days" },
+                        ]}
+                      />
+                    </Labeled>
+                    <Labeled label="When">
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex gap-2">
+                          <WhenTab active={!schedule} label="Run now" onClick={() => setSchedule(false)} />
+                          <WhenTab active={schedule} label="Schedule" onClick={() => setSchedule(true)} />
+                        </div>
+                        {schedule && (
+                          <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)} className={INPUT} />
+                        )}
+                      </div>
+                    </Labeled>
+                  </div>
+                )}
+              </section>
+
+              {/* summary */}
+              <div className="bg-accent-blue/[0.06] border-accent-blue/15 rounded-xl border p-3.5 text-sm leading-relaxed">
+                {canStart ? (
+                  <p className="text-ink-muted">
+                    <span className="text-ink font-semibold">{agent?.name}</span> will {schedule ? "be scheduled to call" : "call"}{" "}
+                    <span className="text-ink font-semibold tabular-nums">{willCall}</span> contact{willCall === 1 ? "" : "s"} from{" "}
+                    <span className="text-ink font-semibold">{audienceLabel}</span>. Outcomes update each contact and sync to their lists.
+                  </p>
+                ) : (
+                  <p className="text-ink-muted">
+                    {noAgent ? "Build a voice agent to begin." : mode === "upload" && !drafts.length ? "Upload a contact list to begin." : matchCount === 0 ? "No contacts match this selection." : "Pick who to call to begin."}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* footer */}
+            <div className="flex items-center justify-end gap-2 border-t border-black/[0.06] px-5 py-4 sm:px-6">
+              <Button variant="outline" onClick={onClose} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
+                Cancel
+              </Button>
+              <Button onClick={submit} disabled={!canStart} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
+                {schedule ? <Calendar className="size-4" /> : <Send className="size-4" />}
+                {schedule ? "Schedule session" : "Start calling"}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------- sub-pieces ------------------------------- */
+
+function Section({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <p className="text-ink text-sm font-medium">{label}</p>
+        {hint && <span className="text-ink-muted text-xs tabular-nums">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-ink mb-1.5 block text-sm font-medium">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function ModeTab({ active, icon: Icon, label, onClick }: { active: boolean; icon: typeof Upload; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors active:scale-[0.98]",
+        active ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+      )}
+    >
+      <Icon className="size-4" />
+      {label}
+    </button>
+  );
+}
+
+function WhenTab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "h-9 flex-1 rounded-lg border text-sm font-medium transition-colors",
+        active ? "border-accent-blue bg-accent-blue/[0.06] text-ink" : "text-ink-muted border-black/12 hover:border-black/25"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function NativeSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-ink focus:border-accent-blue/60 h-11 w-full appearance-none rounded-lg border border-black/15 bg-white pr-9 pl-3.5 text-sm outline-none transition-colors"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <ChevronDown className="text-ink-muted/60 pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
+    </div>
+  );
+}
+
+function AgentSelect({ agents, value, onChange }: { agents: AgentConfig[]; value: AgentConfig; onChange: (a: AgentConfig) => void }) {
+  const [open, setOpen] = useState(false);
+  const single = agents.length === 1;
+  const row = (a: AgentConfig) => {
+    const t = templateById(a.templateId);
+    return (
+      <span className="flex min-w-0 flex-1 items-center gap-3">
+        <AgentOrb colors={t.gradient} size={34} icon={t.icon} />
+        <span className="min-w-0 flex-1">
+          <span className="text-ink block truncate text-sm font-semibold">{a.name}</span>
+          <span className="text-ink-muted block truncate text-xs">{a.role} · {voiceById(a.voiceId).name} voice</span>
+        </span>
+      </span>
+    );
+  };
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => !single && setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={cn("flex w-full items-center gap-3 rounded-xl border border-black/[0.12] bg-white p-2.5 text-left", !single && "hover:border-black/25")}
+      >
+        {row(value)}
+        {!single && <ChevronDown className={cn("text-ink-muted/70 size-4 shrink-0 transition-transform", open && "rotate-180")} />}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
+          <div role="listbox" className="absolute top-full right-0 left-0 z-40 mt-1.5 overflow-hidden rounded-xl border border-black/[0.08] bg-white p-1 shadow-lg shadow-black/[0.08]" style={{ animation: "scale-in 160ms cubic-bezier(0.23,1,0.32,1) both", transformOrigin: "top" }}>
+            {agents.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                role="option"
+                aria-selected={a.id === value.id}
+                onClick={() => { onChange(a); setOpen(false); }}
+                className="hover:bg-accent-blue/[0.06] flex w-full items-center gap-3 rounded-lg p-2 text-left"
+              >
+                {row(a)}
+                {a.id === value.id && <Check className="text-accent-blue size-4 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
