@@ -12,7 +12,6 @@ import {
   ListChecks,
   Loader2,
   PhoneCall,
-  Send,
   Sparkles,
   Upload,
   Users,
@@ -541,7 +540,7 @@ export function ContactCallModal({
                 Cancel
               </Button>
               <Button onClick={submit} disabled={!canStart} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
-                {schedule ? <Calendar className="size-4" /> : <Send className="size-4" />}
+                {schedule ? <Calendar className="size-4" /> : <PhoneCall className="size-4" />}
                 {schedule ? "Schedule session" : "Start calling"}
               </Button>
             </div>
