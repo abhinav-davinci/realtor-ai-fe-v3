@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -26,7 +27,6 @@ import {
   SOURCE_META,
   SOURCE_ORDER,
   TIER_META,
-  TIER_ORDER,
   listScoredLeads,
   type LeadSource,
   type Tier,
@@ -34,6 +34,9 @@ import {
 import { SourceIcon } from "./source-icons";
 import { useAutoCall } from "./auto-call-context";
 import { buildCalls, callState, summarize, type Call, type CallOutcome, type CallState } from "./auto-call-run";
+
+/** Calls that become Lead-Intelligence leads: answered with positive intent. */
+const isPromotable = (c: Call) => c.answered && (c.outcome === "qualified" || c.outcome === "interested" || c.outcome === "callback");
 
 /* --------------------------------- helpers -------------------------------- */
 
@@ -52,19 +55,18 @@ function minutesBetween(a: string, b: string): number {
 function initials(name: string): string {
   return name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
+function fmtDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
 
-type Status = "new" | "retry" | "uncontacted" | "all";
-const STATUS_OPTS: { value: Status; label: string }[] = [
-  { value: "new", label: "New (never called)" },
-  { value: "retry", label: "Needs follow-up" },
-  { value: "uncontacted", label: "New + follow-up" },
-  { value: "all", label: "Everyone" },
-];
-const INTENT_OPTS: { value: Tier | "all"; label: string }[] = [
-  { value: "very-hot", label: "Very hot only" },
-  { value: "hot", label: "Hot and above" },
-  { value: "warm", label: "Warm and above" },
-  { value: "all", label: "Any intent" },
+/** Nurture by intent: single tiers or cumulative "& above" bands. */
+const INTENT_OPTS: { value: string; label: string; tiers: Tier[] }[] = [
+  { value: "very-hot", label: "Very Hot", tiers: ["very-hot"] },
+  { value: "hot", label: "Hot", tiers: ["hot"] },
+  { value: "warm", label: "Warm", tiers: ["warm"] },
+  { value: "hot-above", label: "Hot & above", tiers: ["very-hot", "hot"] },
+  { value: "warm-above", label: "Warm & above", tiers: ["very-hot", "hot", "warm"] },
 ];
 
 const OUTCOME_META: Record<CallOutcome, { label: string; chip: string; icon: typeof Check }> = {
@@ -86,8 +88,8 @@ export function AutoCallModal() {
   const leads = useMemo(() => listScoredLeads(), []);
 
   const [agentId, setAgentId] = useState<string | null>(agents[0]?.id ?? null);
-  const [status, setStatus] = useState<Status>("new");
-  const [intent, setIntent] = useState<Tier | "all">("hot");
+  const [intent, setIntent] = useState("warm-above");
+  const [name, setName] = useState("");
   const [count, setCount] = useState(10);
   const [date, setDate] = useState(() => {
     const d = new Date();
@@ -106,22 +108,27 @@ export function AutoCallModal() {
     return () => window.removeEventListener("keydown", onKey);
   }, [run]);
 
+  // On a finished contacts run, the interested calls were auto-promoted to Lead
+  // Intelligence (in the run's onComplete); here we split the list so the summary
+  // clearly shows which calls became leads and which did not.
+  const promoted = useMemo(() => (run.complete ? run.calls.filter(isPromotable) : []), [run.complete, run.calls]);
+  const notAdded = useMemo(() => (run.complete ? run.calls.filter((c) => !isPromotable(c)) : []), [run.complete, run.calls]);
+
   const agent = agents.find((a) => a.id === agentId) ?? null;
   const minScoreNum = minScore.trim() === "" ? null : Number(minScore);
 
-  // Live count of leads matching the current filters (highest-intent first).
+  const intentLabel = INTENT_OPTS.find((o) => o.value === intent)?.label ?? "Warm & above";
+
+  // Leads matching the chosen intent band (highest-intent first).
   const matches = useMemo(() => {
-    const rank = (t: Tier) => TIER_ORDER.indexOf(t);
+    const tiers = INTENT_OPTS.find((o) => o.value === intent)?.tiers ?? [];
     return leads.filter((l) => {
-      if (status === "new" && l.status !== "new") return false;
-      if (status === "retry" && l.status !== "retry") return false;
-      if (status === "uncontacted" && l.status !== "new" && l.status !== "retry") return false;
-      if (intent !== "all" && rank(l.tier) > rank(intent)) return false;
+      if (!tiers.includes(l.tier)) return false;
       if (!sources.has(l.source)) return false;
       if (minScoreNum != null && l.score < minScoreNum) return false;
       return true;
     });
-  }, [leads, status, intent, sources, minScoreNum]);
+  }, [leads, intent, sources, minScoreNum]);
 
   const willCall = Math.min(count, matches.length);
   const windowMin = minutesBetween(from, to);
@@ -131,7 +138,7 @@ export function AutoCallModal() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   })();
   const dateLabel = date === todayStr ? "today" : new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  const intentLabel = intent === "all" ? "" : `${TIER_META[intent].name.toLowerCase()} `;
+  const defaultName = `${intentLabel} · ${fmtDay(date)}`;
 
   const canStart = !!agent && willCall > 0 && windowMin > 0;
 
@@ -139,7 +146,12 @@ export function AutoCallModal() {
     if (!canStart || !agent) return;
     const t = templateById(agent.templateId);
     const top = [...matches].sort((a, b) => b.score - a.score).slice(0, willCall);
-    run.start(buildCalls(top), { name: agent.name, gradient: t.gradient, icon: t.icon });
+    run.start(buildCalls(top), { name: agent.name, gradient: t.gradient, icon: t.icon }, {
+      kind: "leads",
+      sourceKind: "lead-filter",
+      sourceLabel: `${willCall} ${intentLabel} leads`,
+      sessionName: name.trim() || defaultName,
+    });
   }
 
   function toggleSource(s: LeadSource) {
@@ -160,7 +172,7 @@ export function AutoCallModal() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Auto-call leads"
+        aria-label="Nurture leads"
         className="modal-pop flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -172,7 +184,11 @@ export function AutoCallModal() {
               {run.agent && <AgentOrb colors={run.agent.gradient} size={40} icon={run.agent.icon} speaking={s.connected > 0 && !run.complete} />}
               <div className="min-w-0 flex-1">
                 <h2 className="text-ink truncate text-lg font-bold">
-                  {run.complete ? (run.stopped ? "Run stopped" : "Run complete") : `${run.agent?.name} is calling`}
+                  {run.complete
+                    ? run.stopped
+                      ? "Run stopped"
+                      : "Run complete"
+                    : (run.sessionName ?? `${run.agent?.name} is calling`)}
                 </h2>
                 <p className="text-ink-muted text-xs">
                   {run.complete
@@ -225,31 +241,89 @@ export function AutoCallModal() {
               </div>
             </div>
 
-            {/* live call list */}
+            {/* auto-added to Lead Intelligence (contacts runs) */}
+            {run.complete && run.kind === "contacts" && (
+              <div className="border-b border-black/[0.06] px-5 py-4 sm:px-6">
+                <LeadAddedBanner count={promoted.length} />
+              </div>
+            )}
+
+            {/* call list — grouped on a finished contacts run so it's clear which
+                calls became leads, and which were missed or declined */}
             <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-5 py-3 sm:px-6">
-              {run.calls.map((c, i) => (
-                <CallRow key={c.key} call={c} state={states[i]} runOver={run.complete} />
-              ))}
+              {run.complete && run.kind === "contacts" ? (
+                <>
+                  {promoted.length > 0 && (
+                    <>
+                      <GroupHeader label="Added to Lead Intelligence" count={promoted.length} tone="green" />
+                      {promoted.map((c) => (
+                        <CallRow key={c.key} call={c} state="done" runOver />
+                      ))}
+                    </>
+                  )}
+                  {notAdded.length > 0 && (
+                    <>
+                      {promoted.length > 0 && <GroupHeader label="Not added" count={notAdded.length} />}
+                      {notAdded.map((c) => (
+                        <CallRow key={c.key} call={c} state="done" runOver />
+                      ))}
+                    </>
+                  )}
+                </>
+              ) : (
+                run.calls.map((c, i) => <CallRow key={c.key} call={c} state={states[i]} runOver={run.complete} />)
+              )}
             </div>
 
             {/* footer */}
             <div className="flex items-center gap-2 border-t border-black/[0.06] px-5 py-4 sm:px-6">
               {run.complete ? (
-                <>
-                  <Button variant="outline" onClick={() => run.clearRun()} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
-                    New run
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      run.clearRun();
-                      run.closeModal();
-                      router.push("/leads/intelligence");
-                    }}
-                    className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
-                  >
-                    View leads
-                  </Button>
-                </>
+                run.kind === "contacts" ? (
+                  <>
+                    <Button variant="outline" onClick={() => { run.clearRun(); run.closeModal(); }} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
+                      Done
+                    </Button>
+                    {promoted.length > 0 ? (
+                      <Button
+                        onClick={() => {
+                          run.clearRun();
+                          run.closeModal();
+                          router.push("/leads/intelligence");
+                        }}
+                        className="bg-brand-blue hover:bg-brand-blue-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                      >
+                        View in Lead Intelligence <ArrowUpRight className="size-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => {
+                          run.clearRun();
+                          run.closeModal();
+                          router.push("/leads/contacts");
+                        }}
+                        className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                      >
+                        View contacts
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={() => run.clearRun()} className="text-ink h-10 rounded-lg border-black/15 px-4 text-sm font-semibold">
+                      New run
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        run.clearRun();
+                        run.closeModal();
+                        router.push("/leads/intelligence");
+                      }}
+                      className="bg-brand-green hover:bg-brand-green-hover ml-auto h-10 rounded-lg px-4 text-sm font-semibold text-white"
+                    >
+                      View leads
+                    </Button>
+                  </>
+                )
               ) : (
                 <>
                   <p className="text-ink-muted hidden text-xs sm:block">Close this to keep the calls running in the background.</p>
@@ -285,8 +359,8 @@ export function AutoCallModal() {
                   <PhoneCall className="size-5" />
                 </span>
                 <div>
-                  <h2 className="text-ink text-lg font-bold">Auto-call leads</h2>
-                  <p className="text-ink-muted text-xs">Your AI voice agent dials your top leads, spread across a window.</p>
+                  <h2 className="text-ink text-lg font-bold">Nurture leads</h2>
+                  <p className="text-ink-muted text-xs">Your AI agent calls leads by intent to move them forward.</p>
                 </div>
               </div>
               <button type="button" onClick={() => run.closeModal()} aria-label="Close" className="text-ink-muted hover:text-ink hover:bg-black/[0.04] -mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg">
@@ -313,15 +387,20 @@ export function AutoCallModal() {
                 )}
               </div>
 
-              {/* who to call */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Labeled label="Who to call">
-                  <NativeSelect value={status} onChange={(v) => setStatus(v as Status)} options={STATUS_OPTS} />
-                </Labeled>
-                <Labeled label="Minimum intent">
-                  <NativeSelect value={intent} onChange={(v) => setIntent(v as Tier | "all")} options={INTENT_OPTS} />
-                </Labeled>
-              </div>
+              {/* session name */}
+              <Labeled label="Session name">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={defaultName}
+                  className="text-ink placeholder:text-ink-muted/55 focus:border-accent-blue/60 h-11 w-full rounded-lg border border-black/15 bg-white px-3.5 text-sm outline-none transition-colors"
+                />
+              </Labeled>
+
+              {/* who to call — by intent */}
+              <Labeled label="Who to call">
+                <NativeSelect value={intent} onChange={setIntent} options={INTENT_OPTS} />
+              </Labeled>
 
               {/* how many */}
               <Labeled label="How many leads">
@@ -399,13 +478,13 @@ export function AutoCallModal() {
                 {canStart ? (
                   willCall === 1 ? (
                     <p className="text-ink-muted">
-                      <span className="text-ink font-semibold">{agent?.name}</span> will call your top {intentLabel}lead between{" "}
+                      <span className="text-ink font-semibold">{agent?.name}</span> will call 1 <span className="text-ink font-semibold">{intentLabel}</span> lead between{" "}
                       <span className="text-ink font-semibold">{to12(from)}</span> and <span className="text-ink font-semibold">{to12(to)}</span> {dateLabel}.
                     </p>
                   ) : (
                     <p className="text-ink-muted">
-                      <span className="text-ink font-semibold">{agent?.name}</span> will call the top{" "}
-                      <span className="text-ink font-semibold tabular-nums">{willCall}</span> {intentLabel}leads, about one every{" "}
+                      <span className="text-ink font-semibold">{agent?.name}</span> will call{" "}
+                      <span className="text-ink font-semibold tabular-nums">{willCall}</span> <span className="text-ink font-semibold">{intentLabel}</span> leads, about one every{" "}
                       <span className="text-ink font-semibold">{pace} min</span>, between{" "}
                       <span className="text-ink font-semibold">{to12(from)}</span> and <span className="text-ink font-semibold">{to12(to)}</span> {dateLabel}.
                     </p>
@@ -425,7 +504,7 @@ export function AutoCallModal() {
               </Button>
               <Button onClick={startRun} disabled={!canStart} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
                 <PhoneCall className="size-4" />
-                Start calls
+                Start calling
               </Button>
             </div>
           </>
@@ -442,6 +521,53 @@ function StatTile({ label, value, tone }: { label: string; value: string | numbe
     <div className="rounded-xl border border-black/[0.06] bg-black/[0.015] px-3 py-2 text-center">
       <p className={cn("text-lg font-bold tabular-nums", tone === "green" ? "text-brand-green" : "text-ink")}>{value}</p>
       <p className="text-ink-muted text-[11px]">{label}</p>
+    </div>
+  );
+}
+
+/** The delightful "send interested contacts to Lead Intelligence" moment shown
+ * on a finished contacts run: idle (offer) → sending → done (status banner). */
+/** Status shown on a finished contacts run: the interested leads were added to
+ * Lead Intelligence automatically (no review step). */
+function LeadAddedBanner({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-black/[0.08] bg-black/[0.015] p-3.5">
+        <span className="text-ink-muted grid size-10 shrink-0 place-items-center rounded-full bg-black/[0.04]">
+          <PhoneMissed className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-ink text-sm font-bold">No new leads from this run</p>
+          <p className="text-ink-muted text-xs">Missed and declined calls aren&apos;t added to Lead Intelligence.</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="border-brand-green/25 bg-brand-green/[0.06] flex items-center gap-3 rounded-xl border p-3.5"
+      style={{ animation: "fade-in-up 240ms cubic-bezier(0.23,1,0.32,1) both" }}
+    >
+      <span className="bg-brand-green/15 text-brand-green grid size-10 shrink-0 place-items-center rounded-full motion-safe:animate-[success-pop_460ms_cubic-bezier(0.23,1,0.32,1)_both]">
+        <CheckCircle2 className="size-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-ink text-sm font-bold">
+          {count} {count === 1 ? "lead" : "leads"} added to Lead Intelligence
+        </p>
+        <p className="text-ink-muted text-xs">Open a lead to read the call and take it over.</p>
+      </div>
+    </div>
+  );
+}
+
+/** Section header separating the grouped calls in the completion summary. */
+function GroupHeader({ label, count, tone }: { label: string; count: number; tone?: "green" }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 pb-0.5 first:pt-0">
+      <span className={cn("text-[11px] font-bold tracking-wide uppercase", tone === "green" ? "text-brand-green" : "text-ink-muted/70")}>{label}</span>
+      <span className={cn("rounded-full px-1.5 text-[10px] font-bold tabular-nums", tone === "green" ? "bg-brand-green/10 text-brand-green" : "bg-black/[0.05] text-ink-muted")}>{count}</span>
+      <span className="ml-1 h-px flex-1 bg-black/[0.06]" />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { useAutoCall } from "./auto-call-context";
 import { summarize } from "./auto-call-run";
 
 export function AutoCallTracker() {
-  const { calls, elapsed, complete, agent, openModal, clearRun } = useAutoCall();
+  const { calls, elapsed, complete, agent, sessionName, openModal, clearRun } = useAutoCall();
   const c = summarize(calls, elapsed);
 
   return (
@@ -40,7 +40,7 @@ export function AutoCallTracker() {
             {agent && <AgentOrb colors={agent.gradient} size={36} icon={agent.icon} speaking={c.connected > 0 && !complete} />}
             <div className="min-w-0 flex-1">
               <p className="text-ink truncate text-sm font-semibold">
-                {complete ? "Run complete" : `${agent?.name ?? "Agent"} is calling`}
+                {complete ? "Run complete" : (sessionName ?? `${agent?.name ?? "Agent"} is calling`)}
               </p>
               <p className="text-ink-muted text-xs tabular-nums">
                 Dialled {c.dialled}/{c.total} · {c.connected} connected

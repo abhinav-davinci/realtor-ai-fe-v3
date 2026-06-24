@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Download, Upload } from "lucide-react";
+import { Check, ChevronDown, Download, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
@@ -22,13 +22,20 @@ import {
   listScoredLeads,
   sourceCounts,
   type LeadSource,
+  type ScoredLead,
   type Tier,
 } from "@/lib/lead-intelligence";
-import { EASE_OUT, FilterToggle, SearchBar, LeadDetail, type Filter } from "@/components/conversations/conversation-ui";
+import {
+  acknowledgePromoted,
+  LEADS_CHANGED_EVENT,
+  listAllScoredLeads,
+  takeOverLead,
+  unseenPromotedCount,
+} from "@/lib/lead-promotion";
+import { EASE_OUT, SearchBar, LeadDetail } from "@/components/conversations/conversation-ui";
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceIcon } from "./source-icons";
 import { AutoCallButton } from "./auto-call-context";
-import { UploadLeadsModal } from "./upload-leads-modal";
 
 export function LeadsTable() {
   const params = useSearchParams();
@@ -37,29 +44,46 @@ export function LeadsTable() {
     ? (templateParam as TemplateId)
     : null;
 
-  const allLeads = useMemo(() => listScoredLeads(), []);
+  // Start from the deterministic seed set (SSR-safe), then merge in promoted
+  // leads from localStorage after mount and whenever they change.
+  const [allLeads, setAllLeads] = useState<ScoredLead[]>(() => listScoredLeads());
+  const [unseen, setUnseen] = useState(0);
+  useEffect(() => {
+    const load = () => {
+      setAllLeads(listAllScoredLeads());
+      setUnseen(unseenPromotedCount());
+    };
+    load();
+    window.addEventListener(LEADS_CHANGED_EVENT, load);
+    return () => window.removeEventListener(LEADS_CHANGED_EVENT, load);
+  }, []);
   const perSource = useMemo(() => sourceCounts(allLeads), [allLeads]);
 
   const [tier, setTier] = useState<Tier | "all">("all");
-  const [channel, setChannel] = useState<Filter>("both");
   const [source, setSource] = useState<LeadSource | "all">("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
+
+  function dismissBanner() {
+    acknowledgePromoted();
+    setUnseen(0);
+  }
+  function onTakeOver(id: string) {
+    takeOverLead(id);
+  }
 
   const visible = useMemo(
     () =>
-      filterLeads(allLeads, { tab: "all", tier, channel, source, minScore: null, maxScore: null, query, templateId }),
-    [allLeads, tier, channel, source, query, templateId]
+      filterLeads(allLeads, { tab: "all", tier, channel: "both", source, minScore: null, maxScore: null, query, templateId }),
+    [allLeads, tier, source, query, templateId]
   );
 
   const open = allLeads.find((l) => l.id === openId) ?? null;
-  const filtered = tier !== "all" || channel !== "both" || source !== "all" || query.trim() !== "";
+  const filtered = tier !== "all" || source !== "all" || query.trim() !== "";
 
   function resetFilters() {
     setQuery("");
     setTier("all");
-    setChannel("both");
     setSource("all");
   }
 
@@ -72,9 +96,6 @@ export function LeadsTable() {
           <p className="text-ink-muted text-sm">{allLeads.length} leads · last 30 days</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setUploadOpen(true)} variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
-            <Upload className="size-4" /> Upload Leads
-          </Button>
           <AutoCallButton />
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Download className="size-4" /> Download All Leads
@@ -85,11 +106,35 @@ export function LeadsTable() {
       <div className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 lg:px-8">
         {open ? (
           <div className="space-y-3">
-            <LeadScoreHeader lead={open} />
+            <LeadScoreHeader lead={open} onTakeOver={() => onTakeOver(open.id)} />
             <LeadDetail lead={open} agentName={open.agentRole} onBack={() => setOpenId(null)} />
           </div>
         ) : (
           <>
+            {/* new leads from AI calls */}
+            {unseen > 0 && (
+              <div
+                className="border-brand-green/25 bg-brand-green/[0.06] mb-3 flex items-center gap-3 rounded-xl border px-4 py-3"
+                style={{ animation: `fade-in-up 260ms ${EASE_OUT} both` }}
+              >
+                <span className="bg-brand-green/15 text-brand-green grid size-9 shrink-0 place-items-center rounded-full motion-safe:animate-[success-pop_460ms_cubic-bezier(0.23,1,0.32,1)_both]">
+                  <Sparkles className="size-4.5" />
+                </span>
+                <p className="text-ink min-w-0 flex-1 text-sm font-semibold">
+                  {unseen} new {unseen === 1 ? "lead" : "leads"} added from AI calls.{" "}
+                  <span className="text-ink-muted font-normal">Now at the top of your list.</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={dismissBanner}
+                  aria-label="Dismiss"
+                  className="text-ink-muted hover:bg-black/[0.05] hover:text-ink grid size-7 shrink-0 place-items-center rounded-lg transition-colors"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+
             {/* source chips */}
             <SourceFilter value={source} counts={perSource} total={allLeads.length} onChange={setSource} />
 
@@ -98,7 +143,6 @@ export function LeadsTable() {
               <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={setOpenId} />
               <div className="flex flex-wrap items-center gap-2">
                 <TierFilter value={tier} onChange={setTier} />
-                <FilterToggle value={channel} onChange={setChannel} />
               </div>
             </div>
 
@@ -133,8 +177,6 @@ export function LeadsTable() {
           </>
         )}
       </div>
-
-      {uploadOpen && <UploadLeadsModal onClose={() => setUploadOpen(false)} />}
     </div>
   );
 }

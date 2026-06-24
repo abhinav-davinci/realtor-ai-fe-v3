@@ -7,7 +7,7 @@
  * intelligence-specific additions are the colour-coded intent score and the
  * origin source chip, both folded into the existing right-hand column.
  */
-import { ChevronRight, PhoneCall } from "lucide-react";
+import { ChevronRight, Headset, PhoneCall, Sparkles, UserRoundCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SOURCE_META, TIER_META, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
@@ -35,6 +35,16 @@ export function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query
           </p>
           <OutcomeBadge outcome={lead.outcome} tone={lead.tone} />
           {both && <BothChannelsPill />}
+          {lead.promotedFromAiCall && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-600">
+              <Sparkles className="size-2.5" /> AI call
+            </span>
+          )}
+          {lead.owner === "human" && (
+            <span className="bg-brand-green/10 text-brand-green inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold">
+              <UserRoundCheck className="size-2.5" /> You
+            </span>
+          )}
         </div>
         <p className="text-ink-muted mt-0.5 truncate text-xs">{lead.summary}</p>
       </div>
@@ -51,7 +61,8 @@ export function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query
 }
 
 /** The banner shown above a lead's transcript when it's opened. */
-export function LeadScoreHeader({ lead }: { lead: ScoredLead }) {
+export function LeadScoreHeader({ lead, onTakeOver }: { lead: ScoredLead; onTakeOver?: () => void }) {
+  const handedOff = lead.owner === "human";
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-3">
       <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl text-lg font-bold tabular-nums", TIER_META[lead.tier].badge)}>
@@ -67,12 +78,29 @@ export function LeadScoreHeader({ lead }: { lead: ScoredLead }) {
           </span>
         </div>
         <p className="text-ink-muted mt-0.5 text-xs capitalize">
-          {lead.status} · scored {lead.score}/100 · via {lead.agentRole}
+          {handedOff ? "With sales" : lead.status} · scored {lead.score}/100 · via {lead.agentRole}
         </p>
       </div>
-      <Button className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3 text-sm font-semibold text-white">
-        <PhoneCall className="size-4" /> Call lead
-      </Button>
+      <div className="flex shrink-0 items-center gap-2">
+        {handedOff ? (
+          <span className="bg-brand-green/10 text-brand-green inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
+            <UserRoundCheck className="size-4" /> You&apos;re handling this
+          </span>
+        ) : (
+          onTakeOver && (
+            <Button
+              variant="outline"
+              onClick={onTakeOver}
+              className="text-ink h-9 rounded-lg border-black/15 px-3 text-sm font-semibold"
+            >
+              <Headset className="size-4" /> Take over
+            </Button>
+          )
+        )}
+        <Button className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3 text-sm font-semibold text-white">
+          <PhoneCall className="size-4" /> Call lead
+        </Button>
+      </div>
     </div>
   );
 }

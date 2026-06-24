@@ -38,6 +38,14 @@ export interface ScoredLead extends Lead {
   status: LeadStatus;
   /** Origin platform (deterministic, design mode). */
   source: LeadSource;
+  /** Set when the lead was created by promoting an AI calling outcome. */
+  promotedFromAiCall?: boolean;
+  /** Epoch ms the lead was promoted (drives the "new leads" banner + sort). */
+  promotedAt?: number;
+  /** Who is working the lead: the AI agent (default) or a human after take-over. */
+  owner?: "ai" | "human";
+  /** Epoch ms a human took the lead over. */
+  handoffAt?: number;
 }
 
 /* --------------------------------- tiers ---------------------------------- */
@@ -84,7 +92,7 @@ export const SOURCE_META: Record<
 > = {
   whatsapp: { label: "WhatsApp", short: "WhatsApp", color: "#22c55e", tintBg: "bg-green-50", tintText: "text-green-600" },
   website: { label: "Website chat", short: "Website", color: "#2f6bed", tintBg: "bg-blue-50", tintText: "text-blue-600" },
-  voice: { label: "AI Voice Call", short: "Voice", color: "#7c3aed", tintBg: "bg-violet-50", tintText: "text-violet-600" },
+  voice: { label: "AI Voice Call", short: "AI Calling", color: "#7c3aed", tintBg: "bg-violet-50", tintText: "text-violet-600" },
   instagram: { label: "Instagram", short: "Instagram", color: "#ec4899", tintBg: "bg-pink-50", tintText: "text-pink-600" },
   facebook: { label: "Facebook", short: "Facebook", color: "#4f46e5", tintBg: "bg-indigo-50", tintText: "text-indigo-600" },
   youtube: { label: "YouTube", short: "YouTube", color: "#ef4444", tintBg: "bg-red-50", tintText: "text-red-600" },
