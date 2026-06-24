@@ -8,7 +8,6 @@ import {
   Check,
   ChevronDown,
   FileSpreadsheet,
-  Gauge,
   ListChecks,
   Loader2,
   PhoneCall,
@@ -21,13 +20,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { listAgents, templateById, voiceById, type AgentConfig } from "@/lib/agents";
 import { AgentOrb } from "@/components/ai-team/agent-ui";
-import { TIER_ORDER } from "@/lib/lead-intelligence";
 import {
   addContactsToList,
   applyCallOutcomes,
   buildCallsFromContacts,
   contactIdFor,
-  contactTierMeta,
   initialsOf,
   listContactLists,
   listContacts,
@@ -35,17 +32,16 @@ import {
   saveContactList,
   upsertMany,
   type Contact,
-  type ContactTier,
 } from "@/lib/contacts";
 import { useAutoCall } from "../auto-call-context";
 import { INPUT, TagEditor } from "./ui";
 
 const DAY = 86_400_000;
-type Mode = "list" | "tier" | "upload";
+// Contacts are raw until a call qualifies them, so the audience is a list or an
+// upload — intent-tier targeting lives in Lead Intelligence (post-qualification).
+type Mode = "list" | "upload";
 type ExtractState = "idle" | "extracting" | "ready" | "error";
 type Draft = Omit<Contact, "id" | "initials" | "addedAt">;
-
-const TIER_CHOICES: ContactTier[] = [...TIER_ORDER, "new"];
 
 function formatPhone(raw: string): string {
   const d = normPhone(raw);
@@ -99,9 +95,8 @@ export function ContactCallModal({
   );
 
   const [agentId, setAgentId] = useState<string | null>(agents[0]?.id ?? null);
-  const [mode, setMode] = useState<Mode>(lists.length ? "list" : "tier");
+  const [mode, setMode] = useState<Mode>("list");
   const [listId, setListId] = useState<string>(lists[0]?.id ?? "all");
-  const [tierSel, setTierSel] = useState<Set<ContactTier>>(() => new Set<ContactTier>(["very-hot", "hot"]));
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [uploadName, setUploadName] = useState("");
   const [uploadFile, setUploadFile] = useState<string | null>(null);
@@ -134,14 +129,12 @@ export function ContactCallModal({
       base = listId === "all" ? allContacts : (lists.find((l) => l.id === listId)?.contactIds ?? [])
         .map((id) => allContacts.find((c) => c.id === id))
         .filter((c): c is Contact => !!c);
-    } else if (mode === "tier") {
-      base = allContacts.filter((c) => tierSel.has(c.tier));
     } else {
       base = []; // upload mode resolves at start
     }
     if (skipDays > 0) base = base.filter((c) => !(c.lastContacted && now - c.lastContacted < skipDays * DAY));
     return base;
-  }, [preset, presetContacts, mode, listId, tierSel, allContacts, lists, skipDays, now]);
+  }, [preset, presetContacts, mode, listId, allContacts, lists, skipDays, now]);
 
   const matchCount = preset ? presetContacts.length : mode === "upload" ? drafts.length : audience.length;
   const willCall = preset ? matchCount : Math.min(maxCount, matchCount);
@@ -157,9 +150,7 @@ export function ContactCallModal({
     ? `${presetContacts.length} selected contact${presetContacts.length === 1 ? "" : "s"}`
     : mode === "list"
       ? listId === "all" ? "all contacts" : lists.find((l) => l.id === listId)?.name ?? "list"
-      : mode === "tier"
-        ? (tierSel.size ? `${[...tierSel].map((t) => contactTierMeta(t).name).join(", ")} contacts` : "no tiers")
-        : (saveToBook ? uploadName.trim() : "") || "the uploaded contacts";
+      : (saveToBook ? uploadName.trim() : "") || "the uploaded contacts";
   const defaultName = `${audienceLabel} · ${todayLabel(now)}`;
 
   async function onPickFile(f: File | undefined) {
@@ -356,7 +347,6 @@ export function ContactCallModal({
                 <>
                 <div className="flex flex-wrap gap-2 rounded-xl bg-black/[0.03] p-1">
                   <ModeTab active={mode === "list"} icon={ListChecks} label="A list" onClick={() => setMode("list")} />
-                  <ModeTab active={mode === "tier"} icon={Gauge} label="By intent" onClick={() => setMode("tier")} />
                   <ModeTab active={mode === "upload"} icon={Upload} label="Upload" onClick={() => setMode("upload")} />
                 </div>
 
@@ -366,37 +356,6 @@ export function ContactCallModal({
                     onChange={setListId}
                     options={[{ value: "all", label: `All contacts (${allContacts.length})` }, ...lists.map((l) => ({ value: l.id, label: `${l.name} (${l.contactIds.length})` }))]}
                   />
-                )}
-
-                {mode === "tier" && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {TIER_CHOICES.map((t) => {
-                      const on = tierSel.has(t);
-                      const m = contactTierMeta(t);
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() =>
-                            setTierSel((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(t)) next.delete(t);
-                              else next.add(t);
-                              return next;
-                            })
-                          }
-                          aria-pressed={on}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors",
-                            on ? "border-transparent bg-ink text-white" : "text-ink-muted border-black/12 hover:border-black/25"
-                          )}
-                        >
-                          <span className={cn("size-2 rounded-full", m.dot)} />
-                          {m.name}
-                        </button>
-                      );
-                    })}
-                  </div>
                 )}
 
                 {mode === "upload" && (
