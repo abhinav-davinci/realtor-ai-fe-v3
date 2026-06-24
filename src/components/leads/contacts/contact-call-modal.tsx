@@ -15,6 +15,7 @@ import {
   Sparkles,
   Upload,
   Users,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -487,20 +488,40 @@ export function ContactCallModal({
                 )}
               </Section>
 
-              {/* advanced */}
-              <section>
-                <button type="button" onClick={() => setAdvanced((a) => !a)} className="text-ink inline-flex items-center gap-1.5 text-sm font-semibold">
-                  More options
-                  <ChevronDown className={cn("text-ink-muted size-4 transition-transform", advanced && "rotate-180")} />
-                </button>
-                {advanced && (
-                  <div className="mt-3 space-y-4 rounded-xl border border-black/[0.08] bg-white p-4" style={{ animation: "fade-in-up 200ms cubic-bezier(0.23,1,0.32,1) both" }}>
-                    {!preset && (
+              {/* when — surfaced upfront, not hidden in advanced */}
+              <Section label="When">
+                <div className="flex flex-wrap gap-2 rounded-xl bg-black/[0.03] p-1">
+                  <ModeTab active={!schedule} icon={Zap} label="Call now" onClick={() => setSchedule(false)} />
+                  <ModeTab active={schedule} icon={Calendar} label="Schedule" onClick={() => setSchedule(true)} />
+                </div>
+                {schedule && (
+                  <div style={{ animation: "fade-in-up 180ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                    <p className="text-ink-muted mb-1.5 text-xs font-medium">Call window</p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1.5fr_1fr_auto_1fr]">
+                      <input type="date" min={minDate} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className={cn(INPUT, "col-span-2 sm:col-span-1")} aria-label="Call date" />
+                      <input type="time" value={scheduleFrom} onChange={(e) => setScheduleFrom(e.target.value)} className={INPUT} aria-label="From time" />
+                      <span className="text-ink-muted hidden place-items-center text-sm sm:grid">to</span>
+                      <input type="time" value={scheduleTo} onChange={(e) => setScheduleTo(e.target.value)} className={INPUT} aria-label="To time" />
+                    </div>
+                    <p className={cn("mt-1.5 text-xs", windowOk ? "text-ink-muted" : "font-medium text-red-600")}>
+                      {windowOk ? "Calls go out within this window on the chosen day." : "The end time must be after the start time."}
+                    </p>
+                  </div>
+                )}
+              </Section>
+
+              {/* advanced (count + skip — not relevant when calling a fixed selection) */}
+              {!preset && (
+                <section>
+                  <button type="button" onClick={() => setAdvanced((a) => !a)} className="text-ink inline-flex items-center gap-1.5 text-sm font-semibold">
+                    More options
+                    <ChevronDown className={cn("text-ink-muted size-4 transition-transform", advanced && "rotate-180")} />
+                  </button>
+                  {advanced && (
+                    <div className="mt-3 space-y-4 rounded-xl border border-black/[0.08] bg-white p-4" style={{ animation: "fade-in-up 200ms cubic-bezier(0.23,1,0.32,1) both" }}>
                       <Labeled label="How many to call">
                         <input type="number" min={1} value={maxCount} onChange={(e) => setMaxCount(Math.max(1, Number(e.target.value) || 1))} className={cn(INPUT, "w-28")} />
                       </Labeled>
-                    )}
-                    {!preset && (
                       <Labeled label="Skip contacts reached recently">
                         <NativeSelect
                           value={String(skipDays)}
@@ -513,32 +534,10 @@ export function ContactCallModal({
                           ]}
                         />
                       </Labeled>
-                    )}
-                    <Labeled label="When">
-                      <div className="flex flex-col gap-2.5">
-                        <div className="flex gap-2">
-                          <WhenTab active={!schedule} label="Run now" onClick={() => setSchedule(false)} />
-                          <WhenTab active={schedule} label="Schedule for later" onClick={() => setSchedule(true)} />
-                        </div>
-                        {schedule && (
-                          <div style={{ animation: "fade-in-up 180ms cubic-bezier(0.23,1,0.32,1) both" }}>
-                            <p className="text-ink-muted mb-1.5 text-xs font-medium">Call window</p>
-                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1.5fr_1fr_auto_1fr]">
-                              <input type="date" min={minDate} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className={cn(INPUT, "col-span-2 sm:col-span-1")} aria-label="Call date" />
-                              <input type="time" value={scheduleFrom} onChange={(e) => setScheduleFrom(e.target.value)} className={INPUT} aria-label="From time" />
-                              <span className="text-ink-muted hidden place-items-center text-sm sm:grid">to</span>
-                              <input type="time" value={scheduleTo} onChange={(e) => setScheduleTo(e.target.value)} className={INPUT} aria-label="To time" />
-                            </div>
-                            <p className={cn("mt-1.5 text-xs", windowOk ? "text-ink-muted" : "font-medium text-red-600")}>
-                              {windowOk ? "Calls go out within this window on the chosen day." : "The end time must be after the start time."}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </Labeled>
-                  </div>
-                )}
-              </section>
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* summary */}
               <div className="bg-accent-blue/[0.06] border-accent-blue/15 rounded-xl border p-3.5 text-sm leading-relaxed">
@@ -645,22 +644,6 @@ function ModeTab({ active, icon: Icon, label, onClick }: { active: boolean; icon
       )}
     >
       <Icon className="size-4" />
-      {label}
-    </button>
-  );
-}
-
-function WhenTab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "h-9 flex-1 rounded-lg border text-sm font-medium transition-colors",
-        active ? "border-accent-blue bg-accent-blue/[0.06] text-ink" : "text-ink-muted border-black/12 hover:border-black/25"
-      )}
-    >
       {label}
     </button>
   );
