@@ -33,6 +33,7 @@ import {
   upsertMany,
   type Contact,
 } from "@/lib/contacts";
+import { promoteCallsToLeads } from "@/lib/lead-promotion";
 import { useAutoCall } from "../auto-call-context";
 import { INPUT, TagEditor } from "./ui";
 
@@ -248,7 +249,11 @@ export function ContactCallModal({
       kind: "contacts",
       sourceLabel: audienceLabel,
       sourceKind: preset ? "selected" : mode,
-      onComplete: (cs) => applyCallOutcomes(cs),
+      onComplete: (cs) => {
+        // Sync tiers back to the book, then auto-promote the interested leads.
+        applyCallOutcomes(cs);
+        promoteCallsToLeads(cs, agent.name);
+      },
     });
     onStarted?.();
     onClose();
