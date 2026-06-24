@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ListPlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContactList } from "@/lib/contacts";
-import { listDot } from "./ui";
 
 const EASE = "cubic-bezier(0.23,1,0.32,1)";
 /** How many list chips show beside "All contacts" before the rest fold into the menu. */
@@ -87,7 +86,7 @@ export function ListsRail({
       <Chip selected={activeId === "all"} onClick={() => pick("all")} label="All contacts" count={totalContacts} />
 
       {quick.map((l) => (
-        <Chip key={l.id} selected={activeId === l.id} onClick={() => pick(l.id)} label={l.name} count={l.contactIds.length} dot={l.color} />
+        <Chip key={l.id} selected={activeId === l.id} onClick={() => pick(l.id)} label={l.name} count={l.contactIds.length} />
       ))}
 
       {showAllLists && (
@@ -102,7 +101,7 @@ export function ListsRail({
               activeHidden ? "border-transparent bg-ink text-white" : "text-ink-muted hover:text-ink border-black/10 hover:border-black/25"
             )}
           >
-            {activeHidden && <span className={cn("size-2 rounded-full", activeHidden ? "bg-white/80" : listDot(activeList.color))} />}
+            {activeHidden && <span className="size-2 rounded-full bg-white/80" />}
             <span className="max-w-[140px] truncate">{activeHidden ? activeList.name : "All lists"}</span>
             <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] tabular-nums", activeHidden ? "bg-white/20 text-white" : "bg-black/[0.06] text-ink-muted")}>
               {lists.length}
@@ -144,7 +143,6 @@ export function ListsRail({
                           activeId === l.id ? "bg-accent-blue/[0.06]" : "hover:bg-black/[0.03]"
                         )}
                       >
-                        <span className={cn("size-2.5 shrink-0 rounded-full", listDot(l.color))} />
                         <span className="text-ink min-w-0 flex-1 truncate font-medium">{l.name}</span>
                         <span className="text-ink-muted text-xs tabular-nums">{l.contactIds.length}</span>
                       </button>
@@ -180,13 +178,11 @@ function Chip({
   onClick,
   label,
   count,
-  dot,
 }: {
   selected: boolean;
   onClick: () => void;
   label: string;
   count: number;
-  dot?: string;
 }) {
   return (
     <button
@@ -198,7 +194,6 @@ function Chip({
         selected ? "border-transparent bg-ink text-white" : "text-ink-muted hover:text-ink border-black/10 hover:border-black/25"
       )}
     >
-      {dot && <span className={cn("size-2 rounded-full", selected ? "bg-white/80" : listDot(dot))} />}
       <span className="max-w-[140px] truncate">{label}</span>
       <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] tabular-nums", selected ? "bg-white/20 text-white" : "bg-black/[0.06] text-ink-muted")}>
         {count}

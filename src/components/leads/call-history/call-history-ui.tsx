@@ -4,6 +4,7 @@
  * the live auto-call modal's outcome chips and stacked bar). */
 import {
   Check,
+  CheckCheck,
   CheckCircle2,
   Gauge,
   ListChecks,
@@ -36,6 +37,7 @@ export const SOURCE_KIND_META: Record<SourceKind, { label: string; icon: LucideI
   tier: { label: "By intent", icon: Gauge },
   upload: { label: "Upload", icon: Upload },
   "lead-filter": { label: "Lead filter", icon: Radar },
+  selected: { label: "Selected", icon: CheckCheck },
 };
 
 export function OutcomeChip({ outcome, className }: { outcome: CallOutcome; className?: string }) {

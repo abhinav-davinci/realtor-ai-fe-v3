@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { ListPlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LIST_COLORS, type Contact, type ContactList } from "@/lib/contacts";
-import { CheckMark, INPUT, listTint, ModalShell, Monogram } from "./ui";
+import { type Contact, type ContactList } from "@/lib/contacts";
+import { CheckMark, INPUT, ModalShell, Monogram } from "./ui";
 
 /* ----------------------------- create / rename ---------------------------- */
 
@@ -18,7 +18,6 @@ export function ListModal({
   onSave: (l: ContactList) => void;
 }) {
   const [name, setName] = useState(list?.name ?? "");
-  const [color, setColor] = useState<string>(list?.color ?? LIST_COLORS[0]);
   const ok = name.trim().length > 0;
 
   function save() {
@@ -26,7 +25,7 @@ export function ListModal({
     onSave({
       id: list?.id ?? `list-${Date.now()}`,
       name: name.trim(),
-      color,
+      color: list?.color ?? "accent-blue",
       contactIds: list?.contactIds ?? [],
       createdAt: list?.createdAt ?? Date.now(),
     });
@@ -55,30 +54,9 @@ export function ListModal({
         </>
       }
     >
-      <div className="space-y-4">
-        <div>
-          <label className="text-ink mb-1.5 block text-sm font-medium">List name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Diwali campaign" className={INPUT} autoFocus />
-        </div>
-        <div>
-          <label className="text-ink mb-1.5 block text-sm font-medium">Colour</label>
-          <div className="flex flex-wrap gap-2">
-            {LIST_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                aria-label={`Colour ${c}`}
-                className={cn(
-                  "grid size-9 place-items-center rounded-lg ring-2 transition-all active:scale-95",
-                  color === c ? "ring-ink/40" : "ring-transparent hover:ring-black/15"
-                )}
-              >
-                <span className={cn("size-5 rounded-full", listTint(c))} />
-              </button>
-            ))}
-          </div>
-        </div>
+      <div>
+        <label className="text-ink mb-1.5 block text-sm font-medium">List name</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Diwali campaign" className={INPUT} autoFocus />
       </div>
     </ModalShell>
   );
@@ -120,7 +98,7 @@ export function AddToListModal({
               onClick={() => onPick(l.id)}
               className="hover:bg-black/[0.03] flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left"
             >
-              <span className={cn("size-3 rounded-full", listTint(l.color))} />
+              <ListPlus className="text-ink-muted/50 size-3.5 shrink-0" />
               <span className="text-ink flex-1 truncate text-sm font-medium">{l.name}</span>
               <span className="text-ink-muted text-xs">{l.contactIds.length}</span>
             </button>

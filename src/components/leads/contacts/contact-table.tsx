@@ -79,7 +79,7 @@ export function ContactTable({
                 <td className="py-2.5 pr-3">
                   <div className="flex max-w-[200px] flex-wrap items-center gap-1">
                     {memberships.map((l) => (
-                      <ListChip key={l.id} name={l.name} color={l.color} />
+                      <ListChip key={l.id} name={l.name} />
                     ))}
                     {memberships.length === 0 && <span className="text-ink-muted/40 text-xs">—</span>}
                   </div>

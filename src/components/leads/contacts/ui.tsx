@@ -150,32 +150,15 @@ export function TagEditor({ value, onChange }: { value: string[]; onChange: (tag
 
 /* -------------------------------- list chip ------------------------------- */
 
-const LIST_TINT: Record<string, string> = {
-  "accent-blue": "bg-accent-blue/10 text-accent-blue",
-  "brand-green": "bg-brand-green/10 text-brand-green",
-  "brand-orange": "bg-brand-orange/10 text-brand-orange",
-  gold: "bg-gold/25 text-gold-foreground",
-  red: "bg-red-50 text-red-600",
-};
-export function listTint(color: string): string {
-  return LIST_TINT[color] ?? "bg-black/[0.05] text-ink-muted";
+/** Lists render with one uniform accent — no per-list colour coding (keeps the
+ * UI simple and predictable as the number of lists grows). */
+export function listTint(): string {
+  return "bg-accent-blue/10 text-accent-blue";
 }
 
-const LIST_DOT: Record<string, string> = {
-  "accent-blue": "bg-accent-blue",
-  "brand-green": "bg-brand-green",
-  "brand-orange": "bg-brand-orange",
-  gold: "bg-gold",
-  red: "bg-red-500",
-};
-/** Solid swatch (for list chips/dots), as opposed to the tinted chip background. */
-export function listDot(color: string): string {
-  return LIST_DOT[color] ?? "bg-ink-muted/40";
-}
-
-export function ListChip({ name, color, onRemove }: { name: string; color: string; onRemove?: () => void }) {
+export function ListChip({ name, onRemove }: { name: string; onRemove?: () => void }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", listTint(color))}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", listTint())}>
       {name}
       {onRemove && (
         <button type="button" onClick={onRemove} aria-label={`Remove from ${name}`} className="grid size-3.5 place-items-center rounded-full hover:bg-black/10">

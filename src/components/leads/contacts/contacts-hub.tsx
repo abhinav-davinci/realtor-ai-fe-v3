@@ -73,6 +73,8 @@ export function ContactsHub() {
   const [contactModal, setContactModal] = useState<{ contact: Contact | null } | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
+  /** When set, the call modal targets exactly these selected contacts. */
+  const [callPreset, setCallPreset] = useState<string[] | null>(null);
   const [listModal, setListModal] = useState<ListModalState | null>(null);
   const [addToList, setAddToList] = useState<{ ids: string[] } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -188,6 +190,12 @@ export function ContactsHub() {
   }
 
   const hasContacts = contacts.length > 0;
+  const selecting = selected.size > 0;
+
+  function callContacts(ids: string[] | null) {
+    setCallPreset(ids);
+    setCallOpen(true);
+  }
 
   if (!ready) return <div className="h-full" aria-hidden />;
 
@@ -202,7 +210,12 @@ export function ContactsHub() {
             Your single source of truth. Upload, organise into lists, and call with an AI agent.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Dimmed + inert while selecting, so the bulk bar's "Call selected" is the
+            clear path for the chosen subset (these act on the whole book). */}
+        <div
+          className={cn("flex flex-wrap items-center gap-2 transition-opacity", selecting && "pointer-events-none opacity-40")}
+          aria-hidden={selecting}
+        >
           <Button variant="outline" onClick={() => setContactModal({ contact: null })} className="text-ink h-9 rounded-lg border-black/15 px-3 text-sm font-semibold">
             <Plus className="size-4" /> Add Contact
           </Button>
@@ -210,7 +223,7 @@ export function ContactsHub() {
             <Upload className="size-4" /> Upload
           </Button>
           <Button
-            onClick={() => setCallOpen(true)}
+            onClick={() => callContacts(null)}
             disabled={!hasContacts}
             className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3.5 text-sm font-semibold text-white"
           >
@@ -253,7 +266,7 @@ export function ContactsHub() {
               className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-black/[0.07] bg-black/[0.015] px-3.5 py-2.5"
               style={{ animation: "fade-in-up 200ms cubic-bezier(0.23,1,0.32,1) both" }}
             >
-              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", listTint(activeList.color))}>
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", listTint())}>
                 {activeList.name}
               </span>
               <span className="text-ink-muted text-xs">{activeList.contactIds.length} contact{activeList.contactIds.length === 1 ? "" : "s"}</span>
@@ -279,6 +292,9 @@ export function ContactsHub() {
             >
               <span className="text-sm font-semibold tabular-nums">{selected.size} selected</span>
               <div className="ml-auto flex items-center gap-1.5">
+                <button type="button" onClick={() => callContacts([...selected])} className="text-ink inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold hover:bg-white/90 active:scale-[0.98]">
+                  <PhoneCall className="size-3.5" /> Call selected
+                </button>
                 <button type="button" onClick={() => setAddToList({ ids: [...selected] })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/15 px-3 text-xs font-semibold hover:bg-white/25">
                   <ListPlus className="size-3.5" /> Add to list
                 </button>
@@ -358,7 +374,13 @@ export function ContactsHub() {
       {/* ------------------------------- modals ------------------------------- */}
       {contactModal && <ContactModal contact={contactModal.contact} onClose={() => setContactModal(null)} onSave={onSaveContact} />}
       {uploadOpen && <UploadContactsModal onClose={() => setUploadOpen(false)} onImported={() => reload()} />}
-      {callOpen && <ContactCallModal onClose={() => setCallOpen(false)} />}
+      {callOpen && (
+        <ContactCallModal
+          presetIds={callPreset ?? undefined}
+          onClose={() => { setCallOpen(false); setCallPreset(null); }}
+          onStarted={clearSel}
+        />
+      )}
       {listModal && <ListModal list={listModal.list} onClose={() => setListModal(null)} onSave={onSaveList} />}
       {addToList && (
         <AddToListModal
@@ -366,7 +388,7 @@ export function ContactsHub() {
           lists={lists}
           onClose={() => setAddToList(null)}
           onPick={(listId) => pickListFor(addToList.ids, listId)}
-          onCreate={() => setListModal({ mode: "create", list: null, addIds: addToList.ids })}
+          onCreate={() => { setListModal({ mode: "create", list: null, addIds: addToList.ids }); setAddToList(null); }}
         />
       )}
       {pickerOpen && activeList && (

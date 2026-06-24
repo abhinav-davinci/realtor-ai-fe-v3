@@ -15,6 +15,7 @@ import {
   Send,
   Sparkles,
   Upload,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -60,12 +61,28 @@ function defaultScheduleValue(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-export function ContactCallModal({ onClose }: { onClose: () => void }) {
+export function ContactCallModal({
+  onClose,
+  presetIds,
+  onStarted,
+}: {
+  onClose: () => void;
+  /** When set, call exactly these contacts (the table selection) — no audience picker. */
+  presetIds?: string[];
+  /** Fired when a run actually starts (so the hub can clear the selection). */
+  onStarted?: () => void;
+}) {
   const router = useRouter();
   const run = useAutoCall();
   const agents = useMemo(() => listAgents().filter((a) => a.channels.includes("voice")), []);
   const allContacts = useMemo(() => listContacts(), []);
   const lists = useMemo(() => listContactLists(), []);
+
+  const preset = !!presetIds;
+  const presetContacts = useMemo(
+    () => (presetIds ? allContacts.filter((c) => presetIds.includes(c.id)) : []),
+    [presetIds, allContacts]
+  );
 
   const [agentId, setAgentId] = useState<string | null>(agents[0]?.id ?? null);
   const [mode, setMode] = useState<Mode>(lists.length ? "list" : "tier");
@@ -95,6 +112,7 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
 
   // Resolve the audience (before the count cap) for the live match count.
   const audience = useMemo<Contact[]>(() => {
+    if (preset) return presetContacts;
     let base: Contact[];
     if (mode === "list") {
       base = listId === "all" ? allContacts : (lists.find((l) => l.id === listId)?.contactIds ?? [])
@@ -107,18 +125,19 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
     }
     if (skipDays > 0) base = base.filter((c) => !(c.lastContacted && now - c.lastContacted < skipDays * DAY));
     return base;
-  }, [mode, listId, tierSel, allContacts, lists, skipDays, now]);
+  }, [preset, presetContacts, mode, listId, tierSel, allContacts, lists, skipDays, now]);
 
-  const matchCount = mode === "upload" ? drafts.length : audience.length;
-  const willCall = Math.min(maxCount, matchCount);
+  const matchCount = preset ? presetContacts.length : mode === "upload" ? drafts.length : audience.length;
+  const willCall = preset ? matchCount : Math.min(maxCount, matchCount);
   const noAgent = agents.length === 0;
   const canStart =
     !!agent &&
-    (mode === "upload" ? drafts.length > 0 && (!saveToBook || uploadName.trim().length > 0) : willCall > 0) &&
+    (preset ? presetContacts.length > 0 : mode === "upload" ? drafts.length > 0 && (!saveToBook || uploadName.trim().length > 0) : willCall > 0) &&
     (!schedule || scheduleAt.trim().length > 0);
 
-  const audienceLabel =
-    mode === "list"
+  const audienceLabel = preset
+    ? `${presetContacts.length} selected contact${presetContacts.length === 1 ? "" : "s"}`
+    : mode === "list"
       ? listId === "all" ? "all contacts" : lists.find((l) => l.id === listId)?.name ?? "list"
       : mode === "tier"
         ? (tierSel.size ? `${[...tierSel].map((t) => contactTierMeta(t).name).join(", ")} contacts` : "no tiers")
@@ -187,7 +206,9 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
       return;
     }
     let pool: Contact[];
-    if (mode === "upload") {
+    if (preset) {
+      pool = presetContacts;
+    } else if (mode === "upload") {
       // Combine sheet tags with any custom tags the user added for this upload.
       const tagged: Draft[] = drafts.map((d) => ({ ...d, tags: Array.from(new Set([...d.tags, ...uploadTags])) }));
       const ids = tagged.map((d) => contactIdFor(d.phone));
@@ -210,16 +231,17 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
     } else {
       pool = audience;
     }
-    const top = pool.slice(0, maxCount);
+    const top = preset ? pool : pool.slice(0, maxCount);
     const calls = buildCallsFromContacts(top);
     const t = templateById(agent.templateId);
     run.start(calls, { name: agent.name, gradient: t.gradient, icon: t.icon }, {
       sessionName: name.trim() || defaultName,
       kind: "contacts",
       sourceLabel: audienceLabel,
-      sourceKind: mode,
+      sourceKind: preset ? "selected" : mode,
       onComplete: (cs) => applyCallOutcomes(cs),
     });
+    onStarted?.();
     onClose();
   }
 
@@ -301,7 +323,19 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
               </Section>
 
               {/* who to call */}
-              <Section label="Who to call" hint={`${matchCount} match${matchCount === 1 ? "" : "es"}`}>
+              <Section label="Who to call" hint={preset ? `${matchCount} selected` : `${matchCount} match${matchCount === 1 ? "" : "es"}`}>
+                {preset ? (
+                  <div className="border-accent-blue/20 bg-accent-blue/[0.05] flex items-center gap-3 rounded-xl border p-3.5">
+                    <span className="bg-accent-blue/12 text-accent-blue grid size-9 shrink-0 place-items-center rounded-lg">
+                      <Users className="size-4.5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-ink text-sm font-bold">{presetContacts.length} selected contact{presetContacts.length === 1 ? "" : "s"}</p>
+                      <p className="text-ink-muted text-xs">Calling only the contacts you picked from the table.</p>
+                    </div>
+                  </div>
+                ) : (
+                <>
                 <div className="flex flex-wrap gap-2 rounded-xl bg-black/[0.03] p-1">
                   <ModeTab active={mode === "list"} icon={ListChecks} label="A list" onClick={() => setMode("list")} />
                   <ModeTab active={mode === "tier"} icon={Gauge} label="By intent" onClick={() => setMode("tier")} />
@@ -432,6 +466,8 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
                 )}
+                </>
+                )}
               </Section>
 
               {/* advanced */}
@@ -442,21 +478,25 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
                 </button>
                 {advanced && (
                   <div className="mt-3 space-y-4 rounded-xl border border-black/[0.08] bg-white p-4" style={{ animation: "fade-in-up 200ms cubic-bezier(0.23,1,0.32,1) both" }}>
-                    <Labeled label="How many to call">
-                      <input type="number" min={1} value={maxCount} onChange={(e) => setMaxCount(Math.max(1, Number(e.target.value) || 1))} className={cn(INPUT, "w-28")} />
-                    </Labeled>
-                    <Labeled label="Skip contacts reached recently">
-                      <NativeSelect
-                        value={String(skipDays)}
-                        onChange={(v) => setSkipDays(Number(v))}
-                        options={[
-                          { value: "0", label: "Don't skip" },
-                          { value: "3", label: "Skip if called in last 3 days" },
-                          { value: "7", label: "Skip if called in last 7 days" },
-                          { value: "30", label: "Skip if called in last 30 days" },
-                        ]}
-                      />
-                    </Labeled>
+                    {!preset && (
+                      <Labeled label="How many to call">
+                        <input type="number" min={1} value={maxCount} onChange={(e) => setMaxCount(Math.max(1, Number(e.target.value) || 1))} className={cn(INPUT, "w-28")} />
+                      </Labeled>
+                    )}
+                    {!preset && (
+                      <Labeled label="Skip contacts reached recently">
+                        <NativeSelect
+                          value={String(skipDays)}
+                          onChange={(v) => setSkipDays(Number(v))}
+                          options={[
+                            { value: "0", label: "Don't skip" },
+                            { value: "3", label: "Skip if called in last 3 days" },
+                            { value: "7", label: "Skip if called in last 7 days" },
+                            { value: "30", label: "Skip if called in last 30 days" },
+                          ]}
+                        />
+                      </Labeled>
+                    )}
                     <Labeled label="When">
                       <div className="flex flex-col gap-2.5">
                         <div className="flex gap-2">
@@ -475,11 +515,18 @@ export function ContactCallModal({ onClose }: { onClose: () => void }) {
               {/* summary */}
               <div className="bg-accent-blue/[0.06] border-accent-blue/15 rounded-xl border p-3.5 text-sm leading-relaxed">
                 {canStart ? (
-                  <p className="text-ink-muted">
-                    <span className="text-ink font-semibold">{agent?.name}</span> will {schedule ? "be scheduled to call" : "call"}{" "}
-                    <span className="text-ink font-semibold tabular-nums">{willCall}</span> contact{willCall === 1 ? "" : "s"} from{" "}
-                    <span className="text-ink font-semibold">{audienceLabel}</span>. Outcomes update each contact and sync to their lists.
-                  </p>
+                  preset ? (
+                    <p className="text-ink-muted">
+                      <span className="text-ink font-semibold">{agent?.name}</span> will {schedule ? "be scheduled to call" : "call"} the{" "}
+                      <span className="text-ink font-semibold tabular-nums">{willCall}</span> selected contact{willCall === 1 ? "" : "s"}. Outcomes update each contact and sync to their lists.
+                    </p>
+                  ) : (
+                    <p className="text-ink-muted">
+                      <span className="text-ink font-semibold">{agent?.name}</span> will {schedule ? "be scheduled to call" : "call"}{" "}
+                      <span className="text-ink font-semibold tabular-nums">{willCall}</span> contact{willCall === 1 ? "" : "s"} from{" "}
+                      <span className="text-ink font-semibold">{audienceLabel}</span>. Outcomes update each contact and sync to their lists.
+                    </p>
+                  )
                 ) : (
                   <p className="text-ink-muted">
                     {noAgent ? "Build a voice agent to begin." : mode === "upload" && !drafts.length ? "Upload a contact list to begin." : matchCount === 0 ? "No contacts match this selection." : "Pick who to call to begin."}

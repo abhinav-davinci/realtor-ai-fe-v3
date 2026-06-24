@@ -12,7 +12,7 @@
 import { callState, type Call, type CallOutcome } from "@/components/leads/auto-call-run";
 import type { LeadSource, Tier } from "@/lib/lead-intelligence";
 
-export type SourceKind = "list" | "tier" | "upload" | "lead-filter";
+export type SourceKind = "list" | "tier" | "upload" | "lead-filter" | "selected";
 export type RunKind = "leads" | "contacts";
 export type SessionStatus = "completed" | "stopped";
 
