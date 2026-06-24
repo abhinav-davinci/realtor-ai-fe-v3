@@ -240,9 +240,10 @@ function TierFilter({ value, onChange }: { value: Tier | "all"; onChange: (t: Ti
   }, [open]);
 
   const label = value === "all" ? "All Categories" : TIER_META[value].name;
+  // Only the nurture-worthy bands (Warm and above); Light/Casual aren't called from here.
   const options: { key: Tier | "all"; name: string }[] = [
     { key: "all", name: "All Categories" },
-    ...TIER_ORDER.map((t) => ({ key: t, name: TIER_META[t].name })),
+    ...TIER_ORDER.filter((t) => t !== "light" && t !== "casual").map((t) => ({ key: t, name: TIER_META[t].name })),
   ];
 
   return (
