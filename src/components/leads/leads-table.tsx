@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Download, Sparkles, Upload, X } from "lucide-react";
+import { Check, ChevronDown, Download, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
@@ -36,7 +36,6 @@ import { EASE_OUT, SearchBar, LeadDetail } from "@/components/conversations/conv
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceIcon } from "./source-icons";
 import { AutoCallButton } from "./auto-call-context";
-import { UploadLeadsModal } from "./upload-leads-modal";
 
 export function LeadsTable() {
   const params = useSearchParams();
@@ -64,7 +63,6 @@ export function LeadsTable() {
   const [source, setSource] = useState<LeadSource | "all">("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
 
   function dismissBanner() {
     acknowledgePromoted();
@@ -98,9 +96,6 @@ export function LeadsTable() {
           <p className="text-ink-muted text-sm">{allLeads.length} leads · last 30 days</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setUploadOpen(true)} variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
-            <Upload className="size-4" /> Upload Leads
-          </Button>
           <AutoCallButton />
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Download className="size-4" /> Download All Leads
@@ -182,8 +177,6 @@ export function LeadsTable() {
           </>
         )}
       </div>
-
-      {uploadOpen && <UploadLeadsModal onClose={() => setUploadOpen(false)} />}
     </div>
   );
 }

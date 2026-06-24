@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Download, Sparkles, Upload } from "lucide-react";
+import { ArrowRight, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
 import { templateById, type TemplateId } from "@/lib/agents";
@@ -19,7 +19,6 @@ import { LeadDetail } from "@/components/conversations/conversation-ui";
 import { KpiStrip, SourcesPanel } from "./lead-sources";
 import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceChip } from "./source-icons";
-import { UploadLeadsModal } from "./upload-leads-modal";
 import { AutoCallButton } from "./auto-call-context";
 
 const PREVIEW_COUNT = 6;
@@ -47,7 +46,6 @@ export function LeadIntelligence() {
   const best = useMemo(() => bestConvertingSource(), []);
 
   const [openId, setOpenId] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
 
   const scoped = templateId ? allLeads.filter((l) => l.templateId === templateId) : allLeads;
   const recent = scoped.slice(0, PREVIEW_COUNT);
@@ -67,9 +65,6 @@ export function LeadIntelligence() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setUploadOpen(true)} variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
-            <Upload className="size-4" /> Upload Leads
-          </Button>
           <AutoCallButton />
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
             <Download className="size-4" /> Download All Leads
@@ -132,8 +127,6 @@ export function LeadIntelligence() {
           </div>
         )}
       </div>
-
-      {uploadOpen && <UploadLeadsModal onClose={() => setUploadOpen(false)} />}
     </div>
   );
 }

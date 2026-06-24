@@ -27,7 +27,6 @@ import {
   SOURCE_META,
   SOURCE_ORDER,
   TIER_META,
-  TIER_ORDER,
   listScoredLeads,
   type LeadSource,
   type Tier,
@@ -56,19 +55,18 @@ function minutesBetween(a: string, b: string): number {
 function initials(name: string): string {
   return name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
+function fmtDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
 
-type Status = "new" | "retry" | "uncontacted" | "all";
-const STATUS_OPTS: { value: Status; label: string }[] = [
-  { value: "new", label: "New (never called)" },
-  { value: "retry", label: "Needs follow-up" },
-  { value: "uncontacted", label: "New + follow-up" },
-  { value: "all", label: "Everyone" },
-];
-const INTENT_OPTS: { value: Tier | "all"; label: string }[] = [
-  { value: "very-hot", label: "Very hot only" },
-  { value: "hot", label: "Hot and above" },
-  { value: "warm", label: "Warm and above" },
-  { value: "all", label: "Any intent" },
+/** Nurture by intent: single tiers or cumulative "& above" bands. */
+const INTENT_OPTS: { value: string; label: string; tiers: Tier[] }[] = [
+  { value: "very-hot", label: "Very Hot", tiers: ["very-hot"] },
+  { value: "hot", label: "Hot", tiers: ["hot"] },
+  { value: "warm", label: "Warm", tiers: ["warm"] },
+  { value: "hot-above", label: "Hot & above", tiers: ["very-hot", "hot"] },
+  { value: "warm-above", label: "Warm & above", tiers: ["very-hot", "hot", "warm"] },
 ];
 
 const OUTCOME_META: Record<CallOutcome, { label: string; chip: string; icon: typeof Check }> = {
@@ -90,8 +88,8 @@ export function AutoCallModal() {
   const leads = useMemo(() => listScoredLeads(), []);
 
   const [agentId, setAgentId] = useState<string | null>(agents[0]?.id ?? null);
-  const [status, setStatus] = useState<Status>("new");
-  const [intent, setIntent] = useState<Tier | "all">("hot");
+  const [intent, setIntent] = useState("warm-above");
+  const [name, setName] = useState("");
   const [count, setCount] = useState(10);
   const [date, setDate] = useState(() => {
     const d = new Date();
@@ -119,19 +117,18 @@ export function AutoCallModal() {
   const agent = agents.find((a) => a.id === agentId) ?? null;
   const minScoreNum = minScore.trim() === "" ? null : Number(minScore);
 
-  // Live count of leads matching the current filters (highest-intent first).
+  const intentLabel = INTENT_OPTS.find((o) => o.value === intent)?.label ?? "Warm & above";
+
+  // Leads matching the chosen intent band (highest-intent first).
   const matches = useMemo(() => {
-    const rank = (t: Tier) => TIER_ORDER.indexOf(t);
+    const tiers = INTENT_OPTS.find((o) => o.value === intent)?.tiers ?? [];
     return leads.filter((l) => {
-      if (status === "new" && l.status !== "new") return false;
-      if (status === "retry" && l.status !== "retry") return false;
-      if (status === "uncontacted" && l.status !== "new" && l.status !== "retry") return false;
-      if (intent !== "all" && rank(l.tier) > rank(intent)) return false;
+      if (!tiers.includes(l.tier)) return false;
       if (!sources.has(l.source)) return false;
       if (minScoreNum != null && l.score < minScoreNum) return false;
       return true;
     });
-  }, [leads, status, intent, sources, minScoreNum]);
+  }, [leads, intent, sources, minScoreNum]);
 
   const willCall = Math.min(count, matches.length);
   const windowMin = minutesBetween(from, to);
@@ -141,7 +138,7 @@ export function AutoCallModal() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   })();
   const dateLabel = date === todayStr ? "today" : new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  const intentLabel = intent === "all" ? "" : `${TIER_META[intent].name.toLowerCase()} `;
+  const defaultName = `${intentLabel} · ${fmtDay(date)}`;
 
   const canStart = !!agent && willCall > 0 && windowMin > 0;
 
@@ -149,11 +146,11 @@ export function AutoCallModal() {
     if (!canStart || !agent) return;
     const t = templateById(agent.templateId);
     const top = [...matches].sort((a, b) => b.score - a.score).slice(0, willCall);
-    const sourceLabel = `Top ${willCall} ${intent === "all" ? "" : `${TIER_META[intent].name}+ `}leads`;
     run.start(buildCalls(top), { name: agent.name, gradient: t.gradient, icon: t.icon }, {
       kind: "leads",
       sourceKind: "lead-filter",
-      sourceLabel,
+      sourceLabel: `${willCall} ${intentLabel} leads`,
+      sessionName: name.trim() || defaultName,
     });
   }
 
@@ -175,7 +172,7 @@ export function AutoCallModal() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Auto-call leads"
+        aria-label="Nurture leads"
         className="modal-pop flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -362,8 +359,8 @@ export function AutoCallModal() {
                   <PhoneCall className="size-5" />
                 </span>
                 <div>
-                  <h2 className="text-ink text-lg font-bold">Auto-call leads</h2>
-                  <p className="text-ink-muted text-xs">Your AI voice agent dials your top leads, spread across a window.</p>
+                  <h2 className="text-ink text-lg font-bold">Nurture leads</h2>
+                  <p className="text-ink-muted text-xs">Your AI agent calls leads by intent to move them forward.</p>
                 </div>
               </div>
               <button type="button" onClick={() => run.closeModal()} aria-label="Close" className="text-ink-muted hover:text-ink hover:bg-black/[0.04] -mt-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg">
@@ -390,15 +387,20 @@ export function AutoCallModal() {
                 )}
               </div>
 
-              {/* who to call */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Labeled label="Who to call">
-                  <NativeSelect value={status} onChange={(v) => setStatus(v as Status)} options={STATUS_OPTS} />
-                </Labeled>
-                <Labeled label="Minimum intent">
-                  <NativeSelect value={intent} onChange={(v) => setIntent(v as Tier | "all")} options={INTENT_OPTS} />
-                </Labeled>
-              </div>
+              {/* session name */}
+              <Labeled label="Session name">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={defaultName}
+                  className="text-ink placeholder:text-ink-muted/55 focus:border-accent-blue/60 h-11 w-full rounded-lg border border-black/15 bg-white px-3.5 text-sm outline-none transition-colors"
+                />
+              </Labeled>
+
+              {/* who to call — by intent */}
+              <Labeled label="Who to call">
+                <NativeSelect value={intent} onChange={setIntent} options={INTENT_OPTS} />
+              </Labeled>
 
               {/* how many */}
               <Labeled label="How many leads">
@@ -476,13 +478,13 @@ export function AutoCallModal() {
                 {canStart ? (
                   willCall === 1 ? (
                     <p className="text-ink-muted">
-                      <span className="text-ink font-semibold">{agent?.name}</span> will call your top {intentLabel}lead between{" "}
+                      <span className="text-ink font-semibold">{agent?.name}</span> will call 1 <span className="text-ink font-semibold">{intentLabel}</span> lead between{" "}
                       <span className="text-ink font-semibold">{to12(from)}</span> and <span className="text-ink font-semibold">{to12(to)}</span> {dateLabel}.
                     </p>
                   ) : (
                     <p className="text-ink-muted">
-                      <span className="text-ink font-semibold">{agent?.name}</span> will call the top{" "}
-                      <span className="text-ink font-semibold tabular-nums">{willCall}</span> {intentLabel}leads, about one every{" "}
+                      <span className="text-ink font-semibold">{agent?.name}</span> will call{" "}
+                      <span className="text-ink font-semibold tabular-nums">{willCall}</span> <span className="text-ink font-semibold">{intentLabel}</span> leads, about one every{" "}
                       <span className="text-ink font-semibold">{pace} min</span>, between{" "}
                       <span className="text-ink font-semibold">{to12(from)}</span> and <span className="text-ink font-semibold">{to12(to)}</span> {dateLabel}.
                     </p>
@@ -502,7 +504,7 @@ export function AutoCallModal() {
               </Button>
               <Button onClick={startRun} disabled={!canStart} className="bg-brand-blue hover:bg-brand-blue-hover h-10 rounded-lg px-4 text-sm font-semibold text-white">
                 <PhoneCall className="size-4" />
-                Start calls
+                Start calling
               </Button>
             </div>
           </>

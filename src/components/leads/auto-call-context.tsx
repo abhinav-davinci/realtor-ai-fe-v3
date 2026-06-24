@@ -170,7 +170,7 @@ export function AutoCallButton({ className }: { className?: string }) {
       onClick={openModal}
       className={cn("bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3.5 text-sm font-semibold text-white", className)}
     >
-      <PhoneCall className="size-4" /> Auto-call Leads
+      <PhoneCall className="size-4" /> Start AI Calling
     </Button>
   );
 }
