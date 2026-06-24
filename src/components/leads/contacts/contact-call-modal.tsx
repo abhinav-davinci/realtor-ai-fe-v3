@@ -50,16 +50,30 @@ function formatPhone(raw: string): string {
   const d = normPhone(raw);
   return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : raw.trim();
 }
+const pad2 = (n: number) => String(n).padStart(2, "0");
 function todayLabel(now: number): string {
   return new Date(now).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
-function defaultScheduleValue(): string {
-  const d = new Date(Date.now() + DAY);
-  d.setHours(10, 0, 0, 0);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+/** "YYYY-MM-DD" for a date input (deterministic from a passed timestamp). */
+function isoDate(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
-
+/** "HH:MM" N hours from now (for the default call window). */
+function defaultTime(hourOffset: number): string {
+  return `${pad2((new Date().getHours() + hourOffset) % 24)}:00`;
+}
+/** 24h "HH:MM" → "1:00 PM". */
+function to12(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const ap = h >= 12 ? "PM" : "AM";
+  return `${h % 12 === 0 ? 12 : h % 12}:${pad2(m)} ${ap}`;
+}
+/** "YYYY-MM-DD" → "Tue, 24 Jun" (local, no timezone drift). */
+function fmtSchedDate(iso: string): string {
+  const [y, mo, d] = iso.split("-").map(Number);
+  return new Date(y, mo - 1, d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+}
 export function ContactCallModal({
   onClose,
   presetIds,
@@ -102,7 +116,9 @@ export function ContactCallModal({
   const [maxCount, setMaxCount] = useState(25);
   const [advanced, setAdvanced] = useState(false);
   const [schedule, setSchedule] = useState(false);
-  const [scheduleAt, setScheduleAt] = useState(defaultScheduleValue);
+  const [scheduleDate, setScheduleDate] = useState(() => isoDate(Date.now()));
+  const [scheduleFrom, setScheduleFrom] = useState(() => defaultTime(1));
+  const [scheduleTo, setScheduleTo] = useState(() => defaultTime(2));
   const [scheduled, setScheduled] = useState(false);
   // A run-stable "now" so recency filters and the default name don't drift on re-render.
   const [now] = useState(() => Date.now());
@@ -129,10 +145,12 @@ export function ContactCallModal({
   const matchCount = preset ? presetContacts.length : mode === "upload" ? drafts.length : audience.length;
   const willCall = preset ? matchCount : Math.min(maxCount, matchCount);
   const noAgent = agents.length === 0;
+  const windowOk = scheduleTo > scheduleFrom;
+  const minDate = isoDate(now);
   const canStart =
     !!agent &&
     (preset ? presetContacts.length > 0 : mode === "upload" ? drafts.length > 0 && (!saveToBook || uploadName.trim().length > 0) : willCall > 0) &&
-    (!schedule || scheduleAt.trim().length > 0);
+    (!schedule || (scheduleDate.length > 0 && windowOk));
 
   const audienceLabel = preset
     ? `${presetContacts.length} selected contact${presetContacts.length === 1 ? "" : "s"}`
@@ -272,8 +290,8 @@ export function ContactCallModal({
             <h2 className="text-ink mt-4 text-lg font-bold">Session scheduled</h2>
             <p className="text-ink-muted mx-auto mt-1.5 max-w-sm text-sm">
               {agent?.name} will call {willCall} contact{willCall === 1 ? "" : "s"} from{" "}
-              <span className="text-ink font-medium">{audienceLabel}</span> at{" "}
-              {new Date(scheduleAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true })}.
+              <span className="text-ink font-medium">{audienceLabel}</span> on{" "}
+              <span className="text-ink font-medium">{fmtSchedDate(scheduleDate)}</span>, between {to12(scheduleFrom)} and {to12(scheduleTo)}.
             </p>
             <Button onClick={onClose} className="bg-brand-blue hover:bg-brand-blue-hover mx-auto mt-5 h-11 w-full max-w-[220px] rounded-lg text-sm font-semibold text-white">
               Done
@@ -500,10 +518,21 @@ export function ContactCallModal({
                       <div className="flex flex-col gap-2.5">
                         <div className="flex gap-2">
                           <WhenTab active={!schedule} label="Run now" onClick={() => setSchedule(false)} />
-                          <WhenTab active={schedule} label="Schedule" onClick={() => setSchedule(true)} />
+                          <WhenTab active={schedule} label="Schedule for later" onClick={() => setSchedule(true)} />
                         </div>
                         {schedule && (
-                          <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)} className={INPUT} />
+                          <div style={{ animation: "fade-in-up 180ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                            <p className="text-ink-muted mb-1.5 text-xs font-medium">Call window</p>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1.5fr_1fr_auto_1fr]">
+                              <input type="date" min={minDate} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className={cn(INPUT, "col-span-2 sm:col-span-1")} aria-label="Call date" />
+                              <input type="time" value={scheduleFrom} onChange={(e) => setScheduleFrom(e.target.value)} className={INPUT} aria-label="From time" />
+                              <span className="text-ink-muted hidden place-items-center text-sm sm:grid">to</span>
+                              <input type="time" value={scheduleTo} onChange={(e) => setScheduleTo(e.target.value)} className={INPUT} aria-label="To time" />
+                            </div>
+                            <p className={cn("mt-1.5 text-xs", windowOk ? "text-ink-muted" : "font-medium text-red-600")}>
+                              {windowOk ? "Calls go out within this window on the chosen day." : "The end time must be after the start time."}
+                            </p>
+                          </div>
                         )}
                       </div>
                     </Labeled>
