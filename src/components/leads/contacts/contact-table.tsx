@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Pencil, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmtDate, listsForContact, type Contact, type ContactList } from "@/lib/contacts";
@@ -68,13 +69,7 @@ export function ContactTable({
                 </td>
                 <td className="text-ink-muted py-2.5 pr-3 tabular-nums whitespace-nowrap">{c.phone}</td>
                 <td className="py-2.5 pr-3">
-                  <div className="flex max-w-[220px] flex-wrap items-center gap-1">
-                    {c.tags.slice(0, 3).map((t) => (
-                      <span key={t} className="bg-tag text-tag-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">{t}</span>
-                    ))}
-                    {c.tags.length > 3 && <span className="text-ink-muted/70 text-[11px]">+{c.tags.length - 3}</span>}
-                    {c.tags.length === 0 && <span className="text-ink-muted/40 text-xs">—</span>}
-                  </div>
+                  <TagsCell tags={c.tags} name={c.name} />
                 </td>
                 <td className="py-2.5 pr-3">
                   <div className="flex max-w-[200px] flex-wrap items-center gap-1">
@@ -123,6 +118,100 @@ export function ContactTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* --------------------------------- tags cell ------------------------------- */
+
+function TagChip({ label }: { label: string }) {
+  return <span className="bg-tag text-tag-foreground rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap">{label}</span>;
+}
+
+const MAX_TAGS = 3;
+
+/** First few tags inline; the "+N" is a hover card revealing the full set. The
+ * popover is position:fixed so the table's overflow-x-auto can't clip it. */
+function TagsCell({ tags, name }: { tags: string[]; name: string }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; above: boolean }>({ left: 0, top: 0, above: false });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const timer = useRef<number | null>(null);
+
+  function place() {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const above = window.innerHeight - r.bottom < 180;
+    setPos(above ? { left: r.left, bottom: window.innerHeight - r.top + 6, above: true } : { left: r.left, top: r.bottom + 6, above: false });
+  }
+  function show() {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    place();
+    setOpen(true);
+  }
+  function hideSoon() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setOpen(false), 120);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (tags.length === 0) return <span className="text-ink-muted/40 text-xs">—</span>;
+
+  const shown = tags.slice(0, MAX_TAGS);
+  const extra = tags.length - shown.length;
+
+  return (
+    <div className="flex max-w-[220px] flex-wrap items-center gap-1">
+      {shown.map((t) => (
+        <TagChip key={t} label={t} />
+      ))}
+      {extra > 0 && (
+        <>
+          <button
+            ref={btnRef}
+            type="button"
+            aria-label={`Show all ${tags.length} tags for ${name}`}
+            aria-expanded={open}
+            onClick={() => (open ? setOpen(false) : show())}
+            onMouseEnter={show}
+            onMouseLeave={hideSoon}
+            onFocus={show}
+            onBlur={hideSoon}
+            className="text-accent-blue hover:bg-accent-blue/10 cursor-pointer rounded-full px-1.5 py-0.5 text-[11px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/30"
+          >
+            +{extra}
+          </button>
+          {open && (
+            <div
+              role="tooltip"
+              onMouseEnter={show}
+              onMouseLeave={hideSoon}
+              className="fixed z-50 w-max max-w-[280px] rounded-xl border border-black/[0.08] bg-white p-2.5 shadow-lg shadow-black/[0.1]"
+              style={{ left: pos.left, top: pos.top, bottom: pos.bottom, transformOrigin: pos.above ? "bottom left" : "top left", animation: "scale-in 140ms cubic-bezier(0.23,1,0.32,1) both" }}
+            >
+              <p className="text-ink-muted/70 mb-1.5 text-[10px] font-semibold tracking-wide uppercase">All tags ({tags.length})</p>
+              <div className="flex flex-wrap gap-1">
+                {tags.map((t) => (
+                  <TagChip key={t} label={t} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
