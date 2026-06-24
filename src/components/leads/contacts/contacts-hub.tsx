@@ -287,21 +287,21 @@ export function ContactsHub() {
           {/* bulk bar */}
           {selected.size > 0 && (
             <div
-              className="bg-ink mt-3 flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-2.5 text-white"
+              className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-3.5 py-2.5 shadow-sm"
               style={{ animation: "fade-in-up 180ms cubic-bezier(0.23,1,0.32,1) both" }}
             >
-              <span className="text-sm font-semibold tabular-nums">{selected.size} selected</span>
+              <span className="text-ink text-sm font-semibold tabular-nums">{selected.size} selected</span>
               <div className="ml-auto flex items-center gap-1.5">
-                <button type="button" onClick={() => callContacts([...selected])} className="text-ink inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold hover:bg-white/90 active:scale-[0.98]">
+                <button type="button" onClick={() => callContacts([...selected])} className="bg-brand-blue hover:bg-brand-blue-hover inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold text-white transition-[background-color,transform] active:scale-[0.98]">
                   <PhoneCall className="size-3.5" /> Call selected
                 </button>
-                <button type="button" onClick={() => setAddToList({ ids: [...selected] })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/15 px-3 text-xs font-semibold hover:bg-white/25">
+                <button type="button" onClick={() => setAddToList({ ids: [...selected] })} className="text-accent-blue border-accent-blue/40 hover:bg-accent-blue/[0.06] inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors active:scale-[0.98]">
                   <ListPlus className="size-3.5" /> Add to list
                 </button>
-                <button type="button" onClick={() => setConfirm({ kind: "contacts", ids: [...selected] })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/15 px-3 text-xs font-semibold hover:bg-white/25">
+                <button type="button" onClick={() => setConfirm({ kind: "contacts", ids: [...selected] })} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 active:scale-[0.98]">
                   <Trash2 className="size-3.5" /> Delete
                 </button>
-                <button type="button" onClick={clearSel} aria-label="Clear selection" className="grid size-8 place-items-center rounded-lg hover:bg-white/15">
+                <button type="button" onClick={clearSel} aria-label="Clear selection" className="text-ink-muted hover:bg-black/[0.05] hover:text-ink grid size-9 place-items-center rounded-lg transition-colors">
                   <X className="size-4" />
                 </button>
               </div>
