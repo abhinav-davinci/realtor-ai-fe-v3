@@ -11,7 +11,16 @@
  */
 import type { Call, CallOutcome } from "@/components/leads/auto-call-run";
 import type { Conversation, ConvTurn, OutcomeTone } from "@/lib/conversations";
-import { listScoredLeads, tierForScore, type LeadStatus, type ScoredLead } from "@/lib/lead-intelligence";
+import {
+  breakdownFromKeys,
+  buildScoreBreakdown,
+  listScoredLeads,
+  scoreFromBreakdown,
+  tierForScore,
+  type FactorKey,
+  type LeadStatus,
+  type ScoredLead,
+} from "@/lib/lead-intelligence";
 
 /** The call outcomes that earn a place in the pipeline. */
 const POSITIVE: CallOutcome[] = ["qualified", "interested", "callback"];
@@ -39,13 +48,28 @@ function phoneKey(l: { phone?: string; id: string }): string {
 
 /* ------------------------------ promoted store ---------------------------- */
 
+/** Backfill fields added after a lead was first stored (design-mode migration),
+ * so leads promoted before this version still render the breakdown and journey.
+ * When the breakdown is derived (not stored), the score and tier are recomputed
+ * from it so the number and the factor chips always agree. */
+function migratePromoted(l: ScoredLead): ScoredLead {
+  if (l.scoreBreakdown?.length && l.journey?.length) return l;
+  const derived = !l.scoreBreakdown?.length;
+  const scoreBreakdown = derived ? buildScoreBreakdown(l) : l.scoreBreakdown;
+  const score = derived ? scoreFromBreakdown(scoreBreakdown) : l.score;
+  const tier = derived ? tierForScore(score) : l.tier;
+  const journey =
+    l.journey ?? [{ channel: "voice" as const, kind: "call" as const, when: l.when, note: `AI call: ${l.outcome}` }];
+  return { ...l, scoreBreakdown, score, tier, journey };
+}
+
 export function listPromotedLeads(): ScoredLead[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(PROMOTED_KEY);
     const all = raw ? (JSON.parse(raw) as ScoredLead[]) : [];
     // newest first
-    return all.sort((a, b) => (b.promotedAt ?? 0) - (a.promotedAt ?? 0));
+    return all.map(migratePromoted).sort((a, b) => (b.promotedAt ?? 0) - (a.promotedAt ?? 0));
   } catch {
     return [];
   }
@@ -65,7 +89,8 @@ interface OutcomeShape {
   outcome: string;
   tone: OutcomeTone;
   status: LeadStatus;
-  score: number;
+  /** The flow factors this outcome meets; the score is their sum. */
+  factors: FactorKey[];
   summary: string;
   captured: { label: string; value: string }[];
 }
@@ -75,10 +100,12 @@ const OUTCOME_SHAPE: Record<PositiveOutcome, OutcomeShape> = {
     outcome: "Qualified on call",
     tone: "good",
     status: "contacted",
-    score: 86,
+    factors: ["budget", "timeline", "site-visit", "response", "intent"],
     summary: "Qualified on the call: budget and configuration fit, site visit set.",
     captured: [
-      { label: "Intent", value: "Qualified" },
+      { label: "Budget", value: "₹1.8 Cr" },
+      { label: "Configuration", value: "3BHK" },
+      { label: "Timeline", value: "This weekend" },
       { label: "Next step", value: "Site visit" },
     ],
   },
@@ -86,15 +113,19 @@ const OUTCOME_SHAPE: Record<PositiveOutcome, OutcomeShape> = {
     outcome: "Interested",
     tone: "good",
     status: "new",
-    score: 68,
+    factors: ["budget", "response", "intent"],
     summary: "Interested after the call, wants pricing and floor plans.",
-    captured: [{ label: "Intent", value: "Interested" }],
+    captured: [
+      { label: "Budget", value: "Around ₹90 L" },
+      { label: "Configuration", value: "2BHK" },
+      { label: "Intent", value: "Interested" },
+    ],
   },
   callback: {
     outcome: "Callback requested",
     tone: "warm",
     status: "retry",
-    score: 50,
+    factors: ["callback", "response", "intent"],
     summary: "Asked for a callback to discuss further, warm intent.",
     captured: [{ label: "Intent", value: "Callback" }],
   },
@@ -181,6 +212,8 @@ export function promoteCallsToLeads(calls: Call[], agentName: string): Promotion
     const base = call.lead;
     const id = `pl-${phoneKey(base)}`;
     const conv = buildConversation(base, outcome, agentName, now + i);
+    const scoreBreakdown = breakdownFromKeys(shape.factors);
+    const score = scoreFromBreakdown(scoreBreakdown);
     const lead: ScoredLead = {
       id,
       name: base.name,
@@ -195,12 +228,14 @@ export function promoteCallsToLeads(calls: Call[], agentName: string): Promotion
       captured: shape.captured,
       templateId: base.templateId,
       agentRole: agentName,
-      score: shape.score,
-      tier: tierForScore(shape.score),
+      score,
+      tier: tierForScore(score),
       status: shape.status,
       source: "voice",
       promotedFromAiCall: true,
       promotedAt: now + i,
+      journey: [{ channel: "voice", kind: "call", when: "Just now", note: `AI call: ${shape.outcome}` }],
+      scoreBreakdown,
     };
     byId.set(id, lead);
     made.push(lead);

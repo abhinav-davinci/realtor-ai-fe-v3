@@ -7,10 +7,10 @@
  * intelligence-specific additions are the colour-coded intent score and the
  * origin source chip, both folded into the existing right-hand column.
  */
-import { ChevronRight, Headset, PhoneCall, Sparkles, UserRoundCheck } from "lucide-react";
+import { Check, ChevronRight, Headset, PhoneCall, Sparkles, UserRoundCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { SOURCE_META, TIER_META, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
+import { HOT_THRESHOLD, SOURCE_META, TIER_META, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
 import { BothChannelsPill, Highlight, LeadAvatar, OutcomeBadge } from "@/components/conversations/conversation-ui";
 import { SourceChip } from "./source-icons";
 
@@ -101,6 +101,40 @@ export function LeadScoreHeader({ lead, onTakeOver }: { lead: ScoredLead; onTake
           <PhoneCall className="size-4" /> Call lead
         </Button>
       </div>
+      <ScoreBreakdown lead={lead} />
+    </div>
+  );
+}
+
+/** Why this score: the flow's factors, filled when met, with the Hot line. Makes
+ * the number explainable and shows what would raise it. */
+function ScoreBreakdown({ lead }: { lead: ScoredLead }) {
+  if (!lead.scoreBreakdown?.length) return null;
+  return (
+    <div className="w-full border-t border-black/[0.06] pt-3">
+      <p className="text-ink-muted mb-2 text-xs font-medium">Why this score</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {lead.scoreBreakdown.map((f) => (
+          <span
+            key={f.key}
+            title={f.met ? `${f.label}: +${f.points}` : `${f.label}: not captured yet`}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+              f.met
+                ? "bg-brand-green/10 text-brand-green"
+                : "text-ink-muted/60 border border-dashed border-black/15"
+            )}
+          >
+            {f.met && <Check className="size-2.5" />}
+            {f.label}
+            <span className="tabular-nums">+{f.points}</span>
+          </span>
+        ))}
+      </div>
+      <p className="text-ink-muted mt-2 text-[11px]">
+        Adds up to <span className="text-ink font-semibold tabular-nums">{lead.score}</span>/100. Hot at{" "}
+        {HOT_THRESHOLD}+. The score moves as the lead replies.
+      </p>
     </div>
   );
 }

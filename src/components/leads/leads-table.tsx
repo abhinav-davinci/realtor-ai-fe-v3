@@ -107,7 +107,7 @@ export function LeadsTable() {
         {open ? (
           <div className="space-y-3">
             <LeadScoreHeader lead={open} onTakeOver={() => onTakeOver(open.id)} />
-            <LeadDetail lead={open} agentName={open.agentRole} onBack={() => setOpenId(null)} />
+            <LeadDetail lead={open} agentName={open.agentRole} journey={open.journey} onBack={() => setOpenId(null)} />
           </div>
         ) : (
           <>

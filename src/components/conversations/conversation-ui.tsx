@@ -27,6 +27,8 @@ import {
   type Lead,
   type OutcomeTone,
 } from "@/lib/conversations";
+import { type JourneyStep } from "@/lib/lead-intelligence";
+import { SourceChip } from "@/components/leads/source-icons";
 
 export const EASE_OUT = "cubic-bezier(0.23,1,0.32,1)";
 
@@ -248,7 +250,17 @@ export function FilterToggle({ value, onChange }: { value: Filter; onChange: (f:
 
 /* ------------------------------- lead detail ------------------------------ */
 
-export function LeadDetail({ lead, agentName, onBack }: { lead: Lead; agentName: string; onBack: () => void }) {
+export function LeadDetail({
+  lead,
+  agentName,
+  onBack,
+  journey,
+}: {
+  lead: Lead;
+  agentName: string;
+  onBack: () => void;
+  journey?: JourneyStep[];
+}) {
   const [idx, setIdx] = useState(0);
   const conv = lead.conversations[idx];
   const multi = lead.conversations.length > 1;
@@ -279,6 +291,26 @@ export function LeadDetail({ lead, agentName, onBack }: { lead: Lead; agentName:
         </div>
         <OutcomeBadge outcome={lead.outcome} tone={lead.tone} />
       </div>
+
+      {/* how the lead reached us (first-touch to qualified) */}
+      {journey && journey.length > 0 && (
+        <div className="border-b border-black/[0.06] px-4 py-3">
+          <p className="text-ink-muted mb-2 text-xs font-medium">How this lead reached you</p>
+          <ol className="space-y-2">
+            {journey.map((s, i) => (
+              <li key={i} className="flex items-center gap-2.5">
+                <SourceChip source={s.channel} className="size-6" iconClassName="size-3" />
+                <span className="text-ink flex-1 text-xs">{s.note}</span>
+                {i === 0 && (
+                  <span className="text-ink-muted/70 shrink-0 text-[10px] font-semibold tracking-wide uppercase">
+                    First touch
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {/* merged captured details */}
       {lead.captured.length > 0 && (

@@ -11,7 +11,7 @@
  * back here via applyCallOutcomes, which the lists then mirror for free.
  */
 import { buildCalls, type Call } from "@/components/leads/auto-call-run";
-import { TIER_META, TIER_ORDER, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
+import { breakdownFromKeys, TIER_META, TIER_ORDER, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
 
 /* --------------------------------- model ---------------------------------- */
 
@@ -273,6 +273,10 @@ export function contactToScoredLead(c: Contact): ScoredLead {
     tier,
     status: c.lastContacted ? "contacted" : "new",
     source: "upload",
+    // A contact isn't in a conversation yet, so no factors are captured; the tier
+    // is carried from its history. The journey and breakdown fill in once called.
+    journey: [{ channel: "upload", kind: "form", when: "", note: "From your contacts" }],
+    scoreBreakdown: breakdownFromKeys([]),
   };
 }
 export function buildCallsFromContacts(contacts: Contact[]): Call[] {

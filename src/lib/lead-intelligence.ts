@@ -46,14 +46,18 @@ export interface ScoredLead extends Lead {
   owner?: "ai" | "human";
   /** Epoch ms a human took the lead over. */
   handoffAt?: number;
+  /** How the lead reached us, first-touch first (comment to DM to qualified). */
+  journey: JourneyStep[];
+  /** The score explained: each flow factor and the points it added. Sums to score. */
+  scoreBreakdown: ScoreFactor[];
 }
 
 /* --------------------------------- tiers ---------------------------------- */
 
 export function tierForScore(score: number): Tier {
-  if (score >= 80) return "very-hot";
-  if (score >= 60) return "hot";
-  if (score >= 45) return "warm";
+  if (score >= 85) return "very-hot";
+  if (score >= HOT_THRESHOLD) return "hot"; // 70 = the flow's Hot line
+  if (score >= 50) return "warm";
   if (score >= 30) return "light";
   return "casual";
 }
@@ -161,26 +165,153 @@ function hash(s: string): number {
   return h;
 }
 
-/** Give each detailed lead a believable origin: website visitors stay on the
- * widget, voice-only leads came by phone or WhatsApp call, and the rest spread
- * across chat + social. Deterministic so a lead's badge never changes. */
-function sourceForLead(lead: Lead): LeadSource {
-  if (/website|widget/i.test(lead.name)) return "website";
-  const h = hash(lead.id + "src");
-  if (lead.hasCall && !lead.hasChat) return (["voice", "whatsapp", "voice"] as LeadSource[])[h % 3];
-  const pool: LeadSource[] = ["whatsapp", "website", "instagram", "facebook", "youtube", "whatsapp", "website"];
-  return pool[h % pool.length];
+/* -------------------------------- scoring --------------------------------- */
+
+export type FactorKey = "budget" | "timeline" | "site-visit" | "callback" | "response" | "intent";
+
+export interface ScoreFactor {
+  key: FactorKey;
+  label: string;
+  points: number;
+  met: boolean;
 }
 
-/** Stable 0–100 score nudged by real signals so the list looks intentional. */
-function scoreFor(lead: Lead): number {
-  let s = 20 + (hash(lead.id) % 60); // 20..79 base spread
-  if (lead.tone === "good") s += 18;
-  else if (lead.tone === "warm") s += 8;
-  else if (lead.tone === "cold") s -= 10;
-  if (lead.hasCall && lead.hasChat) s += 6; // engaged on both channels
-  s += Math.min(lead.captured.length, 4) * 2; // qualification detail
-  return Math.max(0, Math.min(100, s));
+/** The lead-scoring factors, straight from the WhatsApp and Meta hot-lead flows.
+ * The points and the Hot line are the source of truth: a lead's score is the sum
+ * of the factors it meets, capped at 100. Ordered by weight for display. */
+export const SCORE_FACTORS: { key: FactorKey; points: number; label: string; hint: string }[] = [
+  { key: "budget", points: 30, label: "Budget", hint: "Shared their budget" },
+  { key: "timeline", points: 30, label: "Timeline", hint: "Said when they want to move or finalise" },
+  { key: "site-visit", points: 25, label: "Site visit", hint: "Agreed to a visit or a booking step" },
+  { key: "callback", points: 20, label: "Callback", hint: "Asked us to call back" },
+  { key: "response", points: 15, label: "Responded", hint: "Replied and stayed in the conversation" },
+  { key: "intent", points: 10, label: "Clear intent", hint: "Showed clear buy or rent intent" },
+];
+
+/** The score at which a lead is Hot (from the flows). */
+export const HOT_THRESHOLD = 70;
+
+/** Recover the flow's six factors from a lead's captured details, outcome and
+ * tone. The bot (or the AI call) is what actually captures these; here we read
+ * them off the same fields the transcript surfaces, so the score is explainable. */
+export function buildScoreBreakdown(lead: Lead): ScoreFactor[] {
+  const text = `${lead.outcome} ${lead.summary}`.toLowerCase();
+  const labels = lead.captured.map((c) => c.label.toLowerCase());
+  const values = lead.captured.map((c) => c.value.toLowerCase());
+  const has = (re: RegExp) => labels.some((l) => re.test(l)) || values.some((v) => re.test(v)) || re.test(text);
+  const negative = /out of budget|beyond|below range|not interested|wrong (city|area)/.test(text);
+
+  const met: Record<FactorKey, boolean> = {
+    budget: !negative && (has(/budget|rent/) || /₹|crore|lakh|\bcr\b|investor|token/.test(text)),
+    timeline: has(/timeline|move[- ]?in|possession|finalise|this (week|month)|next (week|month)|months?/),
+    "site-visit": has(/visit|booked|token|routed to sales|connect(?:ed)? (?:you )?to sales/),
+    callback: has(/callback|call back|reschedul|call you (?:back|monday|tomorrow)/),
+    response: lead.conversations.some((c) => c.transcript.some((t) => t.who === "customer")),
+    intent: !negative && (has(/intent|interest|purpose|investment/) || lead.tone === "good" || lead.tone === "warm"),
+  };
+
+  return SCORE_FACTORS.map((f) => ({ key: f.key, label: f.label, points: f.points, met: met[f.key] }));
+}
+
+/** The score is simply the sum of the met factors, capped at 100. */
+export function scoreFromBreakdown(factors: ScoreFactor[]): number {
+  return Math.min(100, factors.filter((f) => f.met).reduce((sum, f) => sum + f.points, 0));
+}
+
+/** Build a breakdown from a fixed set of met factors (for synthesized leads). */
+export function breakdownFromKeys(keys: FactorKey[]): ScoreFactor[] {
+  const set = new Set(keys);
+  return SCORE_FACTORS.map((f) => ({ key: f.key, label: f.label, points: f.points, met: set.has(f.key) }));
+}
+
+/* ---------------------------- capture / journey --------------------------- */
+
+export type CaptureKind =
+  | "comment"
+  | "story-reply"
+  | "dm"
+  | "form"
+  | "call"
+  | "chat"
+  | "ad-click"
+  | "auto-reply";
+
+export interface JourneyStep {
+  channel: LeadSource;
+  kind: CaptureKind;
+  when: string;
+  note: string;
+}
+
+/** The standard capture journey for a source. Social starts public (a comment or
+ * story), gets an auto-reply, then moves to a 1:1 DM; YouTube funnels out to
+ * WhatsApp; voice and website are direct. Mirrors the hot-lead flows. */
+function journeyFor(source: LeadSource, ctx: string, when: string): JourneyStep[] {
+  switch (source) {
+    case "whatsapp":
+      return [
+        { channel: "whatsapp", kind: "dm", when, note: `Messaged on WhatsApp about ${ctx}` },
+        { channel: "whatsapp", kind: "dm", when, note: "Bot captured budget and timeline" },
+      ];
+    case "instagram":
+      return [
+        { channel: "instagram", kind: "comment", when, note: `Commented on the ${ctx}` },
+        { channel: "instagram", kind: "auto-reply", when, note: "Auto-reply moved the chat to a DM" },
+        { channel: "instagram", kind: "dm", when, note: "Qualified in the Instagram DM" },
+      ];
+    case "facebook":
+      return [
+        { channel: "facebook", kind: "comment", when, note: `Commented on the ${ctx}` },
+        { channel: "facebook", kind: "auto-reply", when, note: "Auto-reply sent a Messenger DM" },
+        { channel: "facebook", kind: "dm", when, note: "Qualified in Messenger" },
+      ];
+    case "youtube":
+      return [
+        { channel: "youtube", kind: "comment", when, note: `Commented on the ${ctx}` },
+        { channel: "youtube", kind: "auto-reply", when, note: "Replied with the WhatsApp link" },
+        { channel: "whatsapp", kind: "dm", when, note: "Continued on WhatsApp and qualified" },
+      ];
+    case "website":
+      return [{ channel: "website", kind: "chat", when, note: `Started a website chat about ${ctx}` }];
+    case "upload":
+      return [{ channel: "upload", kind: "form", when, note: "Imported from an uploaded list" }];
+    case "voice":
+    default:
+      return [{ channel: "voice", kind: "call", when, note: `AI call about ${ctx}` }];
+  }
+}
+
+/** Curated origin per seed lead (design mode), so the source mix and journeys
+ * read like a real account instead of a random hash. Keyed by name; anything not
+ * listed falls back to a deterministic source from its channels. */
+const LEAD_CAPTURE: Record<string, { source: LeadSource; ctx: string }> = {
+  "Aarti Sharma": { source: "whatsapp", ctx: "Baner 3BHK homes" },
+  "Karan Singh": { source: "whatsapp", ctx: "amenities post" },
+  "Suresh Menon": { source: "whatsapp", ctx: "booking update" },
+  "Neha Reddy": { source: "instagram", ctx: "site-visit reel" },
+  "Deepak Rao": { source: "instagram", ctx: "project walkthrough reel" },
+  "Meena Iyer": { source: "instagram", ctx: "3BHK story" },
+  "Imran Khan": { source: "facebook", ctx: "investment offer ad" },
+  "Anjali Verma": { source: "facebook", ctx: "project launch post" },
+  "Ritu Bansal": { source: "facebook", ctx: "booking post" },
+  "Priya Nair": { source: "youtube", ctx: "3BHK tour video" },
+  "Faisal Ahmed": { source: "youtube", ctx: "project comparison video" },
+  "Vikram Joshi": { source: "voice", ctx: "the project" },
+  "Sameer Gupta": { source: "voice", ctx: "the site visit" },
+  "Lata Kulkarni": { source: "voice", ctx: "the visit feedback" },
+  "Arjun Desai": { source: "voice", ctx: "the payment reminder" },
+  "Rohan Mehta": { source: "website", ctx: "Kharadi homes" },
+  "Sneha Patil": { source: "website", ctx: "the 2BHK brochure" },
+};
+
+/** Origin source + capture journey for a lead (curated, with a safe fallback). */
+function captureForLead(lead: Lead): { source: LeadSource; journey: JourneyStep[] } {
+  const curated = LEAD_CAPTURE[lead.name];
+  const when = lead.when;
+  if (curated) return { source: curated.source, journey: journeyFor(curated.source, curated.ctx, when) };
+  if (/website|widget/i.test(lead.name)) return { source: "website", journey: journeyFor("website", "the website", when) };
+  const source: LeadSource = lead.hasCall && !lead.hasChat ? "voice" : "website";
+  return { source, journey: journeyFor(source, "your project", when) };
 }
 
 /** Lifecycle status from the outcome text (with a hash split for the remainder). */
@@ -206,7 +337,9 @@ export function listScoredLeads(): ScoredLead[] {
 
   return leads.map((lead) => {
     const templateId = tidByConvId.get(lead.conversations[0].id) ?? "custom";
-    const score = scoreFor(lead);
+    const scoreBreakdown = buildScoreBreakdown(lead);
+    const score = scoreFromBreakdown(scoreBreakdown);
+    const { source, journey } = captureForLead(lead);
     return {
       ...lead,
       templateId,
@@ -214,7 +347,9 @@ export function listScoredLeads(): ScoredLead[] {
       score,
       tier: tierForScore(score),
       status: statusFor(lead),
-      source: sourceForLead(lead),
+      source,
+      journey,
+      scoreBreakdown,
     };
   });
 }
