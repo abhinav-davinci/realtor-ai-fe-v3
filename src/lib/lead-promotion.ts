@@ -14,6 +14,7 @@ import type { Conversation, ConvTurn, OutcomeTone } from "@/lib/conversations";
 import {
   breakdownFromKeys,
   buildScoreBreakdown,
+  isWarmOrAbove,
   listScoredLeads,
   scoreFromBreakdown,
   tierForScore,
@@ -48,19 +49,27 @@ function phoneKey(l: { phone?: string; id: string }): string {
 
 /* ------------------------------ promoted store ---------------------------- */
 
-/** Backfill fields added after a lead was first stored (design-mode migration),
- * so leads promoted before this version still render the breakdown and journey.
- * When the breakdown is derived (not stored), the score and tier are recomputed
- * from it so the number and the factor chips always agree. */
+/** Normalize a lead promoted before this version (design-mode migration) so it
+ * matches the current factor model: leads carry a breakdown, a journey, and a
+ * score that agrees with the factors. Known outcomes are refreshed from their
+ * canonical shape (so old fixed scores like 86/68/50 become the factor sums);
+ * anything else is derived from its content. */
 function migratePromoted(l: ScoredLead): ScoredLead {
   if (l.scoreBreakdown?.length && l.journey?.length) return l;
-  const derived = !l.scoreBreakdown?.length;
-  const scoreBreakdown = derived ? buildScoreBreakdown(l) : l.scoreBreakdown;
-  const score = derived ? scoreFromBreakdown(scoreBreakdown) : l.score;
-  const tier = derived ? tierForScore(score) : l.tier;
   const journey =
     l.journey ?? [{ channel: "voice" as const, kind: "call" as const, when: l.when, note: `AI call: ${l.outcome}` }];
-  return { ...l, scoreBreakdown, score, tier, journey };
+
+  const shape = Object.values(OUTCOME_SHAPE).find((s) => s.outcome === l.outcome);
+  if (shape) {
+    const scoreBreakdown = breakdownFromKeys(shape.factors);
+    const score = scoreFromBreakdown(scoreBreakdown);
+    return { ...l, captured: shape.captured, summary: shape.summary, score, tier: tierForScore(score), scoreBreakdown, journey };
+  }
+
+  const scoreBreakdown = l.scoreBreakdown?.length ? l.scoreBreakdown : buildScoreBreakdown(l);
+  const derived = !l.scoreBreakdown?.length;
+  const score = derived ? scoreFromBreakdown(scoreBreakdown) : l.score;
+  return { ...l, scoreBreakdown, score, tier: derived ? tierForScore(score) : l.tier, journey };
 }
 
 export function listPromotedLeads(): ScoredLead[] {
@@ -297,7 +306,8 @@ export function listAllScoredLeads(): ScoredLead[] {
   const overlay = readHandoffs();
   const seen = new Set(promoted.map(phoneKey));
   const statics = listScoredLeads().filter((l) => !seen.has(phoneKey(l)));
-  return [...promoted, ...statics].map((l) => applyHandoff(l, overlay));
+  // Lead Intelligence is Warm and above only; keep promoted leads to the same bar.
+  return [...promoted, ...statics].filter(isWarmOrAbove).map((l) => applyHandoff(l, overlay));
 }
 
 /* --------------------------- "new leads" banner --------------------------- */

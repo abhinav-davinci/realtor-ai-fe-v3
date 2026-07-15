@@ -57,12 +57,20 @@ export interface ScoredLead extends Lead {
 export function tierForScore(score: number): Tier {
   if (score >= 85) return "very-hot";
   if (score >= HOT_THRESHOLD) return "hot"; // 70 = the flow's Hot line
-  if (score >= 50) return "warm";
+  if (score >= 45) return "warm";
   if (score >= 30) return "light";
   return "casual";
 }
 
 export const TIER_ORDER: Tier[] = ["very-hot", "hot", "warm", "light", "casual"];
+
+/** Lead Intelligence only surfaces Warm and above. Light/Casual leads (low
+ * intent: out of budget, browsing, operational updates) don't belong here. Same
+ * set as the AI-calling "Warm & above" audience in auto-call-modal. */
+export const NURTURE_TIERS: Tier[] = ["very-hot", "hot", "warm"];
+export function isWarmOrAbove(lead: Pick<ScoredLead, "tier">): boolean {
+  return NURTURE_TIERS.includes(lead.tier);
+}
 
 /** Single source of truth for tier presentation: a temperature ramp (red →
  * coral → amber → blue → grey). `name` is title-case; the badge renders it
@@ -351,7 +359,8 @@ export function listScoredLeads(): ScoredLead[] {
       journey,
       scoreBreakdown,
     };
-  });
+    // Only Warm and above belong in Lead Intelligence (see isWarmOrAbove).
+  }).filter(isWarmOrAbove);
 }
 
 /* ------------------------------- filtering -------------------------------- */
