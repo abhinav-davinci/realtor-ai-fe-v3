@@ -258,7 +258,7 @@ export function LeadDetail({
 }: {
   lead: Lead;
   agentName: string;
-  onBack: () => void;
+  onBack?: () => void;
   journey?: JourneyStep[];
 }) {
   const [idx, setIdx] = useState(0);
@@ -269,14 +269,16 @@ export function LeadDetail({
     <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white">
       {/* header */}
       <div className="flex items-center gap-3 border-b border-black/[0.06] px-4 py-3">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to leads"
-          className="text-ink-muted hover:text-ink hover:bg-black/[0.04] grid size-8 shrink-0 place-items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/40"
-        >
-          <ArrowLeft className="size-4.5" />
-        </button>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to leads"
+            className="text-ink-muted hover:text-ink hover:bg-black/[0.04] grid size-8 shrink-0 place-items-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue/40"
+          >
+            <ArrowLeft className="size-4.5" />
+          </button>
+        )}
         <LeadAvatar lead={lead} className="size-9" />
         <div className="min-w-0 flex-1">
           <p className="text-ink truncate text-sm font-semibold">

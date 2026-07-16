@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
 import { LEADS_CHANGED_EVENT, listAllScoredLeads, takeOverLead } from "@/lib/lead-promotion";
 import { LeadDetail } from "@/components/conversations/conversation-ui";
 import { KpiStrip, SourcesPanel } from "./lead-sources";
-import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
+import { BackToLeadsBar, LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceChip } from "./source-icons";
 import { AutoCallButton } from "./auto-call-context";
 
@@ -47,6 +47,28 @@ export function LeadIntelligence() {
 
   const [openId, setOpenId] = useState<string | null>(null);
 
+  // Open a lead from the top; go back to exactly where the list was scrolled.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const savedScroll = useRef(0);
+  function openLead(id: string) {
+    savedScroll.current = scrollRef.current?.scrollTop ?? 0;
+    setOpenId(id);
+  }
+  function closeLead() {
+    setOpenId(null);
+  }
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: openId ? 0 : savedScroll.current });
+  }, [openId]);
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openId]);
+
   const scoped = templateId ? allLeads.filter((l) => l.templateId === templateId) : allLeads;
   const recent = scoped.slice(0, PREVIEW_COUNT);
   const open = allLeads.find((l) => l.id === openId) ?? null;
@@ -54,7 +76,7 @@ export function LeadIntelligence() {
   const viewAll = () => router.push(`/leads/intelligence${templateId ? `?template=${templateId}` : ""}`);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
+    <div ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-black/[0.06] px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
@@ -75,8 +97,9 @@ export function LeadIntelligence() {
       <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
         {open ? (
           <div className="space-y-3">
+            <BackToLeadsBar onBack={closeLead} />
             <LeadScoreHeader lead={open} onTakeOver={() => takeOverLead(open.id)} />
-            <LeadDetail lead={open} agentName={open.agentRole} journey={open.journey} onBack={() => setOpenId(null)} />
+            <LeadDetail lead={open} agentName={open.agentRole} journey={open.journey} />
           </div>
         ) : allLeads.length === 0 ? (
           <EmptyLeads onLaunch={() => router.push("/ai-team")} />
@@ -103,7 +126,7 @@ export function LeadIntelligence() {
 
                 <div className="mt-4 space-y-2.5">
                   {recent.map((l) => (
-                    <ScoredLeadRow key={l.id} lead={l} query="" onOpen={() => setOpenId(l.id)} />
+                    <ScoredLeadRow key={l.id} lead={l} query="" onOpen={() => openLead(l.id)} />
                   ))}
                 </div>
 

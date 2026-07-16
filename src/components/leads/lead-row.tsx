@@ -7,12 +7,31 @@
  * intelligence-specific additions are the colour-coded intent score and the
  * origin source chip, both folded into the existing right-hand column.
  */
-import { Check, ChevronRight, Headset, PhoneCall, Sparkles, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Headset, PhoneCall, Sparkles, UserRoundCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HOT_THRESHOLD, SOURCE_META, TIER_META, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
 import { BothChannelsPill, Highlight, LeadAvatar, OutcomeBadge } from "@/components/conversations/conversation-ui";
 import { SourceChip } from "./source-icons";
+
+/** Sticky bar that returns from a lead's detail to the full list. It stays pinned
+ * to the top while the (long) transcript scrolls, so the way back is always in
+ * reach. The arrow nudges left on hover to read as "go back"; press scales for
+ * feedback; both are motion-safe. */
+export function BackToLeadsBar({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="sticky top-0 z-20 -mx-4 border-b border-black/[0.06] bg-cream/80 px-4 py-2.5 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <button
+        type="button"
+        onClick={onBack}
+        className="group text-ink hover:border-black/25 inline-flex items-center gap-1.5 rounded-lg border border-black/15 bg-white px-3 py-1.5 text-sm font-semibold outline-none transition-[border-color,transform] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-accent-blue/30 active:scale-[0.98]"
+      >
+        <ArrowLeft className="size-4 transition-transform duration-150 ease-out motion-safe:group-hover:-translate-x-0.5" />
+        Back to leads
+      </button>
+    </div>
+  );
+}
 
 export function TierBadge({ tier }: { tier: Tier }) {
   const meta = TIER_META[tier];

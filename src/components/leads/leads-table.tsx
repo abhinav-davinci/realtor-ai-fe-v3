@@ -33,7 +33,7 @@ import {
   unseenPromotedCount,
 } from "@/lib/lead-promotion";
 import { EASE_OUT, SearchBar, LeadDetail } from "@/components/conversations/conversation-ui";
-import { LeadScoreHeader, ScoredLeadRow } from "./lead-row";
+import { BackToLeadsBar, LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceIcon } from "./source-icons";
 import { AutoCallButton } from "./auto-call-context";
 
@@ -64,6 +64,28 @@ export function LeadsTable() {
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 
+  // Open a lead from the top; go back to exactly where the list was scrolled.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const savedScroll = useRef(0);
+  function openLead(id: string) {
+    savedScroll.current = scrollRef.current?.scrollTop ?? 0;
+    setOpenId(id);
+  }
+  function closeLead() {
+    setOpenId(null);
+  }
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: openId ? 0 : savedScroll.current });
+  }, [openId]);
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openId]);
+
   function dismissBanner() {
     acknowledgePromoted();
     setUnseen(0);
@@ -88,7 +110,7 @@ export function LeadsTable() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
+    <div ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-black/[0.06] px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
@@ -106,8 +128,9 @@ export function LeadsTable() {
       <div className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 lg:px-8">
         {open ? (
           <div className="space-y-3">
+            <BackToLeadsBar onBack={closeLead} />
             <LeadScoreHeader lead={open} onTakeOver={() => onTakeOver(open.id)} />
-            <LeadDetail lead={open} agentName={open.agentRole} journey={open.journey} onBack={() => setOpenId(null)} />
+            <LeadDetail lead={open} agentName={open.agentRole} journey={open.journey} />
           </div>
         ) : (
           <>
@@ -140,7 +163,7 @@ export function LeadsTable() {
 
             {/* search + tier + channel */}
             <div className="mt-3 flex flex-col gap-2.5 lg:flex-row lg:items-center">
-              <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={setOpenId} />
+              <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={openLead} />
               <div className="flex flex-wrap items-center gap-2">
                 <TierFilter value={tier} onChange={setTier} />
               </div>
@@ -160,7 +183,7 @@ export function LeadsTable() {
             {visible.length > 0 ? (
               <div className="mt-2.5 space-y-2.5">
                 {visible.map((l) => (
-                  <ScoredLeadRow key={l.id} lead={l} query={query} onOpen={() => setOpenId(l.id)} />
+                  <ScoredLeadRow key={l.id} lead={l} query={query} onOpen={() => openLead(l.id)} />
                 ))}
               </div>
             ) : (
