@@ -20,7 +20,7 @@ import { SourceChip } from "./source-icons";
  * feedback; both are motion-safe. */
 export function BackToLeadsBar({ onBack }: { onBack: () => void }) {
   return (
-    <div className="sticky top-0 z-20 -mx-4 border-b border-black/[0.06] bg-cream/80 px-4 py-2.5 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <div className="sticky top-0 z-20 -mx-4 border-b border-black/[0.06] bg-white/80 px-4 py-2.5 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <button
         type="button"
         onClick={onBack}
