@@ -296,6 +296,44 @@
   }
 }
 
+/* Lead distribution: after a calling run, each new lead flies from the agent out
+   to the team member it landed on. --tx/--ty (set inline per dot) are the offset
+   to that person's avatar. The mid-keyframe travels further across than down, so
+   the path bows outward and reads as a fan-out rather than a straight line.
+   Transform/opacity only; gated with motion-safe in the markup. */
+@keyframes lead-fly {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  55% {
+    transform: translate(calc(var(--tx) * 0.5), calc(var(--ty) * 0.3)) scale(1);
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(0.5);
+    opacity: 0;
+  }
+}
+
+/* The nudge an avatar gives as a lead lands on it. Starts and ends at rest, so
+   it reads as a bump rather than an entrance. */
+@keyframes lead-land {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.14);
+  }
+}
+
 /* Voice recorder waveform bars */
 @keyframes voice-wave {
   0%,
@@ -809,5 +847,13 @@
   .launch-celebration *,
   .launch-celebration {
     animation: none !important;
+  }
+  /* The distribution fan-out is movement, so it goes; the avatars and their
+     counts stay, which is where the actual information is. */
+  .lead-handout * {
+    animation: none !important;
+  }
+  .lead-handout .lead-dot {
+    display: none;
   }
 }

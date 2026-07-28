@@ -8,11 +8,13 @@
 import { ChevronUp, X } from "lucide-react";
 import { AgentOrb } from "@/components/ai-team/agent-ui";
 import { useAutoCall } from "./auto-call-context";
+import { LeadHandoutLine } from "./lead-handout";
 import { summarize } from "./auto-call-run";
 
 export function AutoCallTracker() {
-  const { calls, elapsed, complete, agent, sessionName, openModal, clearRun } = useAutoCall();
+  const { calls, elapsed, complete, agent, sessionName, distributed, openModal, clearRun } = useAutoCall();
   const c = summarize(calls, elapsed);
+  const handed = distributed?.assigned ?? 0;
 
   return (
     <div
@@ -43,13 +45,20 @@ export function AutoCallTracker() {
                 {complete ? "Run complete" : (sessionName ?? `${agent?.name ?? "Agent"} is calling`)}
               </p>
               <p className="text-ink-muted text-xs tabular-nums">
-                Dialled {c.dialled}/{c.total} · {c.connected} connected
+                {complete && handed > 0
+                  ? `${handed} ${handed === 1 ? "lead" : "leads"} shared with the team`
+                  : `Dialled ${c.dialled}/${c.total} · ${c.connected} connected`}
               </p>
             </div>
             {!complete && (
               <ChevronUp className="text-ink-muted/60 size-4 shrink-0 transition-transform group-hover:-translate-y-0.5" />
             )}
           </div>
+          {/* Who has them, for the case where the run finished while you were
+              somewhere else. Static: this card is glanced at often. */}
+          {complete && distributed && handed > 0 && (
+            <LeadHandoutLine result={distributed} className="mt-2.5" />
+          )}
           <div className="mt-2.5 flex h-2 w-full overflow-hidden rounded-full bg-black/[0.07]">
             <div className="bg-brand-green transition-[width] duration-500 ease-out" style={{ width: `${(c.connected / Math.max(c.total, 1)) * 100}%` }} />
             <div className="bg-ink-muted/30 transition-[width] duration-500 ease-out" style={{ width: `${(c.missed / Math.max(c.total, 1)) * 100}%` }} />

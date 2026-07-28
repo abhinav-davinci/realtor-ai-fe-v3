@@ -188,7 +188,11 @@ export function LeadsTable() {
                 </span>
                 <p className="text-ink min-w-0 flex-1 text-sm font-semibold">
                   {unseen} new {unseen === 1 ? "lead" : "leads"} added from AI calls.{" "}
-                  <span className="text-ink-muted font-normal">Now at the top of your list.</span>
+                  <span className="text-ink-muted font-normal">
+                    {viewer.can("leads.viewAll")
+                      ? "Already shared out across the team."
+                      : "Now at the top of your list."}
+                  </span>
                 </p>
                 <button
                   type="button"

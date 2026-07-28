@@ -16,15 +16,13 @@ import {
   SlidersHorizontal,
   Sparkles,
   Square,
-  Users,
   Voicemail,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { listAgents, templateById, voiceById, type AgentConfig } from "@/lib/agents";
-import { initialsOf, memberById } from "@/lib/team";
-import type { DistributionResult } from "@/lib/lead-distribution";
+import { LeadHandout } from "./lead-handout";
 import { AgentOrb } from "@/components/ai-team/agent-ui";
 import {
   SOURCE_META,
@@ -254,7 +252,7 @@ export function AutoCallModal() {
             {/* who picked the new leads up (both run kinds) */}
             {run.complete && (run.distributed?.assigned ?? 0) > 0 && (
               <div className="border-b border-black/[0.06] px-5 py-4 sm:px-6">
-                <DistributionBanner result={run.distributed!} />
+                <LeadHandout result={run.distributed!} />
               </div>
             )}
 
@@ -566,50 +564,6 @@ function LeadAddedBanner({ count }: { count: number }) {
           {count} {count === 1 ? "lead" : "leads"} added to Lead Intelligence
         </p>
         <p className="text-ink-muted text-xs">Open a lead to read the call and take it over.</p>
-      </div>
-    </div>
-  );
-}
-
-/** Where the run's new leads went. Distribution is automatic, so this is a
- * receipt rather than a decision: it says the work is already on someone's desk
- * and shows the split, so nobody has to go looking for it. */
-function DistributionBanner({ result }: { result: DistributionResult }) {
-  const rows = Object.entries(result.byMember)
-    .map(([id, count]) => ({ member: memberById(id), count }))
-    .filter((r) => r.member)
-    .sort((a, b) => b.count - a.count);
-
-  return (
-    <div
-      className="border-accent-blue/25 bg-accent-blue/[0.05] flex flex-wrap items-center gap-3 rounded-xl border p-3.5"
-      style={{ animation: "fade-in-up 240ms cubic-bezier(0.23,1,0.32,1) both" }}
-    >
-      <span className="bg-accent-blue/15 text-accent-blue grid size-10 shrink-0 place-items-center rounded-full">
-        <Users className="size-5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-ink text-sm font-bold text-balance">
-          {result.assigned} {result.assigned === 1 ? "lead" : "leads"} shared across {rows.length}{" "}
-          {rows.length === 1 ? "person" : "people"}
-        </p>
-        <p className="text-ink-muted text-xs">Each one went to whoever was holding the fewest.</p>
-      </div>
-      {/* Own row: the names wrap freely instead of squeezing the sentence. */}
-      <div className="flex w-full flex-wrap items-center gap-1.5">
-        {rows.map(({ member, count }, i) => (
-          <span
-            key={member!.id}
-            className="text-ink-muted inline-flex items-center gap-1.5 rounded-full bg-white py-1 pr-2.5 pl-1 text-xs font-semibold shadow-sm ring-1 ring-black/[0.06] motion-safe:opacity-0 motion-safe:animate-[fade-in-up_260ms_ease-out_both]"
-            style={{ animationDelay: `${80 + i * 45}ms` }}
-          >
-            <span className="bg-accent-blue/15 text-accent-blue grid size-5 place-items-center rounded-full text-[9px] font-bold">
-              {initialsOf(member!.name)}
-            </span>
-            {member!.name.split(" ")[0]}
-            <span className="text-ink tabular-nums">{count}</span>
-          </span>
-        ))}
       </div>
     </div>
   );
