@@ -1,6 +1,7 @@
-import { redirect } from "next/navigation";
+import { LeadsLanding } from "@/components/leads/leads-landing";
 
-// The Leads section opens on its Overview.
+// Where the Leads rail item drops you, which depends on who you are: admins
+// open on the Overview, a User opens on the list of people they have to call.
 export default function LeadsPage() {
-  redirect("/leads/overview");
+  return <LeadsLanding />;
 }

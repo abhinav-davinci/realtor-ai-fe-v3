@@ -97,27 +97,36 @@ export type Capability =
   | "team.manage"
   | "billing.view"
   | "leads.viewAll"
+  | "leads.intelligence"
   | "leads.distribute"
+  | "calls.history"
   | "contacts.manage"
   | "campaigns.run"
   | "content.manage"
   | "agents.manage"
-  | "workflows.manage";
+  | "workflows.manage"
+  | "dashboard.view"
+  | "insights.view";
 
 const ADMIN_CAPABILITIES: Capability[] = [
   "team.manage",
   "billing.view",
   "leads.viewAll",
+  "leads.intelligence",
   "leads.distribute",
+  "calls.history",
   "contacts.manage",
   "campaigns.run",
   "content.manage",
   "agents.manage",
   "workflows.manage",
+  "dashboard.view",
+  "insights.view",
 ];
 
-/** A User has none of the organization-level capabilities. What they get is
- * their own assigned leads, which is not a capability but a scope. */
+/** A User has none of the organization-level capabilities. Their whole app is
+ * two screens: the leads assigned to them, and their own site visits. That is
+ * a scope rather than a capability, which is why nothing is listed here. */
 const CAPABILITIES: Record<ViewerRole, Capability[]> = {
   "super-admin": ADMIN_CAPABILITIES,
   admin: ADMIN_CAPABILITIES,

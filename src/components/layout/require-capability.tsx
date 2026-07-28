@@ -41,10 +41,10 @@ export function RequireCapability({
           Your account has the User role, which covers the leads assigned to you. Ask an admin if you need this.
         </p>
         <Link
-          href="/leads/overview"
+          href="/leads/my-calls"
           className="text-accent-blue group mt-5 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
         >
-          Go to my leads
+          Go to my calling list
           <ArrowRight className="size-4 transition-transform duration-150 ease-out motion-safe:group-hover:translate-x-0.5" />
         </Link>
       </div>

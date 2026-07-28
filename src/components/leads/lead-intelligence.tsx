@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Download, Flame, PhoneCall, Sparkles, UserRoundCheck, Users } from "lucide-react";
+import { ArrowRight, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
 import { templateById, type TemplateId } from "@/lib/agents";
@@ -15,7 +15,6 @@ import {
   type ScoredLead,
 } from "@/lib/lead-intelligence";
 import { LEADS_CHANGED_EVENT, listDistributedLeads, takeOverLead } from "@/lib/lead-promotion";
-import { useViewer } from "@/lib/use-viewer";
 import { LeadDetail } from "@/components/conversations/conversation-ui";
 import { KpiStrip, SourcesPanel } from "./lead-sources";
 import { BackToLeadsBar, LeadScoreHeader, ScoredLeadRow } from "./lead-row";
@@ -34,23 +33,14 @@ export function LeadIntelligence() {
     ? (templateParam as TemplateId)
     : null;
 
-  const viewer = useViewer();
-  const orgWide = viewer.can("leads.viewAll");
-
   // Seed set first (SSR-safe), then merge promoted leads from localStorage.
-  const [everyLead, setAllLeads] = useState<ScoredLead[]>(() => listScoredLeads());
+  const [allLeads, setAllLeads] = useState<ScoredLead[]>(() => listScoredLeads());
   useEffect(() => {
     const load = () => setAllLeads(listDistributedLeads());
     load();
     window.addEventListener(LEADS_CHANGED_EVENT, load);
     return () => window.removeEventListener(LEADS_CHANGED_EVENT, load);
   }, []);
-
-  // A User sees only their own leads, and their own numbers with them.
-  const allLeads = useMemo(
-    () => (orgWide ? everyLead : everyLead.filter((l) => l.assigneeId === viewer.id)),
-    [everyLead, orgWide, viewer.id]
-  );
   const summary = useMemo(() => leadSummary(), []);
   const sources = useMemo(() => sourceBreakdown(), []);
   const best = useMemo(() => bestConvertingSource(), []);
@@ -92,22 +82,14 @@ export function LeadIntelligence() {
         <div className="min-w-0 flex-1">
           <h1 className="text-ink text-xl font-bold">Overview</h1>
           <p className="text-ink-muted text-sm">
-            {orgWide ? (
-              <>
-                {summary.total.toLocaleString("en-IN")} leads across {sources.length} channels · last 30 days
-              </>
-            ) : (
-              <>
-                {allLeads.length} {allLeads.length === 1 ? "lead" : "leads"} assigned to you · last 30 days
-              </>
-            )}
+            {summary.total.toLocaleString("en-IN")} leads across {sources.length} channels · last 30 days
             {templateId && <span> · {templateById(templateId).role}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {viewer.can("campaigns.run") && <AutoCallButton />}
+          <AutoCallButton />
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
-            <Download className="size-4" /> Download {orgWide ? "All Leads" : "My Leads"}
+            <Download className="size-4" /> Download All Leads
           </Button>
         </div>
       </div>
@@ -123,21 +105,15 @@ export function LeadIntelligence() {
           <EmptyLeads onLaunch={() => router.push("/ai-team")} />
         ) : (
           <div className="space-y-5">
-            {/* Org-wide numbers are not a User's to see; theirs are their own
-                queue instead. */}
-            {orgWide ? <KpiStrip summary={summary} /> : <MyLeadsStrip leads={allLeads} />}
+            <KpiStrip summary={summary} />
 
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
               {/* main: recent leads (the priority) */}
               <section className="min-w-0 flex-1 rounded-2xl border border-black/[0.07] bg-white p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-ink font-bold">{orgWide ? "Recent leads" : "Work these first"}</h2>
-                    <p className="text-ink-muted text-xs">
-                      {orgWide
-                        ? "Your latest leads, scored by buying intent."
-                        : "Your leads, hottest intent first. Call the top of this list today."}
-                    </p>
+                    <h2 className="text-ink font-bold">Recent leads</h2>
+                    <p className="text-ink-muted text-xs">Your latest leads, scored by buying intent.</p>
                   </div>
                   <button
                     type="button"
@@ -166,53 +142,14 @@ export function LeadIntelligence() {
                 )}
               </section>
 
-              {/* side: compact lead sources (organization-wide, so admins only) */}
-              {orgWide && (
-                <div className="lg:w-[332px] lg:shrink-0">
-                  <SourcesPanel data={sources} summary={summary} best={best} />
-                </div>
-              )}
+              {/* side: compact lead sources */}
+              <div className="lg:w-[332px] lg:shrink-0">
+                <SourcesPanel data={sources} summary={summary} best={best} />
+              </div>
             </div>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-/* ------------------------------ my leads strip ---------------------------- */
-
-/** A User's own queue, counted from the leads assigned to them. Deliberately
- * about what to do next rather than how the organization is performing. */
-function MyLeadsStrip({ leads }: { leads: ScoredLead[] }) {
-  const hot = leads.filter((l) => l.tier === "hot" || l.tier === "very-hot").length;
-  const takenOver = leads.filter((l) => l.owner === "human").length;
-  const waiting = leads.length - takenOver;
-
-  const tiles = [
-    { icon: Users, tint: "bg-accent-blue/10 text-accent-blue", value: leads.length, label: "Assigned to you" },
-    { icon: Flame, tint: "bg-orange-50 text-orange-600", value: hot, label: "Hot, call today" },
-    { icon: PhoneCall, tint: "bg-brand-orange/10 text-brand-orange", value: waiting, label: "Not picked up yet" },
-    { icon: UserRoundCheck, tint: "bg-brand-green/10 text-brand-green", value: takenOver, label: "You took over" },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {tiles.map(({ icon: Icon, tint, value, label }, i) => (
-        <div
-          key={label}
-          className="rounded-2xl border border-black/[0.07] bg-white p-4 motion-safe:opacity-0 motion-safe:animate-[fade-in-up_320ms_ease-out_both]"
-          style={{ animationDelay: `${i * 45}ms` }}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-ink-muted text-xs font-medium">{label}</span>
-            <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${tint}`}>
-              <Icon className="size-4" />
-            </span>
-          </div>
-          <p className="text-ink mt-2.5 text-[26px] leading-none font-bold tabular-nums">{value}</p>
-        </div>
-      ))}
     </div>
   );
 }

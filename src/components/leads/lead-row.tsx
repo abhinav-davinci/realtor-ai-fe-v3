@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HOT_THRESHOLD, SOURCE_META, TIER_META, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
 import { initialsOf, memberById } from "@/lib/team";
+import { useViewer } from "@/lib/use-viewer";
 import { BothChannelsPill, Highlight, LeadAvatar, OutcomeBadge } from "@/components/conversations/conversation-ui";
 import { SourceChip } from "./source-icons";
 
@@ -38,7 +39,10 @@ export function BackToLeadsBar({ onBack }: { onBack: () => void }) {
  * rather than a control: the avatar makes it scannable down a long list without
  * competing with the tinted status chips beside it. */
 export function AssigneeChip({ id, className }: { id?: string; className?: string }) {
+  const viewer = useViewer();
   if (!id) return null;
+  // Saying "Kajal" on every row of Kajal's own list is noise, not information.
+  if (id === viewer.id && !viewer.can("leads.viewAll")) return null;
   const member = memberById(id);
   const name = member?.name ?? "Removed user";
   const first = name.split(" ")[0];

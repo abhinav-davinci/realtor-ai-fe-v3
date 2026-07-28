@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Contact, History, Radar, Share2, KanbanSquare, CalendarCheck, MessagesSquare, Headphones, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Contact, History, Radar, Share2, KanbanSquare, CalendarCheck, MessagesSquare, PhoneCall, Headphones, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { listScoredLeads, type ScoredLead } from "@/lib/lead-intelligence";
 import { LEADS_CHANGED_EVENT, listDistributedLeads } from "@/lib/lead-promotion";
 import { useViewer } from "@/lib/use-viewer";
-import type { Capability } from "@/lib/team";
+
 
 interface NavItem {
   label: string;
@@ -17,19 +17,25 @@ interface NavItem {
   href: string;
   exact?: boolean;
   soon?: boolean;
-  /** Hidden from viewers without this capability (see lib/team.ts). */
-  needs?: Capability;
 }
 
-const NAV: NavItem[] = [
+/** Everything, for the people who run the organization. */
+const ADMIN_NAV: NavItem[] = [
   { label: "Overview", icon: LayoutDashboard, href: "/leads/overview" },
-  { label: "Contacts", icon: Contact, href: "/leads/contacts", needs: "contacts.manage" },
+  { label: "Contacts", icon: Contact, href: "/leads/contacts" },
   { label: "AI Call History", icon: History, href: "/leads/call-history" },
   { label: "Lead Intelligence", icon: Radar, href: "/leads/intelligence" },
-  { label: "Lead Distribution", icon: Share2, href: "/leads/distribution", needs: "leads.distribute" },
+  { label: "Lead Distribution", icon: Share2, href: "/leads/distribution" },
   { label: "Sales Pipeline", icon: KanbanSquare, href: "/leads/pipeline", soon: true },
   { label: "Site Visits", icon: CalendarCheck, href: "/leads/site-visits", soon: true },
   { label: "Conversations", icon: MessagesSquare, href: "/leads/conversations", soon: true },
+];
+
+/** A User's whole app: the people they have to call, and the visits they are
+ * running. Deliberately two items, not a filtered version of the admin list. */
+const USER_NAV: NavItem[] = [
+  { label: "My Calling List", icon: PhoneCall, href: "/leads/my-calls" },
+  { label: "My Site Visits", icon: CalendarCheck, href: "/leads/site-visits", soon: true },
 ];
 
 export function LeadsSidebar() {
@@ -67,7 +73,7 @@ export function LeadsSidebar() {
       </div>
 
       <nav className="flex flex-col gap-1 px-3">
-        {NAV.filter((i) => !i.needs || viewer.can(i.needs)).map(({ label, icon: Icon, href, exact, soon }) => {
+        {(viewer.can("leads.intelligence") ? ADMIN_NAV : USER_NAV).map(({ label, icon: Icon, href, exact, soon }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -82,7 +88,7 @@ export function LeadsSidebar() {
             >
               <Icon className="size-[18px]" strokeWidth={1.75} />
               <span className="flex-1">{label}</span>
-              {label === "Lead Intelligence" && needsAttention > 0 && (
+              {(label === "Lead Intelligence" || label === "My Calling List") && needsAttention > 0 && (
                 <span className="bg-accent-blue/15 text-accent-blue grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold">
                   {needsAttention}
                 </span>

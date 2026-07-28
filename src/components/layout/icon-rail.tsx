@@ -34,11 +34,11 @@ export interface RailItem {
 const SETTINGS_HREF = "/account";
 
 export const PRIMARY: RailItem[] = [
-  { label: "Dashboard", icon: LayoutGrid },
+  { label: "Dashboard", icon: LayoutGrid, needs: "dashboard.view" },
   { label: "AI Team", icon: Sparkles, href: "/ai-team", needs: "agents.manage" },
   { label: "Leads", icon: Radar, href: "/leads" },
   { label: "Content Studio", icon: Megaphone, href: "/", needs: "content.manage" },
-  { label: "Insights", icon: LineChart },
+  { label: "Insights", icon: LineChart, needs: "insights.view" },
   { label: "Build Workflow", icon: Spline, needs: "workflows.manage" },
 ];
 

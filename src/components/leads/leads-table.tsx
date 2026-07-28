@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Download, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, Download, Flame, PhoneCall, Sparkles, UserRoundCheck, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_TEMPLATE_IDS } from "@/lib/conversations";
@@ -152,10 +152,12 @@ export function LeadsTable() {
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-black/[0.06] px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
-          <h1 className="text-ink text-xl font-bold">{viewer.can("leads.viewAll") ? "Lead Intelligence" : "My Leads"}</h1>
+          <h1 className="text-ink text-xl font-bold">
+            {viewer.can("leads.viewAll") ? "Lead Intelligence" : "My Calling List"}
+          </h1>
           <p className="text-ink-muted text-sm">
             {allLeads.length} {allLeads.length === 1 ? "lead" : "leads"}
-            {viewer.can("leads.viewAll") ? " · last 30 days" : " assigned to you · last 30 days"}
+            {viewer.can("leads.viewAll") ? " · last 30 days" : " assigned to you, hottest first"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -198,6 +200,9 @@ export function LeadsTable() {
                 </button>
               </div>
             )}
+
+            {/* A User's queue at a glance: what to call, and what is untouched. */}
+            {!viewer.can("leads.viewAll") && <MyQueueStrip leads={allLeads} />}
 
             {/* source chips */}
             <SourceFilter value={source} counts={perSource} total={allLeads.length} onChange={setSource} />
@@ -245,6 +250,42 @@ export function LeadsTable() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------- my queue --------------------------------- */
+
+/** A rep's own numbers, above their calling list. Deliberately about what to do
+ * next rather than how the organization is performing. */
+function MyQueueStrip({ leads }: { leads: ScoredLead[] }) {
+  const hot = leads.filter((l) => l.tier === "hot" || l.tier === "very-hot").length;
+  const takenOver = leads.filter((l) => l.owner === "human").length;
+
+  const tiles = [
+    { icon: Users, tint: "bg-accent-blue/10 text-accent-blue", value: leads.length, label: "Assigned to you" },
+    { icon: Flame, tint: "bg-orange-50 text-orange-600", value: hot, label: "Hot, call today" },
+    { icon: PhoneCall, tint: "bg-brand-orange/10 text-brand-orange", value: leads.length - takenOver, label: "Not picked up yet" },
+    { icon: UserRoundCheck, tint: "bg-brand-green/10 text-brand-green", value: takenOver, label: "You took over" },
+  ];
+
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {tiles.map(({ icon: Icon, tint, value, label }, i) => (
+        <div
+          key={label}
+          className="rounded-2xl border border-black/[0.07] bg-white p-4 motion-safe:opacity-0 motion-safe:animate-[fade-in-up_320ms_ease-out_both]"
+          style={{ animationDelay: `${i * 45}ms` }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-ink-muted text-xs font-medium">{label}</span>
+            <span className={cn("grid size-7 shrink-0 place-items-center rounded-lg", tint)}>
+              <Icon className="size-4" />
+            </span>
+          </div>
+          <p className="text-ink mt-2.5 text-[26px] leading-none font-bold tabular-nums">{value}</p>
+        </div>
+      ))}
     </div>
   );
 }
