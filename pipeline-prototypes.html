@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sales Pipeline — concept wireframes</title>
+<style>
+  :root{
+    --ink:#16203a; --muted:#6b7280; --line:rgba(16,32,58,.10); --line-2:rgba(16,32,58,.06);
+    --bg:#f4f4f1; --surface:#ffffff; --navy:#16243f; --blue:#2f6bed; --green:#1c9e57; --orange:#ef8e2b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1320px;margin:0 auto;padding:22px 26px 60px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  h1{font-size:22px;font-weight:800;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .tabs{display:flex;gap:6px;background:#e7e7e2;padding:5px;border-radius:12px}
+  .tab{border:0;background:transparent;color:#4b5366;font-weight:600;font-size:13px;padding:8px 14px;border-radius:9px;cursor:pointer}
+  .tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(16,32,58,.12)}
+  .ghost-btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:600;color:#475067}
+
+  /* lens bar */
+  .lens{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  .chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:600;color:#3f4656}
+  .chip .car{color:var(--muted);font-weight:500}
+  .chip.search{flex:1;min-width:160px;color:#9aa1ad;font-weight:500;max-width:280px}
+
+  .layout{display:flex;gap:16px;align-items:flex-start}
+  .main{flex:1;min-width:0}
+  .rail{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:14px}
+  @media(max-width:1080px){.layout{flex-direction:column}.rail{width:100%}}
+
+  .card{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 2px 10px -6px rgba(16,32,58,.12)}
+  .card.pad{padding:16px}
+  .card h2{font-size:14px;font-weight:800;margin:0}
+  .card .desc{font-size:11.5px;color:var(--muted);margin-top:1px}
+
+  /* stage flow strip */
+  .flow{display:flex;gap:10px;margin-bottom:16px}
+  .flow .stg{flex:1;background:#fff;border:1px solid var(--line-2);border-top:3px solid #ccc;border-radius:12px;padding:12px 12px 11px;position:relative;box-shadow:0 2px 10px -7px rgba(16,32,58,.14)}
+  .flow .stg .n{font-size:24px;font-weight:800;line-height:1}
+  .flow .stg .lbl{font-size:11px;color:var(--muted);margin-top:5px}
+  .flow .stg .conv{position:absolute;right:-7px;top:50%;transform:translateY(-50%);font-size:10px;color:#9aa1ad;background:var(--bg);padding:0 2px;z-index:2}
+
+  /* kanban */
+  .board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+  .col{flex:1;min-width:182px;background:#ececeb;border-radius:13px;padding:10px}
+  .col .ch{display:flex;align-items:center;justify-content:space-between;margin:2px 4px 9px}
+  .col .ch .t{font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px}
+  .col .ch .t .dot{width:8px;height:8px;border-radius:3px}
+  .col .ch .cnt{font-size:11px;font-weight:700;color:#fff;background:#aab;border-radius:7px;padding:1px 7px}
+  .lcard{background:#fff;border:1px solid var(--line-2);border-radius:11px;padding:11px;margin-bottom:9px;box-shadow:0 1px 2px rgba(16,32,58,.05)}
+  .lcard .r1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .lcard .nm{font-size:13px;font-weight:700}
+  .score{font-size:11px;font-weight:800;color:#fff;border-radius:7px;padding:2px 7px;min-width:26px;text-align:center}
+  .meta{display:flex;align-items:center;gap:6px;font-size:11px;color:#5b6273;margin-top:7px}
+  .cdot{width:8px;height:8px;border-radius:999px;flex-shrink:0}
+  .proj{font-size:11px;color:#5b6273;margin-top:4px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px;margin-top:8px}
+  .lfoot{display:flex;align-items:center;justify-content:space-between;margin-top:9px;padding-top:8px;border-top:1px solid var(--line-2)}
+  .lfoot .when{font-size:10.5px;color:#9aa1ad}
+  .lfoot .act{font-size:11px;font-weight:700;color:var(--blue);border:1px solid rgba(47,107,237,.25);background:rgba(47,107,237,.06);border-radius:7px;padding:3px 9px}
+
+  /* funnel + list */
+  .funnel{display:flex;gap:6px;align-items:flex-end;margin-bottom:14px}
+  .funnel .seg{border-radius:9px 9px 7px 7px;color:#fff;padding:10px 12px;display:flex;flex-direction:column;justify-content:flex-end;min-height:64px}
+  .funnel .seg .n{font-size:20px;font-weight:800;line-height:1}
+  .funnel .seg .l{font-size:10.5px;opacity:.92;margin-top:3px}
+  .list .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line-2)}
+  .list .row:last-child{border-bottom:0}
+  .list .row .nm{font-weight:700;font-size:13px;width:130px;flex-shrink:0}
+  .list .row .cell{font-size:11.5px;color:#5b6273;display:flex;align-items:center;gap:6px}
+  .list .row .stagepill{font-size:10px;font-weight:700;border-radius:6px;padding:2px 8px}
+  .head{display:flex;gap:12px;padding:9px 14px;font-size:10.5px;font-weight:700;color:#9aa1ad;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
+  .grow{flex:1;min-width:0}
+  .w90{width:90px;flex-shrink:0}.w120{width:120px;flex-shrink:0}.w70{width:64px;flex-shrink:0;text-align:right}
+
+  /* swimlanes */
+  .lane{background:#fff;border:1px solid var(--line-2);border-left:4px solid #ccc;border-radius:12px;padding:14px 14px 6px;margin-bottom:12px;box-shadow:0 2px 10px -7px rgba(16,32,58,.14)}
+  .lane .lh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+  .lane .lh .nm{font-size:14px;font-weight:800}
+  .lane .lh .mini{display:flex;gap:10px;font-size:11px;color:#5b6273}
+  .lane .lh .mini b{color:var(--ink)}
+  .lane .lh .mini .hot{color:#ef4444}
+  .lane .track{display:flex;gap:9px;overflow-x:auto;padding-bottom:9px}
+  .mcard{flex:0 0 156px;background:#fafafa;border:1px solid var(--line-2);border-radius:10px;padding:10px}
+  .mcard .r1{display:flex;align-items:center;justify-content:space-between}
+  .mcard .nm{font-size:12.5px;font-weight:700}
+  .mcard .stage{font-size:9.5px;font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;display:inline-block;margin-top:7px}
+
+  /* rail viz */
+  .bar{display:flex;align-items:center;gap:8px;margin-top:9px}
+  .bar .bl{font-size:11px;color:#475067;width:88px;flex-shrink:0;display:flex;align-items:center;gap:6px}
+  .bar .track{flex:1;height:7px;background:#eee;border-radius:999px;overflow:hidden}
+  .bar .fill{height:100%;border-radius:999px}
+  .bar .v{font-size:10.5px;color:#9aa1ad;width:26px;text-align:right;flex-shrink:0}
+  .attn{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--line-2)}
+  .attn:last-child{border-bottom:0}
+  .attn .nm{font-size:12.5px;font-weight:600;flex:1}
+  .note{font-size:11px;color:var(--muted);line-height:1.5;background:#fff;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div>
+      <h1>Sales Pipeline</h1>
+      <div class="sub">Concept wireframes — same data, three layouts. Pick the one that feels right.</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="tabs">
+        <button class="tab on" data-view="kanban">Kanban board</button>
+        <button class="tab" data-view="funnel">Funnel + list</button>
+        <button class="tab" data-view="swim">Project swimlanes</button>
+      </div>
+      <button class="ghost-btn">Integrate CRM</button>
+    </div>
+  </div>
+
+  <div class="lens">
+    <span class="chip">Project <span class="car">All ▾</span></span>
+    <span class="chip">Channel <span class="car">All ▾</span></span>
+    <span class="chip">Topic <span class="car">All ▾</span></span>
+    <span class="chip search">Search leads…</span>
+  </div>
+
+  <div class="layout">
+    <div class="main">
+      <div id="flow" class="flow"></div>
+      <div id="view-kanban"></div>
+      <div id="view-funnel" class="hidden"></div>
+      <div id="view-swim" class="hidden"></div>
+    </div>
+    <div class="rail" id="rail"></div>
+  </div>
+
+</div>
+
+<script>
+const channelColor={Voice:"#7c3aed",WhatsApp:"#22c55e",Chatbot:"#2f6bed",Instagram:"#ec4899",Facebook:"#4f46e5"};
+const bucketColor={"Home loan":"#1c9e57","Pricing":"#2f6bed","Availability":"#7c3aed","Site visit":"#ef8e2b","Amenities":"#16b8c4","Other":"#94a3b8"};
+const stageColor={New:"#2f6bed",Engaged:"#38bdf8",Qualified:"#ef8e2b","Site Visit":"#7c3aed",Negotiation:"#f59e0b",Closed:"#1c9e57"};
+const projColor={"Sunshine Smart City":"#2f6bed","TryThat Vista Phase 2":"#ef8e2b","Green Acres Residency":"#1c9e57","Other inquiries":"#94a3b8"};
+const STAGES=["New","Engaged","Qualified","Site Visit","Negotiation","Closed"];
+function sc(s){return s>=80?"#ef4444":s>=60?"#ef8e2b":s>=45?"#eab308":"#94a3b8";}
+function act(ch){return (ch==="Voice"||ch==="WhatsApp")?"Call":"Reply";}
+
+const LEADS=[
+ {nm:"Sana Sheikh",ch:"Facebook",pj:"Other inquiries",bk:"Other",s:41,st:"New",w:"2h ago"},
+ {nm:"Meena Iyer",ch:"Instagram",pj:"Sunshine Smart City",bk:"Pricing",s:49,st:"New",w:"3h ago"},
+ {nm:"Farah Khan",ch:"Facebook",pj:"Green Acres Residency",bk:"Other",s:38,st:"New",w:"5h ago"},
+ {nm:"Rohan Mehta",ch:"Chatbot",pj:"TryThat Vista Phase 2",bk:"Pricing",s:64,st:"Engaged",w:"1h ago"},
+ {nm:"Karan Patel",ch:"Voice",pj:"Sunshine Smart City",bk:"Pricing",s:73,st:"Engaged",w:"4h ago"},
+ {nm:"Vikram Desai",ch:"WhatsApp",pj:"Green Acres Residency",bk:"Amenities",s:58,st:"Engaged",w:"Yesterday"},
+ {nm:"Aarti Sharma",ch:"WhatsApp",pj:"Sunshine Smart City",bk:"Home loan",s:82,st:"Qualified",w:"2h ago"},
+ {nm:"Imran Khan",ch:"Voice",pj:"TryThat Vista Phase 2",bk:"Availability",s:88,st:"Qualified",w:"Yesterday"},
+ {nm:"Priya Nair",ch:"Chatbot",pj:"TryThat Vista Phase 2",bk:"Home loan",s:79,st:"Qualified",w:"6h ago"},
+ {nm:"Neha Rao",ch:"Instagram",pj:"Sunshine Smart City",bk:"Site visit",s:91,st:"Site Visit",w:"1h ago"},
+ {nm:"Arjun Reddy",ch:"Voice",pj:"Green Acres Residency",bk:"Site visit",s:85,st:"Site Visit",w:"Yesterday"},
+ {nm:"Deepak Joshi",ch:"WhatsApp",pj:"TryThat Vista Phase 2",bk:"Availability",s:67,st:"Negotiation",w:"2d ago"},
+ {nm:"Sanjay Gupta",ch:"Voice",pj:"Sunshine Smart City",bk:"Home loan",s:94,st:"Negotiation",w:"3h ago"},
+ {nm:"Ritu Singh",ch:"Chatbot",pj:"Green Acres Residency",bk:"Site visit",s:71,st:"Closed",w:"4d ago"},
+];
+
+/* ---- stage flow strip (current count in each stage + conversion) ---- */
+function reached(st){ // cumulative leads that reached at least this stage
+ const idx=STAGES.indexOf(st);
+ return LEADS.filter(l=>STAGES.indexOf(l.st)>=idx).length;
+}
+function renderFlow(){
+ const el=document.getElementById("flow");
+ el.innerHTML=STAGES.map((st,i)=>{
+   const cur=LEADS.filter(l=>l.st===st).length;
+   const conv=i>0?Math.round(reached(st)/reached(STAGES[i-1])*100):null;
+   return `<div class="stg" style="border-top-color:${stageColor[st]}">
+     <div class="n" style="color:${stageColor[st]}">${cur}</div>
+     <div class="lbl">${st}</div>
+     ${conv!==null?`<div class="conv">${conv}%›</div>`:""}
+   </div>`;
+ }).join("");
+}
+
+/* ---- kanban ---- */
+function leadCard(l){
+ return `<div class="lcard">
+   <div class="r1"><span class="nm">${l.nm}</span><span class="score" style="background:${sc(l.s)}">${l.s}</span></div>
+   <div class="meta"><span class="cdot" style="background:${channelColor[l.ch]}"></span>${l.ch}</div>
+   <div class="proj">${l.pj}</div>
+   <span class="tag" style="background:${bucketColor[l.bk]}1a;color:${bucketColor[l.bk]}">${l.bk}</span>
+   <div class="lfoot"><span class="when">${l.w}</span><span class="act">${act(l.ch)}</span></div>
+ </div>`;
+}
+function renderKanban(){
+ const el=document.getElementById("view-kanban");
+ el.innerHTML=`<div class="board">`+STAGES.map(st=>{
+   const items=LEADS.filter(l=>l.st===st);
+   return `<div class="col">
+     <div class="ch"><span class="t"><span class="dot" style="background:${stageColor[st]}"></span>${st}</span>
+       <span class="cnt" style="background:${stageColor[st]}">${items.length}</span></div>
+     ${items.map(leadCard).join("")||'<div style="font-size:11px;color:#aab;padding:6px 4px">—</div>'}
+   </div>`;
+ }).join("")+`</div>`;
+}
+
+/* ---- funnel + list ---- */
+function renderFunnel(){
+ const el=document.getElementById("view-funnel");
+ const max=reached("New");
+ const funnel=`<div class="card pad" style="margin-bottom:14px">
+   <h2>Conversion funnel</h2><div class="desc">Leads that reached each stage</div>
+   <div class="funnel" style="margin-top:14px">`+STAGES.map(st=>{
+     const r=reached(st);
+     return `<div class="seg" style="background:${stageColor[st]};flex:${0.5+r/max};opacity:${.55+ .45*(r/max)}">
+       <div class="n">${r}</div><div class="l">${st}</div></div>`;
+   }).join("")+`</div></div>`;
+ const head=`<div class="head"><span style="width:130px;flex-shrink:0">Lead</span><span class="grow">Channel</span><span class="w120">Project</span><span class="w120">Topic</span><span class="w90">Stage</span><span class="w70">Score</span></div>`;
+ const rows=LEADS.slice().sort((a,b)=>b.s-a.s).map(l=>`<div class="row">
+   <span class="nm">${l.nm}</span>
+   <span class="cell grow"><span class="cdot" style="background:${channelColor[l.ch]}"></span>${l.ch}</span>
+   <span class="cell w120">${l.pj.replace(" Residency","").replace("TryThat ","")}</span>
+   <span class="cell w120"><span class="tag" style="margin:0;background:${bucketColor[l.bk]}1a;color:${bucketColor[l.bk]}">${l.bk}</span></span>
+   <span class="w90"><span class="stagepill" style="background:${stageColor[l.st]}1a;color:${stageColor[l.st]}">${l.st}</span></span>
+   <span class="w70"><span class="score" style="background:${sc(l.s)}">${l.s}</span></span>
+ </div>`).join("");
+ el.innerHTML=funnel+`<div class="card">${head}<div class="list">${rows}</div></div>`;
+}
+
+/* ---- swimlanes ---- */
+function renderSwim(){
+ const el=document.getElementById("view-swim");
+ const projs=["Sunshine Smart City","TryThat Vista Phase 2","Green Acres Residency","Other inquiries"];
+ el.innerHTML=projs.map(p=>{
+   const items=LEADS.filter(l=>l.pj===p);
+   const qual=items.filter(l=>["Qualified","Site Visit","Negotiation","Closed"].includes(l.st)).length;
+   const hot=items.filter(l=>l.s>=80).length;
+   const nw=items.filter(l=>l.st==="New").length;
+   return `<div class="lane" style="border-left-color:${projColor[p]}">
+     <div class="lh"><span class="nm">${p}</span>
+       <span class="mini"><span><b>${items.length}</b> inquiries</span><span><b>${nw}</b> new</span><span><b>${qual}</b> qualified</span><span class="hot"><b style="color:#ef4444">${hot}</b> hot</span></span></div>
+     <div class="track">`+items.map(l=>`<div class="mcard">
+        <div class="r1"><span class="nm">${l.nm}</span><span class="score" style="background:${sc(l.s)}">${l.s}</span></div>
+        <div class="meta"><span class="cdot" style="background:${channelColor[l.ch]}"></span>${l.ch}</div>
+        <span class="tag" style="background:${bucketColor[l.bk]}1a;color:${bucketColor[l.bk]}">${l.bk}</span><br>
+        <span class="stage" style="background:${stageColor[l.st]}">${l.st}</span>
+     </div>`).join("")+`</div></div>`;
+ }).join("");
+}
+
+/* ---- right insights rail (constant) ---- */
+function barBlock(title,desc,data,colorMap){
+ const tot=data.reduce((s,d)=>s+d[1],0);
+ return `<div class="card pad"><h2>${title}</h2><div class="desc">${desc}</div>`+
+  data.sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
+   const pct=Math.round(v/tot*100);
+   return `<div class="bar"><span class="bl"><span class="cdot" style="background:${colorMap[k]}"></span>${k}</span>
+     <span class="track"><span class="fill" style="width:${pct}%;background:${colorMap[k]}"></span></span><span class="v">${pct}%</span></div>`;
+  }).join("")+`</div>`;
+}
+function tally(key){const m={};LEADS.forEach(l=>m[l[key]]=(m[l[key]]||0)+1);return Object.entries(m);}
+function renderRail(){
+ const attn=LEADS.filter(l=>l.s>=85).sort((a,b)=>b.s-a.s);
+ document.getElementById("rail").innerHTML=
+  `<div class="note">These three panels stay constant across every layout — they show how <b>channel mix</b> and <b>query buckets</b> ride alongside whichever board you pick.</div>`+
+  barBlock("Channels","Where inquiries come from",tally("ch"),channelColor)+
+  barBlock("What buyers are asking","Inquiries by topic",tally("bk"),bucketColor)+
+  `<div class="card pad"><h2>Needs attention</h2><div class="desc">Hottest leads, act today</div>`+
+   attn.map(l=>`<div class="attn"><span class="cdot" style="background:${channelColor[l.ch]}"></span><span class="nm">${l.nm}</span><span class="score" style="background:${sc(l.s)}">${l.s}</span></div>`).join("")+`</div>`;
+}
+
+renderFlow();renderKanban();renderFunnel();renderSwim();renderRail();
+
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+ t.classList.add("on");
+ const v=t.dataset.view;
+ ["kanban","funnel","swim"].forEach(k=>document.getElementById("view-"+k).classList.toggle("hidden",k!==v));
+}));
+</script>
+</body>
+</html>
