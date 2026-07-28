@@ -327,12 +327,18 @@ export function listDistributedLeads(): ScoredLead[] {
 
 /* --------------------------- "new leads" banner --------------------------- */
 
-/** Promoted leads the user hasn't acknowledged on the Lead Intelligence page. */
-export function unseenPromotedCount(): number {
+/** Promoted leads the user hasn't acknowledged on the Lead Intelligence page.
+ * Pass a member id to count only the ones that landed on them, so a User is
+ * never shown an organization-wide number. */
+export function unseenPromotedCount(assigneeId?: string): number {
   if (typeof window === "undefined") return 0;
   try {
     const ack = Number(localStorage.getItem(ACK_KEY) ?? 0);
-    return listPromotedLeads().filter((l) => (l.promotedAt ?? 0) > ack).length;
+    const owners = readAssignments();
+    return listPromotedLeads().filter((l) => {
+      if ((l.promotedAt ?? 0) <= ack) return false;
+      return assigneeId ? owners[l.id]?.memberId === assigneeId : true;
+    }).length;
   } catch {
     return 0;
   }

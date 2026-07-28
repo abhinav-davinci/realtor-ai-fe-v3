@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Contact, History, Radar, Share2, KanbanSquare, CalendarCheck, MessagesSquare, Headphones, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { listScoredLeads } from "@/lib/lead-intelligence";
+import { listScoredLeads, type ScoredLead } from "@/lib/lead-intelligence";
+import { LEADS_CHANGED_EVENT, listDistributedLeads } from "@/lib/lead-promotion";
+import { useViewer } from "@/lib/use-viewer";
+import type { Capability } from "@/lib/team";
 
 interface NavItem {
   label: string;
@@ -14,14 +17,16 @@ interface NavItem {
   href: string;
   exact?: boolean;
   soon?: boolean;
+  /** Hidden from viewers without this capability (see lib/team.ts). */
+  needs?: Capability;
 }
 
 const NAV: NavItem[] = [
   { label: "Overview", icon: LayoutDashboard, href: "/leads/overview" },
-  { label: "Contacts", icon: Contact, href: "/leads/contacts" },
+  { label: "Contacts", icon: Contact, href: "/leads/contacts", needs: "contacts.manage" },
   { label: "AI Call History", icon: History, href: "/leads/call-history" },
   { label: "Lead Intelligence", icon: Radar, href: "/leads/intelligence" },
-  { label: "Lead Distribution", icon: Share2, href: "/leads/distribution" },
+  { label: "Lead Distribution", icon: Share2, href: "/leads/distribution", needs: "leads.distribute" },
   { label: "Sales Pipeline", icon: KanbanSquare, href: "/leads/pipeline", soon: true },
   { label: "Site Visits", icon: CalendarCheck, href: "/leads/site-visits", soon: true },
   { label: "Conversations", icon: MessagesSquare, href: "/leads/conversations", soon: true },
@@ -29,12 +34,28 @@ const NAV: NavItem[] = [
 
 export function LeadsSidebar() {
   const pathname = usePathname();
-  // "Needs attention" count: new + hot leads. Deterministic static data, so it's
-  // safe to compute during render (no localStorage, no hydration mismatch).
-  const count = useMemo(
-    () => listScoredLeads().filter((l) => l.status === "new" || l.tier === "hot" || l.tier === "very-hot").length,
-    []
-  );
+  const viewer = useViewer();
+  // "Needs attention": new + hot leads. The seed set is deterministic and so is
+  // safe during render, but a User must only be counted their own, which means
+  // reading localStorage and therefore waiting for mount.
+  const [scoped, setScoped] = useState<ScoredLead[] | null>(null);
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (viewer.can("leads.viewAll")) {
+      setScoped(null);
+      return;
+    }
+    const load = () => setScoped(listDistributedLeads().filter((l) => l.assigneeId === viewer.id));
+    load();
+    /* eslint-enable react-hooks/set-state-in-effect */
+    window.addEventListener(LEADS_CHANGED_EVENT, load);
+    return () => window.removeEventListener(LEADS_CHANGED_EVENT, load);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewer.id, viewer.role]);
+
+  const needsAttention = (scoped ?? listScoredLeads()).filter(
+    (l) => l.status === "new" || l.tier === "hot" || l.tier === "very-hot"
+  ).length;
 
   return (
     <aside className="bg-cream hidden w-[272px] shrink-0 flex-col border-r border-black/[0.06] lg:flex">
@@ -46,7 +67,7 @@ export function LeadsSidebar() {
       </div>
 
       <nav className="flex flex-col gap-1 px-3">
-        {NAV.map(({ label, icon: Icon, href, exact, soon }) => {
+        {NAV.filter((i) => !i.needs || viewer.can(i.needs)).map(({ label, icon: Icon, href, exact, soon }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -61,9 +82,9 @@ export function LeadsSidebar() {
             >
               <Icon className="size-[18px]" strokeWidth={1.75} />
               <span className="flex-1">{label}</span>
-              {label === "Lead Intelligence" && count > 0 && (
+              {label === "Lead Intelligence" && needsAttention > 0 && (
                 <span className="bg-accent-blue/15 text-accent-blue grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold">
-                  {count}
+                  {needsAttention}
                 </span>
               )}
               {soon && (

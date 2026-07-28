@@ -9,12 +9,14 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PLAN, TEAM_CHANGED_EVENT, listMembers, seatUsage, type SeatUsage } from "@/lib/team";
+import { useViewer } from "@/lib/use-viewer";
 
 /** Server and first client render both show the no-members copy, so the seat
  * numbers can never cause a hydration mismatch. */
 const EMPTY: SeatUsage = { used: 0, total: PLAN.seats, remaining: PLAN.seats };
 
 export function PlanStrip() {
+  const viewer = useViewer();
   const [seats, setSeats] = useState<SeatUsage>(EMPTY);
 
   const reload = useCallback(() => setSeats(seatUsage(listMembers())), []);
@@ -29,6 +31,9 @@ export function PlanStrip() {
   }, [reload]);
 
   const full = seats.remaining === 0 && seats.used > 0;
+
+  // Seats and upgrades are the organization's business, not a User's.
+  if (!viewer.can("billing.view")) return null;
 
   return (
     <div className="flex shrink-0 justify-end border-b border-black/[0.06] bg-white px-4 py-2.5 sm:px-6 lg:px-8">

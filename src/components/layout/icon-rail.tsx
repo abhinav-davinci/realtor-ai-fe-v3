@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { useViewer } from "@/lib/use-viewer";
+import type { Capability } from "@/lib/team";
 
 export interface RailItem {
   label: string;
@@ -23,6 +25,8 @@ export interface RailItem {
   active?: boolean;
   accent?: boolean; // render in the blue accent color (e.g. Logout)
   onClick?: () => void;
+  /** Hidden from viewers without this capability (see lib/team.ts). */
+  needs?: Capability;
 }
 
 /** Owned by the secondary Settings item rather than a PRIMARY section, so the
@@ -31,11 +35,11 @@ const SETTINGS_HREF = "/account";
 
 export const PRIMARY: RailItem[] = [
   { label: "Dashboard", icon: LayoutGrid },
-  { label: "AI Team", icon: Sparkles, href: "/ai-team" },
+  { label: "AI Team", icon: Sparkles, href: "/ai-team", needs: "agents.manage" },
   { label: "Leads", icon: Radar, href: "/leads" },
-  { label: "Content Studio", icon: Megaphone, href: "/" },
+  { label: "Content Studio", icon: Megaphone, href: "/", needs: "content.manage" },
   { label: "Insights", icon: LineChart },
-  { label: "Build Workflow", icon: Spline },
+  { label: "Build Workflow", icon: Spline, needs: "workflows.manage" },
 ];
 
 function RailButton({ label, icon: Icon, active, accent, onClick }: RailItem) {
@@ -68,6 +72,7 @@ export function IconRail() {
   const router = useRouter();
   const pathname = usePathname();
   const { logout } = useAuth();
+  const viewer = useViewer();
 
   // Each section owns its href prefix (/ai-team, /leads, ...); Content Studio
   // ("/") is the fallback that owns every route no other section claims.
@@ -78,7 +83,7 @@ export function IconRail() {
     if (href === "/") return !claimed.some((h) => pathname.startsWith(h));
     return pathname === href || pathname.startsWith(href + "/");
   };
-  const primary = PRIMARY.map((item) => ({
+  const primary = PRIMARY.filter((item) => !item.needs || viewer.can(item.needs)).map((item) => ({
     ...item,
     active: isActive(item.href),
     onClick: item.href ? () => router.push(item.href!) : undefined,

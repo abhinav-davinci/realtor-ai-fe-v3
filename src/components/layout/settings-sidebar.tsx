@@ -11,22 +11,33 @@ import { usePathname } from "next/navigation";
 import { CreditCard, Settings, ShieldCheck, Users, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { CURRENT_USER, TEAM_CHANGED_EVENT, WORKSPACE_NAME, listMembers } from "@/lib/team";
+import { TEAM_CHANGED_EVENT, WORKSPACE_NAME, listMembers, type Capability } from "@/lib/team";
+import { useViewer } from "@/lib/use-viewer";
 
 interface NavItem {
   label: string;
   icon: LucideIcon;
   href: string;
+  /** Hidden from viewers without this capability (see lib/team.ts). */
+  needs?: Capability;
 }
+
+/** The badge beside the workspace name says what you are in it. */
+const ROLE_LABEL: Record<"super-admin" | "admin" | "user", string> = {
+  "super-admin": "Super Admin",
+  admin: "Admin",
+  user: "User",
+};
 
 const NAV: NavItem[] = [
   { label: "Account Settings", icon: Settings, href: "/account/settings" },
-  { label: "User Management", icon: Users, href: "/account/users" },
-  { label: "Credit & Usage", icon: CreditCard, href: "/account/usage" },
+  { label: "User Management", icon: Users, href: "/account/users", needs: "team.manage" },
+  { label: "Credit & Usage", icon: CreditCard, href: "/account/usage", needs: "billing.view" },
 ];
 
 export function SettingsSidebar() {
   const pathname = usePathname();
+  const viewer = useViewer();
   // Team size lives in localStorage, so it can only be counted after mount.
   // Server and first client render both show no badge, so hydration matches.
   const [members, setMembers] = useState(0);
@@ -45,12 +56,12 @@ export function SettingsSidebar() {
       <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
         <h2 className="text-ink truncate text-lg font-bold">{WORKSPACE_NAME}</h2>
         <Badge className="bg-brand-orange relative shrink-0 rounded-md px-2 text-[11px] font-semibold text-white after:absolute after:inset-0 after:-translate-x-full after:bg-gradient-to-r after:from-transparent after:via-white/45 after:to-transparent after:content-[''] motion-safe:after:animate-shimmer">
-          <span className="inline-block motion-safe:animate-float">{CURRENT_USER.role}</span>
+          <span className="inline-block motion-safe:animate-float">{ROLE_LABEL[viewer.role]}</span>
         </Badge>
       </div>
 
       <nav className="flex flex-col gap-1 px-3">
-        {NAV.map(({ label, icon: Icon, href }) => {
+        {NAV.filter((i) => !i.needs || viewer.can(i.needs)).map(({ label, icon: Icon, href }) => {
           const active = pathname.startsWith(href);
           return (
             <Link
@@ -75,21 +86,23 @@ export function SettingsSidebar() {
         })}
       </nav>
 
-      {/* education footer card */}
-      <div className="mt-auto p-4">
-        <div className="rounded-xl bg-surface p-4 shadow-sm ring-1 ring-black/[0.06]">
-          <div className="flex items-center gap-2">
-            <span className="bg-accent-blue/10 text-accent-blue grid size-8 place-items-center rounded-lg">
-              <ShieldCheck className="size-4" />
-            </span>
-            <p className="text-ink text-sm font-semibold">Give the least access</p>
+      {/* education footer card: advice about running the team, so admins only */}
+      {viewer.can("team.manage") && (
+        <div className="mt-auto p-4">
+          <div className="rounded-xl bg-surface p-4 shadow-sm ring-1 ring-black/[0.06]">
+            <div className="flex items-center gap-2">
+              <span className="bg-accent-blue/10 text-accent-blue grid size-8 place-items-center rounded-lg">
+                <ShieldCheck className="size-4" />
+              </span>
+              <p className="text-ink text-sm font-semibold">Give the least access</p>
+            </div>
+            <p className="text-ink-muted mt-2 text-xs leading-snug">
+              Admins can invite, remove, and see the whole organization. Keep that for the people who run it, and give
+              everyone else the User role.
+            </p>
           </div>
-          <p className="text-ink-muted mt-2 text-xs leading-snug">
-            Admins can invite, remove, and see the whole organization. Keep that for the people who run it, and give
-            everyone else the User role.
-          </p>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

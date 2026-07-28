@@ -34,6 +34,7 @@ import {
 } from "@/lib/lead-promotion";
 import { distributionPool } from "@/lib/lead-distribution";
 import { TEAM_CHANGED_EVENT, type Member } from "@/lib/team";
+import { useViewer } from "@/lib/use-viewer";
 import { FilterSelect } from "@/components/leads/contacts/ui";
 import { EASE_OUT, SearchBar, LeadDetail } from "@/components/conversations/conversation-ui";
 import { BackToLeadsBar, LeadScoreHeader, ScoredLeadRow } from "./lead-row";
@@ -47,19 +48,30 @@ export function LeadsTable() {
     ? (templateParam as TemplateId)
     : null;
 
+  const viewer = useViewer();
+
   // Start from the deterministic seed set (SSR-safe), then merge in promoted
   // leads from localStorage after mount and whenever they change.
-  const [allLeads, setAllLeads] = useState<ScoredLead[]>(() => listScoredLeads());
+  const [everyLead, setAllLeads] = useState<ScoredLead[]>(() => listScoredLeads());
   const [unseen, setUnseen] = useState(0);
   useEffect(() => {
     const load = () => {
       setAllLeads(listDistributedLeads());
-      setUnseen(unseenPromotedCount());
+      setUnseen(unseenPromotedCount(viewer.can("leads.viewAll") ? undefined : viewer.id));
     };
     load();
     window.addEventListener(LEADS_CHANGED_EVENT, load);
     return () => window.removeEventListener(LEADS_CHANGED_EVENT, load);
-  }, []);
+    // Re-runs when the viewer resolves after mount, so the count is theirs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewer.id, viewer.role]);
+  // A User only ever sees the leads assigned to them. Everything downstream
+  // (counts, source chips, search, filters) reads this, so the scope is applied
+  // once rather than remembered at each call site.
+  const allLeads = useMemo(
+    () => (viewer.can("leads.viewAll") ? everyLead : everyLead.filter((l) => l.assigneeId === viewer.id)),
+    [everyLead, viewer]
+  );
   const perSource = useMemo(() => sourceCounts(allLeads), [allLeads]);
 
   const [tier, setTier] = useState<Tier | "all">("all");
@@ -140,13 +152,16 @@ export function LeadsTable() {
       {/* header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-black/[0.06] px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
-          <h1 className="text-ink text-xl font-bold">Lead Intelligence</h1>
-          <p className="text-ink-muted text-sm">{allLeads.length} leads · last 30 days</p>
+          <h1 className="text-ink text-xl font-bold">{viewer.can("leads.viewAll") ? "Lead Intelligence" : "My Leads"}</h1>
+          <p className="text-ink-muted text-sm">
+            {allLeads.length} {allLeads.length === 1 ? "lead" : "leads"}
+            {viewer.can("leads.viewAll") ? " · last 30 days" : " assigned to you · last 30 days"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <AutoCallButton />
+          {viewer.can("campaigns.run") && <AutoCallButton />}
           <Button variant="outline" className="text-ink hidden h-9 items-center gap-1.5 rounded-lg border-black/15 px-3 text-sm font-semibold sm:inline-flex">
-            <Download className="size-4" /> Download All Leads
+            <Download className="size-4" /> Download {viewer.can("leads.viewAll") ? "All Leads" : "My Leads"}
           </Button>
         </div>
       </div>
@@ -192,7 +207,8 @@ export function LeadsTable() {
               <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={openLead} />
               <div className="flex flex-wrap items-center gap-2">
                 <TierFilter value={tier} onChange={setTier} />
-                {pool.length > 0 && (
+                {/* Pointless when every lead in the list is already yours. */}
+                {pool.length > 0 && viewer.can("leads.viewAll") && (
                   <FilterSelect label="Owner" value={assignee} options={assigneeOptions} onChange={setAssignee} />
                 )}
               </div>

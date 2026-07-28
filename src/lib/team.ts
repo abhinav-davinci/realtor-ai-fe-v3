@@ -70,6 +70,120 @@ export const WORKSPACE_NAME = "RealtorOS";
 /** An invitation is good for a week, which is what the success dialog promises. */
 export const INVITE_TTL_DAYS = 7;
 
+/* --------------------------------- viewer --------------------------------- */
+
+export type ViewerRole = "super-admin" | "admin" | "user";
+
+/** Who is looking at the app right now. */
+export interface Viewer {
+  /** OWNER_ID for the account holder, otherwise the member's id. */
+  id: string;
+  name: string;
+  email: string;
+  initials: string;
+  role: ViewerRole;
+  /** True when the owner is looking through a member's eyes. */
+  impersonating: boolean;
+}
+
+export const OWNER_ID = "owner";
+
+/**
+ * What a role is allowed to do. Admins run the organization; Users work the
+ * leads they are given and nothing else. This mirrors ROLE_PERMISSIONS above,
+ * which is the copy the same rules are explained with, so the two must agree.
+ */
+export type Capability =
+  | "team.manage"
+  | "billing.view"
+  | "leads.viewAll"
+  | "leads.distribute"
+  | "contacts.manage"
+  | "campaigns.run"
+  | "content.manage"
+  | "agents.manage"
+  | "workflows.manage";
+
+const ADMIN_CAPABILITIES: Capability[] = [
+  "team.manage",
+  "billing.view",
+  "leads.viewAll",
+  "leads.distribute",
+  "contacts.manage",
+  "campaigns.run",
+  "content.manage",
+  "agents.manage",
+  "workflows.manage",
+];
+
+/** A User has none of the organization-level capabilities. What they get is
+ * their own assigned leads, which is not a capability but a scope. */
+const CAPABILITIES: Record<ViewerRole, Capability[]> = {
+  "super-admin": ADMIN_CAPABILITIES,
+  admin: ADMIN_CAPABILITIES,
+  user: [],
+};
+
+export function can(viewer: Viewer, capability: Capability): boolean {
+  return CAPABILITIES[viewer.role].includes(capability);
+}
+
+export const OWNER_VIEWER: Viewer = {
+  id: OWNER_ID,
+  name: CURRENT_USER.name,
+  email: CURRENT_USER.email,
+  initials: CURRENT_USER.initials,
+  role: "super-admin",
+  impersonating: false,
+};
+
+const VIEW_AS_KEY = "tt_view_as";
+
+/** Fired when the viewer switches, so the whole shell re-reads its permissions. */
+export const VIEW_CHANGED_EVENT = "tt-view-changed";
+export function notifyViewChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(VIEW_CHANGED_EVENT));
+}
+
+/**
+ * Design-mode impersonation. There is no real auth here, so the only way to show
+ * what a team member sees is to let the owner borrow their view. A real build
+ * would take the viewer from the session instead, and this whole switch goes
+ * away with it.
+ */
+export function setViewAs(memberId: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (memberId) localStorage.setItem(VIEW_AS_KEY, memberId);
+    else localStorage.removeItem(VIEW_AS_KEY);
+    notifyViewChanged();
+  } catch {
+    /* ignore */
+  }
+}
+
+export function currentViewer(): Viewer {
+  if (typeof window === "undefined") return OWNER_VIEWER;
+  let id: string | null = null;
+  try {
+    id = localStorage.getItem(VIEW_AS_KEY);
+  } catch {
+    return OWNER_VIEWER;
+  }
+  if (!id) return OWNER_VIEWER;
+  const member = memberById(id);
+  // A member who has since been removed or deactivated cannot be viewed as.
+  if (!member || member.status !== "active") return OWNER_VIEWER;
+  return {
+    id: member.id,
+    name: member.name,
+    email: member.email,
+    initials: initialsOf(member.name),
+    role: member.role === "admin" ? "admin" : "user",
+    impersonating: true,
+  };
+}
+
 const DAY = 86_400_000;
 
 /* ---------------------------------- plan ---------------------------------- */
