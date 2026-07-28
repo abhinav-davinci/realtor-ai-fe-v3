@@ -1,7 +1,7 @@
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationsBell } from "./notifications-panel";
+import { AccountMenu } from "./account-menu";
 import { MobileNav } from "./mobile-nav";
 
 function Logo() {
@@ -33,7 +33,7 @@ export function TopBar() {
           />
         </div>
 
-        <div className="ml-auto flex items-center gap-4 sm:gap-5">
+        <div className="ml-auto flex items-center gap-3 sm:gap-4">
           <button
             aria-label="Search"
             className="text-ink-muted hover:text-ink grid size-9 place-items-center rounded-full sm:hidden"
@@ -41,9 +41,7 @@ export function TopBar() {
             <Search className="size-[20px]" />
           </button>
           <NotificationsBell />
-          <Avatar className="size-9">
-            <AvatarFallback className="bg-brand-orange font-semibold text-white">AR</AvatarFallback>
-          </Avatar>
+          <AccountMenu />
         </div>
       </div>
     </header>

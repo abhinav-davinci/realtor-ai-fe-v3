@@ -8,7 +8,8 @@ export function AppShell({
   sidebar,
 }: {
   children: React.ReactNode;
-  /** Override the secondary sidebar (defaults to the Content Studio menu). */
+  /** Override the secondary sidebar (defaults to the Content Studio menu).
+   * Pass `null` for a full-width page with no secondary sidebar. */
   sidebar?: React.ReactNode;
 }) {
   return (
@@ -18,7 +19,7 @@ export function AppShell({
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
           <div className="flex min-h-0 flex-1">
-            {sidebar ?? <ContentStudioSidebar />}
+            {sidebar === undefined ? <ContentStudioSidebar /> : sidebar}
             <main className="min-w-0 flex-1 overflow-hidden bg-white">{children}</main>
           </div>
         </div>

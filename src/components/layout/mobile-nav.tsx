@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, Settings, LogOut, X } from "lucide-react";
+import { Menu, Settings, LogOut, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -127,11 +127,23 @@ export function MobileNav() {
               </div>
             </div>
 
-            {/* Footer actions */}
+            {/* Footer actions: the same account destinations as the top-bar menu. */}
             <div className="flex items-center justify-between gap-2 border-t border-black/[0.07] px-4 py-3">
-              <button className="text-ink-muted hover:text-ink flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
-                <Settings className="size-4" /> Settings
-              </button>
+              <div className="flex items-center gap-1">
+                <Link
+                  href="/account/settings"
+                  className="text-ink-muted hover:bg-black/[0.04] hover:text-ink flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  <Settings className="size-4" /> Settings
+                </Link>
+                <Link
+                  href="/account/users"
+                  aria-label="User Management"
+                  className="text-ink-muted hover:bg-black/[0.04] hover:text-ink grid size-9 place-items-center rounded-lg transition-colors"
+                >
+                  <Users className="size-4" />
+                </Link>
+              </div>
               <Button
                 onClick={() => {
                   logout();

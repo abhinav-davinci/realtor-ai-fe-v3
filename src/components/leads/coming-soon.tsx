@@ -1,22 +1,29 @@
 import Link from "next/link";
 import { ArrowRight, type LucideIcon } from "lucide-react";
 
-/** Placeholder screen for the Leads cluster items that aren't built yet. */
+/** Placeholder screen for items that aren't built yet. Defaults to the Leads
+ * cluster; pass the eyebrow and back link to use it in another section. */
 export function ComingSoon({
   title,
   description,
   icon: Icon,
+  eyebrow = "Part of your Leads workspace",
+  backHref = "/leads/overview",
+  backLabel = "Go to Overview",
 }: {
   title: string;
   description: string;
   icon: LucideIcon;
+  eyebrow?: string;
+  backHref?: string;
+  backLabel?: string;
 }) {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex items-center gap-3 border-b border-black/[0.06] px-4 py-3 sm:px-6 lg:px-8">
         <div>
           <p className="text-ink font-bold">{title}</p>
-          <p className="text-ink-muted text-xs">Part of your Leads workspace</p>
+          <p className="text-ink-muted text-xs">{eyebrow}</p>
         </div>
       </div>
       <div className="grid flex-1 place-items-center p-8">
@@ -30,10 +37,10 @@ export function ComingSoon({
           </span>
           <p className="text-ink-muted mt-3 text-sm">{description}</p>
           <Link
-            href="/leads/overview"
+            href={backHref}
             className="text-accent-blue mt-5 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
           >
-            Go to Overview <ArrowRight className="size-4" />
+            {backLabel} <ArrowRight className="size-4" />
           </Link>
         </div>
       </div>

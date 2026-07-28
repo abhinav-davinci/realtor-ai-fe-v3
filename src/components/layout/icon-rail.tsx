@@ -25,6 +25,10 @@ export interface RailItem {
   onClick?: () => void;
 }
 
+/** Routes that belong to no rail section (reached from the account menu), so the
+ * Content Studio fallback must not claim them. */
+const OUTSIDE_SECTIONS = ["/account"];
+
 export const PRIMARY: RailItem[] = [
   { label: "Dashboard", icon: LayoutGrid },
   { label: "AI Team", icon: Sparkles, href: "/ai-team" },
@@ -67,10 +71,12 @@ export function IconRail() {
 
   // Each section owns its href prefix (/ai-team, /leads, ...); Content Studio
   // ("/") is the fallback that owns every route not claimed by a section.
+  // Account pages sit outside every section, so no rail item lights up there.
   const sectionHrefs = PRIMARY.map((i) => i.href).filter((h): h is string => !!h && h !== "/");
+  const claimed = [...sectionHrefs, ...OUTSIDE_SECTIONS];
   const isActive = (href?: string) => {
     if (!href) return false;
-    if (href === "/") return !sectionHrefs.some((h) => pathname.startsWith(h));
+    if (href === "/") return !claimed.some((h) => pathname.startsWith(h));
     return pathname === href || pathname.startsWith(href + "/");
   };
   const primary = PRIMARY.map((item) => ({
