@@ -7,6 +7,7 @@
  * developer wires to real editors later.
  */
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Check,
   CheckCheck,
@@ -15,11 +16,11 @@ import {
   ChevronRight,
   CircleCheck,
   Copy,
-  Download,
   ExternalLink,
   FileDown,
   Globe,
   Image as ImageIcon,
+  ListPlus,
   Megaphone,
   MessageSquarePlus,
   Minus,
@@ -30,7 +31,6 @@ import {
   RotateCw,
   Search,
   Trash2,
-  Upload,
   Workflow,
   X,
 } from "lucide-react";
@@ -39,8 +39,6 @@ import { cn } from "@/lib/utils";
 import {
   BROADCASTS,
   BROADCAST_STATUS_TONE,
-  CONTACTS,
-  CONTACT_TAGS,
   TEMPLATES,
   TEMPLATE_STATUS_TONE,
   deleteFlow,
@@ -50,11 +48,27 @@ import {
   seedFlowsIfEmpty,
   type Broadcast,
   type Flow,
-  type OutreachContact,
   type TemplateButtonKind,
   type TemplateStatus,
   type WaTemplate,
 } from "@/lib/outreach";
+import {
+  addContactsToList,
+  CONTACT_TAGS,
+  CONTACTS_CHANGED_EVENT,
+  contactIdFor,
+  fmtDate,
+  initialsOf,
+  LIST_COLORS,
+  listContactLists,
+  listContacts,
+  notifyContactsChanged,
+  saveContact,
+  saveContactList,
+  seedContactsIfNeeded,
+  type Contact,
+  type ContactList,
+} from "@/lib/contacts";
 import { ConfirmDialog, EASE_OUT, inr, Monogram, StatusPill } from "./outreach-shared";
 import { TemplateComposer } from "./outreach-template-composer";
 import { BroadcastComposer } from "./outreach-broadcast-composer";
@@ -710,11 +724,14 @@ function Stat({ n, label, tone = "text-ink" }: { n: number; label: string; tone?
 
 /* -------------------------------- contacts -------------------------------- */
 
-const CONTACT_IMPORT_POOL = ["Rohan Shah", "Divya Menon", "Aman Kapoor", "Pooja Iyer", "Nikhil Rao"];
-
-function initialsOf(name: string): string {
-  return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
-}
+/** Dot color per list accent, as static classes so Tailwind keeps them. */
+const LIST_DOT: Record<string, string> = {
+  "accent-blue": "bg-accent-blue",
+  "brand-green": "bg-brand-green",
+  "brand-orange": "bg-brand-orange",
+  gold: "bg-gold",
+  red: "bg-red-500",
+};
 
 function downloadCsv(filename: string, rows: string[][]) {
   const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -727,28 +744,46 @@ function downloadCsv(filename: string, rows: string[][]) {
 }
 
 export function ContactsPanel() {
-  const [contacts, setContacts] = useState<OutreachContact[]>(CONTACTS);
+  const router = useRouter();
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [lists, setLists] = useState<ContactList[]>([]);
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("All Tags");
+  const [listFilter, setListFilter] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [editing, setEditing] = useState<OutreachContact | "new" | null>(null);
-  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [addToListIds, setAddToListIds] = useState<string[] | null>(null);
+
+  // The one shared contact book (lib/contacts): read it, stay in sync on change.
+  useEffect(() => {
+    seedContactsIfNeeded();
+    const load = () => {
+      setContacts(listContacts());
+      setLists(listContactLists());
+    };
+    load();
+    window.addEventListener(CONTACTS_CHANGED_EVENT, load);
+    return () => window.removeEventListener(CONTACTS_CHANGED_EVENT, load);
+  }, []);
 
   const tagOptions = useMemo(
     () => ["All Tags", ...Array.from(new Set(contacts.flatMap((c) => c.tags)))],
     [contacts]
   );
+  const listName = listFilter === "all" ? "All lists" : lists.find((l) => l.id === listFilter)?.name ?? "All lists";
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const digits = q.replace(/\D/g, "");
+    const members = listFilter === "all" ? null : new Set(lists.find((l) => l.id === listFilter)?.contactIds ?? []);
     return contacts.filter((c) => {
+      if (members && !members.has(c.id)) return false;
       if (tagFilter !== "All Tags" && !c.tags.includes(tagFilter)) return false;
       if (!q) return true;
       const phoneHit = digits.length >= 2 && c.phone.replace(/\D/g, "").includes(digits);
       return c.name.toLowerCase().includes(q) || phoneHit || c.tags.some((t) => t.toLowerCase().includes(q));
     });
-  }, [contacts, query, tagFilter]);
+  }, [contacts, lists, query, tagFilter, listFilter]);
 
   const allSelected = rows.length > 0 && rows.every((c) => selected.has(c.id));
   const someSelected = selected.size > 0;
@@ -769,29 +804,34 @@ export function ContactsPanel() {
       return next;
     });
   }
-  function saveContact(c: OutreachContact) {
-    setContacts((prev) => (prev.some((x) => x.id === c.id) ? prev.map((x) => (x.id === c.id ? c : x)) : [c, ...prev]));
-    setEditing(null);
+  // All writes go to the master book; re-read locally and let other open surfaces refresh.
+  function handleSave(c: Contact) {
+    saveContact(c);
+    notifyContactsChanged();
+    setContacts(listContacts());
+    setAdding(false);
   }
-  function deleteIds(ids: string[]) {
-    setContacts((prev) => prev.filter((c) => !ids.includes(c.id)));
+  function addSelectedToList(listId: string) {
+    if (!addToListIds) return;
+    addContactsToList(listId, addToListIds);
+    notifyContactsChanged();
+    setLists(listContactLists());
     setSelected(new Set());
-    setConfirmIds(null);
+    setAddToListIds(null);
   }
-  function importContacts() {
-    const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    setContacts((prev) => [
-      ...CONTACT_IMPORT_POOL.map((name, i) => ({
-        id: `imp-${Date.now()}-${i}`,
-        name,
-        initials: initialsOf(name),
-        phone: `+91 9${(800000000 + i * 173).toString().slice(0, 9)}`,
-        tags: ["Imported"],
-        source: "Import",
-        added: today,
-      })),
-      ...prev,
-    ]);
+  function createListWith(name: string) {
+    if (!addToListIds) return;
+    saveContactList({
+      id: `list-${Date.now()}`,
+      name: name.trim() || "New list",
+      color: LIST_COLORS[lists.length % LIST_COLORS.length],
+      contactIds: addToListIds,
+      createdAt: Date.now(),
+    });
+    notifyContactsChanged();
+    setLists(listContactLists());
+    setSelected(new Set());
+    setAddToListIds(null);
   }
 
   return (
@@ -810,6 +850,14 @@ export function ContactsPanel() {
             />
           </div>
           <FilterSelect label="tag" value={tagFilter} options={tagOptions} onChange={setTagFilter} />
+          {lists.length > 0 && (
+            <FilterSelect
+              label="list"
+              value={listName}
+              options={["All lists", ...lists.map((l) => l.name)]}
+              onChange={(name) => setListFilter(name === "All lists" ? "all" : lists.find((l) => l.name === name)?.id ?? "all")}
+            />
+          )}
         </div>
 
         {someSelected ? (
@@ -817,11 +865,11 @@ export function ContactsPanel() {
             <span className="text-ink-muted text-sm">{selected.size} selected</span>
             <button
               type="button"
-              onClick={() => setConfirmIds([...selected])}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/60 px-3 text-sm font-semibold text-red-500 transition-colors hover:bg-red-50 active:scale-[0.98]"
+              onClick={() => setAddToListIds([...selected])}
+              className="border-accent-blue/30 text-accent-blue hover:bg-accent-blue/[0.06] inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition-colors active:scale-[0.98]"
             >
-              <Trash2 className="size-4" />
-              Delete selected
+              <ListPlus className="size-4" />
+              Add to list
             </button>
             <button
               type="button"
@@ -836,37 +884,18 @@ export function ContactsPanel() {
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() =>
-                downloadCsv("contacts-sample.csv", [
-                  ["name", "phone", "tags"],
-                  ["Ketan Mehta", "+919876543210", "Buyer;Hot lead"],
-                  ["Priya Nair", "+919812345678", "Tenant"],
-                ])
-              }
+              onClick={() => router.push("/leads/contacts")}
               className="text-ink inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]"
             >
-              <Download className="size-4" />
-              Download Sample
+              <ExternalLink className="size-4" />
+              Manage in Contacts
             </button>
-            <label className="text-ink inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]">
-              <Upload className="size-4" />
-              Import
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) importContacts();
-                  e.target.value = "";
-                }}
-              />
-            </label>
             <button
               type="button"
               onClick={() =>
                 downloadCsv("contacts.csv", [
                   ["name", "phone", "tags", "source", "added"],
-                  ...contacts.map((c) => [c.name, c.phone, c.tags.join(";"), c.source, c.added]),
+                  ...contacts.map((c) => [c.name, c.phone, c.tags.join(";"), c.source, fmtDate(c.addedAt)]),
                 ])
               }
               className="text-ink inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-medium transition-colors hover:bg-black/[0.03] active:scale-[0.98]"
@@ -874,17 +903,25 @@ export function ContactsPanel() {
               <FileDown className="size-4" />
               Export
             </button>
-            <PrimaryButton icon={Plus} onClick={() => setEditing("new")}>
+            <PrimaryButton icon={Plus} onClick={() => setAdding(true)}>
               Add Contact
             </PrimaryButton>
           </div>
         )}
       </div>
 
+      <p className="text-ink-muted -mt-1 mb-3 text-xs">
+        Your shared contact book. Bulk import and editing live in{" "}
+        <button type="button" onClick={() => router.push("/leads/contacts")} className="text-accent-blue font-medium hover:underline">
+          Contacts
+        </button>
+        .
+      </p>
+
       {/* table */}
       <div className={cn(CARD, "overflow-hidden")}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="text-ink-muted border-b border-black/[0.06] text-left text-xs">
                 <th className="w-12 px-4 py-3">
@@ -900,13 +937,12 @@ export function ContactsPanel() {
                 <th className="px-4 py-3 font-medium">Tags</th>
                 <th className="px-4 py-3 font-medium">Source</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Added</th>
-                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-ink-muted px-4 py-12 text-center">
+                  <td colSpan={6} className="text-ink-muted px-4 py-12 text-center">
                     No contacts match your search.
                   </td>
                 </tr>
@@ -945,27 +981,7 @@ export function ContactsPanel() {
                           {c.source}
                         </span>
                       </td>
-                      <td className="text-ink-muted px-4 py-3 text-xs whitespace-nowrap">{c.added}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => setEditing(c)}
-                            aria-label={`Edit ${c.name}`}
-                            className="text-ink-muted hover:text-accent-blue grid size-7 place-items-center rounded-md transition-colors hover:bg-accent-blue/10 active:scale-95"
-                          >
-                            <Pencil className="size-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmIds([c.id])}
-                            aria-label={`Delete ${c.name}`}
-                            className="text-ink-muted grid size-7 place-items-center rounded-md transition-colors hover:bg-red-50 hover:text-red-500 active:scale-95"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
-                      </td>
+                      <td className="text-ink-muted px-4 py-3 text-xs whitespace-nowrap">{fmtDate(c.addedAt)}</td>
                     </tr>
                   );
                 })
@@ -979,22 +995,104 @@ export function ContactsPanel() {
         </div>
       </div>
 
-      {editing && (
-        <ContactModal
-          contact={editing === "new" ? null : editing}
-          onClose={() => setEditing(null)}
-          onSave={saveContact}
+      {adding && <ContactModal contact={null} onClose={() => setAdding(false)} onSave={handleSave} />}
+      {addToListIds && (
+        <AddToListModal
+          count={addToListIds.length}
+          lists={lists}
+          onPick={addSelectedToList}
+          onCreate={createListWith}
+          onClose={() => setAddToListIds(null)}
         />
       )}
-      <ConfirmDialog
-        open={!!confirmIds}
-        title={confirmIds && confirmIds.length > 1 ? `Delete ${confirmIds.length} contacts?` : "Delete this contact?"}
-        message="They will be removed from your contacts. This can't be undone."
-        confirmLabel="Delete"
-        onConfirm={() => confirmIds && deleteIds(confirmIds)}
-        onCancel={() => setConfirmIds(null)}
-      />
     </PanelScroll>
+  );
+}
+
+/** Add the selected contacts to an existing list, or spin up a new one. Writes
+ * to the shared book so the list shows up everywhere lists are used. */
+function AddToListModal({
+  count,
+  lists,
+  onPick,
+  onCreate,
+  onClose,
+}: {
+  count: number;
+  lists: ContactList[];
+  onPick: (listId: string) => void;
+  onCreate: (name: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-ink/40 absolute inset-0" style={{ animation: `fade-in 150ms ${EASE_OUT} both` }} onClick={onClose} aria-hidden />
+      <div className="modal-pop relative flex max-h-[80vh] w-full max-w-sm flex-col rounded-2xl bg-white shadow-2xl shadow-black/25">
+        <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3.5">
+          <h2 className="text-ink text-base font-bold">
+            Add {count} contact{count === 1 ? "" : "s"} to a list
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-ink-muted hover:bg-black/[0.05] hover:text-ink grid size-8 place-items-center rounded-lg transition-colors"
+          >
+            <X className="size-4.5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+          {lists.length === 0 ? (
+            <p className="text-ink-muted px-3 py-6 text-center text-sm">No lists yet. Create your first below.</p>
+          ) : (
+            lists.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => onPick(l.id)}
+                className="hover:bg-accent-blue/[0.06] flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors"
+              >
+                <span className={cn("size-2.5 shrink-0 rounded-full", LIST_DOT[l.color] ?? "bg-ink-muted")} />
+                <span className="text-ink flex-1 truncate text-sm font-medium">{l.name}</span>
+                <span className="text-ink-muted text-xs">{l.contactIds.length}</span>
+              </button>
+            ))
+          )}
+        </div>
+        <div className="flex items-center gap-2 border-t border-black/[0.06] p-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && name.trim()) onCreate(name);
+            }}
+            placeholder="New list name"
+            className="text-ink placeholder:text-ink-muted/55 focus:border-accent-blue/50 h-10 flex-1 rounded-lg border border-black/15 bg-white px-3 text-sm outline-none transition-colors"
+          />
+          <button
+            type="button"
+            onClick={() => name.trim() && onCreate(name)}
+            disabled={!name.trim()}
+            className={cn(
+              "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-[background-color,transform] duration-150",
+              name.trim() ? "bg-brand-green hover:bg-brand-green-hover text-white active:scale-[0.98]" : "text-ink-muted cursor-not-allowed bg-black/[0.06]"
+            )}
+          >
+            <Plus className="size-4" />
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1031,9 +1129,9 @@ function ContactModal({
   onClose,
   onSave,
 }: {
-  contact: OutreachContact | null;
+  contact: Contact | null;
   onClose: () => void;
-  onSave: (c: OutreachContact) => void;
+  onSave: (c: Contact) => void;
 }) {
   const [name, setName] = useState(contact?.name ?? "");
   const [phone, setPhone] = useState(contact?.phone ?? "");
@@ -1052,13 +1150,15 @@ function ContactModal({
     if (!ok) return;
     const display = name.trim() || phone.trim();
     onSave({
-      id: contact?.id ?? `ct-${phone.replace(/\D/g, "")}`,
+      id: contact?.id ?? contactIdFor(phone),
       name: display,
       initials: initialsOf(display),
       phone: phone.trim(),
       tags,
-      source: contact?.source ?? "Manual",
-      added: contact?.added ?? new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+      tier: contact?.tier ?? "new",
+      source: contact?.source ?? "WhatsApp",
+      lastContacted: contact?.lastContacted ?? null,
+      addedAt: contact?.addedAt ?? Date.now(),
     });
   }
 

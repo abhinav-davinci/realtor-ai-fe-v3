@@ -26,13 +26,16 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TEMPLATES, type Broadcast, type WaTemplate } from "@/lib/outreach";
 import {
-  CONTACTS,
-  TEMPLATES,
-  type Broadcast,
-  type OutreachContact,
-  type WaTemplate,
-} from "@/lib/outreach";
+  contactIdFor,
+  listContactLists,
+  listContacts,
+  saveContact,
+  upsertMany,
+  type Contact,
+  type ContactList,
+} from "@/lib/contacts";
 import { EASE_OUT, Monogram, PhonePreview } from "./outreach-shared";
 
 const INPUT =
@@ -65,7 +68,7 @@ export function BroadcastComposer({
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [template, setTemplate] = useState<WaTemplate | null>(initialTemplate);
-  const [recipients, setRecipients] = useState<OutreachContact[]>([]);
+  const [recipients, setRecipients] = useState<Contact[]>([]);
   const [scheduled, setScheduled] = useState(false);
   const [scheduleAt, setScheduleAt] = useState("");
   const [showContacts, setShowContacts] = useState(false);
@@ -75,7 +78,7 @@ export function BroadcastComposer({
   const step1Ok = name.trim().length > 0 && !!template;
   const step2Ok = recipients.length > 0;
 
-  function addRecipients(list: OutreachContact[]) {
+  function addRecipients(list: Contact[]) {
     setRecipients((prev) => {
       const seen = new Set(prev.map((p) => p.id));
       return [...prev, ...list.filter((c) => !seen.has(c.id))];
@@ -196,7 +199,13 @@ export function BroadcastComposer({
                   recipients={recipients}
                   onSelectContacts={() => setShowContacts(true)}
                   onAddContact={() => setShowAdd(true)}
-                  onImportCsv={(list) => addRecipients(list)}
+                  onImportCsv={(list) => {
+                    // Imported numbers land in the shared book too, then join this broadcast.
+                    upsertMany(
+                      list.map((c) => ({ name: c.name, phone: c.phone, tags: c.tags, tier: "new" as const, source: "Import", lastContacted: null }))
+                    );
+                    addRecipients(list);
+                  }}
                   onRemove={(id) => setRecipients((prev) => prev.filter((c) => c.id !== id))}
                   onClear={() => setRecipients([])}
                 />
@@ -251,6 +260,7 @@ export function BroadcastComposer({
         <AddContactModal
           onClose={() => setShowAdd(false)}
           onAdd={(c) => {
+            saveContact(c); // new contacts persist to the shared book
             addRecipients([c]);
             setShowAdd(false);
           }}
@@ -447,10 +457,10 @@ function Step2({
   onClear,
 }: {
   template: WaTemplate | null;
-  recipients: OutreachContact[];
+  recipients: Contact[];
   onSelectContacts: () => void;
   onAddContact: () => void;
-  onImportCsv: (list: OutreachContact[]) => void;
+  onImportCsv: (list: Contact[]) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
 }) {
@@ -551,7 +561,7 @@ function AudienceAction({
 }
 
 /** Upload CSV: in design mode it simulates importing a small batch of contacts. */
-function CsvAction({ onImport }: { onImport: (list: OutreachContact[]) => void }) {
+function CsvAction({ onImport }: { onImport: (list: Contact[]) => void }) {
   const POOL = ["Rohan Shah", "Divya Menon", "Aman Kapoor", "Pooja Iyer", "Nikhil Rao", "Sara Khan"];
   return (
     <label className="hover:border-accent-blue/50 hover:bg-accent-blue/[0.03] flex cursor-pointer flex-col items-start gap-1 rounded-xl border border-black/12 bg-white p-3.5 text-left transition-colors active:scale-[0.99]">
@@ -567,15 +577,20 @@ function CsvAction({ onImport }: { onImport: (list: OutreachContact[]) => void }
         onChange={(e) => {
           if (!e.target.files?.[0]) return;
           onImport(
-            POOL.map((name, i) => ({
-              id: `csv-${i}`,
-              name,
-              initials: initials(name),
-              phone: `+91 9${(800000000 + i * 137).toString().slice(0, 9)}`,
-              tags: ["Imported"],
-              source: "Import",
-              added: "Just now",
-            }))
+            POOL.map((name, i) => {
+              const phone = `+91 9${(800000000 + i * 137).toString().slice(0, 9)}`;
+              return {
+                id: contactIdFor(phone),
+                name,
+                initials: initials(name),
+                phone,
+                tags: ["Imported"],
+                tier: "new" as const,
+                source: "Import",
+                lastContacted: null,
+                addedAt: Date.now(),
+              };
+            })
           );
           e.target.value = "";
         }}
@@ -758,19 +773,25 @@ function SelectContactsModal({
   onClose,
   onAdd,
 }: {
-  alreadySelected: OutreachContact[];
+  alreadySelected: Contact[];
   onClose: () => void;
-  onAdd: (list: OutreachContact[]) => void;
+  onAdd: (list: Contact[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(() => new Set(alreadySelected.map((c) => c.id)));
+  const all = useMemo(() => listContacts(), []);
+  const lists = useMemo(() => listContactLists(), []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return CONTACTS;
-    return CONTACTS.filter((c) => c.name.toLowerCase().includes(q) || c.phone.replace(/\s/g, "").includes(q.replace(/\s/g, "")));
-  }, [query]);
+    if (!q) return all;
+    return all.filter((c) => c.name.toLowerCase().includes(q) || c.phone.replace(/\s/g, "").includes(q.replace(/\s/g, "")));
+  }, [all, query]);
+
+  function addList(l: ContactList) {
+    setPicked((prev) => new Set([...prev, ...l.contactIds]));
+  }
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(page, pageCount - 1);
@@ -794,7 +815,7 @@ function SelectContactsModal({
     });
   }
 
-  const newlyPicked = CONTACTS.filter((c) => picked.has(c.id) && !alreadySelected.some((a) => a.id === c.id));
+  const newlyPicked = all.filter((c) => picked.has(c.id) && !alreadySelected.some((a) => a.id === c.id));
 
   return (
     <ModalShell onClose={onClose} className="flex max-h-[80vh] max-w-md flex-col">
@@ -838,6 +859,22 @@ function SelectContactsModal({
           </button>
           <span className="text-ink-muted">{filtered.length} total contacts</span>
         </div>
+        {lists.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-ink-muted/70 text-[11px]">Add a list:</span>
+            {lists.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => addList(l)}
+                className="text-ink-muted hover:border-accent-blue/40 hover:text-accent-blue inline-flex items-center gap-1 rounded-full border border-black/12 px-2 py-0.5 text-[11px] font-medium transition-colors active:scale-95"
+              >
+                {l.name}
+                <span className="text-ink-muted/60">{l.contactIds.length}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
@@ -936,7 +973,7 @@ function AddContactModal({
   onAdd,
 }: {
   onClose: () => void;
-  onAdd: (c: OutreachContact) => void;
+  onAdd: (c: Contact) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -986,13 +1023,15 @@ function AddContactModal({
           onClick={() => {
             const display = name.trim() || phone.trim();
             onAdd({
-              id: `manual-${phone.replace(/\D/g, "")}`,
+              id: contactIdFor(phone),
               name: display,
               initials: initials(display),
               phone: phone.trim(),
               tags: [],
-              source: "Manual",
-              added: "Just now",
+              tier: "new",
+              source: "WhatsApp",
+              lastContacted: null,
+              addedAt: Date.now(),
             });
           }}
           disabled={!ok}
