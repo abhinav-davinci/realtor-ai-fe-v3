@@ -42,10 +42,16 @@ export interface ScoredLead extends Lead {
   promotedFromAiCall?: boolean;
   /** Epoch ms the lead was promoted (drives the "new leads" banner + sort). */
   promotedAt?: number;
-  /** Who is working the lead: the AI agent (default) or a human after take-over. */
+  /** Who is DRIVING the lead right now: the AI agent (default) or a human after
+   * take-over. Separate from `assigneeId`, which is who is responsible for it. */
   owner?: "ai" | "human";
   /** Epoch ms a human took the lead over. */
   handoffAt?: number;
+  /** Team member responsible for this lead (see lib/lead-distribution.ts). The
+   * AI can still be nurturing it: being assigned does not stop the agent. */
+  assigneeId?: string;
+  /** Epoch ms the lead was distributed to its assignee. */
+  assignedAt?: number;
   /** How the lead reached us, first-touch first (comment to DM to qualified). */
   journey: JourneyStep[];
   /** The score explained: each flow factor and the points it added. Sums to score. */

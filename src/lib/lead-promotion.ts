@@ -22,6 +22,7 @@ import {
   type LeadStatus,
   type ScoredLead,
 } from "@/lib/lead-intelligence";
+import { applyAssignment, distributeUnassigned, readAssignments } from "@/lib/lead-distribution";
 
 /** The call outcomes that earn a place in the pipeline. */
 const POSITIVE: CallOutcome[] = ["qualified", "interested", "callback"];
@@ -304,10 +305,24 @@ function applyHandoff(l: ScoredLead, overlay: Record<string, Handoff>): ScoredLe
 export function listAllScoredLeads(): ScoredLead[] {
   const promoted = listPromotedLeads();
   const overlay = readHandoffs();
+  const owners = readAssignments();
   const seen = new Set(promoted.map(phoneKey));
   const statics = listScoredLeads().filter((l) => !seen.has(phoneKey(l)));
   // Lead Intelligence is Warm and above only; keep promoted leads to the same bar.
-  return [...promoted, ...statics].filter(isWarmOrAbove).map((l) => applyHandoff(l, overlay));
+  // Two independent overlays: who took the lead over, and whose lead it is.
+  return [...promoted, ...statics]
+    .filter(isWarmOrAbove)
+    .map((l) => applyAssignment(applyHandoff(l, overlay), owners));
+}
+
+/** Every lead, with anything that arrived without an owner shared out first.
+ * This is what the leads screens read: distribution is automatic, so a lead can
+ * never be sitting there unowned by the time someone looks at the list. */
+export function listDistributedLeads(): ScoredLead[] {
+  const leads = listAllScoredLeads();
+  const result = distributeUnassigned(leads);
+  // Only re-read when the pass actually handed something out.
+  return result.assigned > 0 ? listAllScoredLeads() : leads;
 }
 
 /* --------------------------- "new leads" banner --------------------------- */

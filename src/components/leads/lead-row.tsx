@@ -11,6 +11,7 @@ import { ArrowLeft, Check, ChevronRight, Headset, PhoneCall, Sparkles, UserRound
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HOT_THRESHOLD, SOURCE_META, TIER_META, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
+import { initialsOf, memberById } from "@/lib/team";
 import { BothChannelsPill, Highlight, LeadAvatar, OutcomeBadge } from "@/components/conversations/conversation-ui";
 import { SourceChip } from "./source-icons";
 
@@ -30,6 +31,30 @@ export function BackToLeadsBar({ onBack }: { onBack: () => void }) {
         Back to leads
       </button>
     </div>
+  );
+}
+
+/** Whose lead this is. Distribution is automatic, so this is a fact to read
+ * rather than a control: the avatar makes it scannable down a long list without
+ * competing with the tinted status chips beside it. */
+export function AssigneeChip({ id, className }: { id?: string; className?: string }) {
+  if (!id) return null;
+  const member = memberById(id);
+  const name = member?.name ?? "Removed user";
+  const first = name.split(" ")[0];
+  return (
+    <span
+      className={cn(
+        "text-ink-muted inline-flex shrink-0 items-center gap-1 rounded-full bg-black/[0.04] py-0.5 pr-2 pl-0.5 text-[10px] font-semibold",
+        className
+      )}
+      title={`Assigned to ${name}`}
+    >
+      <span className="bg-accent-blue/15 text-accent-blue grid size-4 place-items-center rounded-full text-[8px] font-bold">
+        {member ? initialsOf(member.name) : "?"}
+      </span>
+      {first}
+    </span>
   );
 }
 
@@ -64,6 +89,7 @@ export function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query
               <UserRoundCheck className="size-2.5" /> You
             </span>
           )}
+          <AssigneeChip id={lead.assigneeId} />
         </div>
         <p className="text-ink-muted mt-0.5 truncate text-xs">{lead.summary}</p>
       </div>
@@ -101,6 +127,12 @@ export function LeadScoreHeader({ lead, onTakeOver }: { lead: ScoredLead; onTake
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        {lead.assigneeId && (
+          <span className="text-ink-muted mr-0.5 inline-flex items-center gap-1.5 text-xs">
+            Assigned to
+            <AssigneeChip id={lead.assigneeId} className="text-[11px]" />
+          </span>
+        )}
         {handedOff ? (
           <span className="bg-brand-green/10 text-brand-green inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
             <UserRoundCheck className="size-4" /> You&apos;re handling this

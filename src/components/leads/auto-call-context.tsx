@@ -12,6 +12,8 @@ import { PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { recordSession, type SourceKind } from "@/lib/call-sessions";
+import { distributeUnassigned, type DistributionResult } from "@/lib/lead-distribution";
+import { LEADS_CHANGED_EVENT, listAllScoredLeads } from "@/lib/lead-promotion";
 import { runDuration, TICK, type Call } from "./auto-call-run";
 
 export interface AgentMeta {
@@ -47,6 +49,8 @@ interface AutoCallValue {
   /** Run label shown in the header (null for the default leads run). */
   sessionName: string | null;
   kind: RunKind;
+  /** What the run's new leads were shared out to, once it finishes. */
+  distributed: DistributionResult | null;
   start: (calls: Call[], agent: AgentMeta, meta?: RunMeta) => void;
   pause: () => void;
   resume: () => void;
@@ -73,8 +77,10 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
   const [agent, setAgent] = useState<AgentMeta | null>(null);
   const [meta, setMeta] = useState<RunMeta | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [distributed, setDistributed] = useState<DistributionResult | null>(null);
   const firedRef = useRef(false);
   const recordedRef = useRef(false);
+  const distributedRef = useRef(false);
   const startedAtRef = useRef(0);
 
   const active = calls.length > 0;
@@ -117,6 +123,19 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     });
   }, [complete, agent, calls, elapsed, meta, stopped]);
 
+  // Share the run's leads out across the team, exactly once. Declared after the
+  // onComplete effect so a contacts run has already promoted its winners into
+  // Lead Intelligence by the time this reads them. Covers both run kinds, and
+  // sweeps up anything that was still unassigned from before.
+  useEffect(() => {
+    if (!complete || distributedRef.current) return;
+    distributedRef.current = true;
+    const result = distributeUnassigned(listAllScoredLeads());
+    setDistributed(result);
+    // Tell any open leads screen to re-read, the same way the lead store does.
+    if (result.assigned > 0) window.dispatchEvent(new Event(LEADS_CHANGED_EVENT));
+  }, [complete]);
+
   const start = useCallback((c: Call[], ag: AgentMeta, m?: RunMeta) => {
     setCalls(c);
     setElapsed(0);
@@ -126,6 +145,8 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     setMeta(m ?? null);
     firedRef.current = false;
     recordedRef.current = false;
+    distributedRef.current = false;
+    setDistributed(null);
     startedAtRef.current = Date.now();
     setModalOpen(true);
   }, []);
@@ -141,6 +162,8 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
     setMeta(null);
     firedRef.current = false;
     recordedRef.current = false;
+    distributedRef.current = false;
+    setDistributed(null);
     startedAtRef.current = 0;
   }, []);
   const openModal = useCallback(() => setModalOpen(true), []);
@@ -151,9 +174,10 @@ export function AutoCallProvider({ children }: { children: React.ReactNode }) {
       calls, elapsed, paused, stopped, active, complete, agent, modalOpen,
       sessionName: meta?.sessionName ?? null,
       kind: meta?.kind ?? "leads",
+      distributed,
       start, pause, resume, stop, clearRun, openModal, closeModal,
     }),
-    [calls, elapsed, paused, stopped, active, complete, agent, modalOpen, meta, start, pause, resume, stop, clearRun, openModal, closeModal]
+    [calls, elapsed, paused, stopped, active, complete, agent, modalOpen, meta, distributed, start, pause, resume, stop, clearRun, openModal, closeModal]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

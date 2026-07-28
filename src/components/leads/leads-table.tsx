@@ -28,10 +28,13 @@ import {
 import {
   acknowledgePromoted,
   LEADS_CHANGED_EVENT,
-  listAllScoredLeads,
+  listDistributedLeads,
   takeOverLead,
   unseenPromotedCount,
 } from "@/lib/lead-promotion";
+import { distributionPool } from "@/lib/lead-distribution";
+import { TEAM_CHANGED_EVENT, type Member } from "@/lib/team";
+import { FilterSelect } from "@/components/leads/contacts/ui";
 import { EASE_OUT, SearchBar, LeadDetail } from "@/components/conversations/conversation-ui";
 import { BackToLeadsBar, LeadScoreHeader, ScoredLeadRow } from "./lead-row";
 import { SourceIcon } from "./source-icons";
@@ -50,7 +53,7 @@ export function LeadsTable() {
   const [unseen, setUnseen] = useState(0);
   useEffect(() => {
     const load = () => {
-      setAllLeads(listAllScoredLeads());
+      setAllLeads(listDistributedLeads());
       setUnseen(unseenPromotedCount());
     };
     load();
@@ -61,8 +64,18 @@ export function LeadsTable() {
 
   const [tier, setTier] = useState<Tier | "all">("all");
   const [source, setSource] = useState<LeadSource | "all">("all");
+  const [assignee, setAssignee] = useState("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+
+  // Who leads can land on. Read after mount (localStorage), same as the leads.
+  const [pool, setPool] = useState<Member[]>([]);
+  useEffect(() => {
+    const load = () => setPool(distributionPool());
+    load();
+    window.addEventListener(TEAM_CHANGED_EVENT, load);
+    return () => window.removeEventListener(TEAM_CHANGED_EVENT, load);
+  }, []);
 
   // Open a lead from the top; go back to exactly where the list was scrolled.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -94,20 +107,33 @@ export function LeadsTable() {
     takeOverLead(id);
   }
 
-  const visible = useMemo(
-    () =>
-      filterLeads(allLeads, { tab: "all", tier, channel: "both", source, minScore: null, maxScore: null, query, templateId }),
-    [allLeads, tier, source, query, templateId]
-  );
+  const visible = useMemo(() => {
+    const base = filterLeads(allLeads, {
+      tab: "all", tier, channel: "both", source, minScore: null, maxScore: null, query, templateId,
+    });
+    if (assignee === "all") return base;
+    if (assignee === "none") return base.filter((l) => !l.assigneeId);
+    return base.filter((l) => l.assigneeId === assignee);
+  }, [allLeads, tier, source, assignee, query, templateId]);
 
   const open = allLeads.find((l) => l.id === openId) ?? null;
-  const filtered = tier !== "all" || source !== "all" || query.trim() !== "";
+  const filtered = tier !== "all" || source !== "all" || assignee !== "all" || query.trim() !== "";
 
   function resetFilters() {
     setQuery("");
     setTier("all");
     setSource("all");
+    setAssignee("all");
   }
+
+  const assigneeOptions = useMemo(
+    () => [
+      { value: "all", label: "All owners" },
+      ...pool.map((m) => ({ value: m.id, label: m.name })),
+      { value: "none", label: "Unassigned" },
+    ],
+    [pool]
+  );
 
   return (
     <div ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
@@ -166,6 +192,9 @@ export function LeadsTable() {
               <SearchBar leads={allLeads} query={query} setQuery={setQuery} onOpenLead={openLead} />
               <div className="flex flex-wrap items-center gap-2">
                 <TierFilter value={tier} onChange={setTier} />
+                {pool.length > 0 && (
+                  <FilterSelect label="Owner" value={assignee} options={assigneeOptions} onChange={setAssignee} />
+                )}
               </div>
             </div>
 

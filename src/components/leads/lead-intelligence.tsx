@@ -14,7 +14,7 @@ import {
   type LeadSource,
   type ScoredLead,
 } from "@/lib/lead-intelligence";
-import { LEADS_CHANGED_EVENT, listAllScoredLeads, takeOverLead } from "@/lib/lead-promotion";
+import { LEADS_CHANGED_EVENT, listDistributedLeads, takeOverLead } from "@/lib/lead-promotion";
 import { LeadDetail } from "@/components/conversations/conversation-ui";
 import { KpiStrip, SourcesPanel } from "./lead-sources";
 import { BackToLeadsBar, LeadScoreHeader, ScoredLeadRow } from "./lead-row";
@@ -36,7 +36,7 @@ export function LeadIntelligence() {
   // Seed set first (SSR-safe), then merge promoted leads from localStorage.
   const [allLeads, setAllLeads] = useState<ScoredLead[]>(() => listScoredLeads());
   useEffect(() => {
-    const load = () => setAllLeads(listAllScoredLeads());
+    const load = () => setAllLeads(listDistributedLeads());
     load();
     window.addEventListener(LEADS_CHANGED_EVENT, load);
     return () => window.removeEventListener(LEADS_CHANGED_EVENT, load);

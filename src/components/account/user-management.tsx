@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, UserRoundX, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/leads/contacts/ui";
+import { assignedCountFor, releaseMemberLeads } from "@/lib/lead-distribution";
 import { ListFooter } from "@/components/layout/list-footer";
 import {
   PLAN,
@@ -46,6 +47,15 @@ import { TeamEmptyState } from "./team-empty-state";
 import { TeamStats } from "./team-stats";
 import { INPUT } from "./team-ui";
 
+/** Removing someone has two consequences worth spelling out: the seat, and the
+ * leads they were holding. */
+function removeMessage(member: Member | null, leads: number): string {
+  const seat = `They lose access to this organization straight away. Their seat goes back to your ${PLAN.name} plan, and you can restore them from Removed Members.`;
+  if (leads === 0) return seat;
+  const name = member?.name.split(" ")[0] ?? "They";
+  return `${name} is holding ${leads} ${leads === 1 ? "lead" : "leads"}, which go back to the team and are shared out again. ${seat}`;
+}
+
 const ROLE_OPTIONS = [{ value: "all", label: "All Roles" }, ...ROLE_ORDER.map((r) => ({ value: r, label: ROLE_META[r].name }))];
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
@@ -77,6 +87,13 @@ export function UserManagement() {
 
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [resentId, setResentId] = useState<string | null>(null);
+
+  // How many leads the person being removed is holding, so the confirmation can
+  // say where they will go instead of leaving it as a surprise.
+  const removeLeadCount = useMemo(
+    () => (removeTarget ? assignedCountFor(removeTarget.id) : 0),
+    [removeTarget]
+  );
 
   const rootRef = useRef<HTMLDivElement>(null);
   const savedScroll = useRef(0);
@@ -211,7 +228,12 @@ export function UserManagement() {
       void navigator.clipboard?.writeText(inviteLink(m));
     },
     onToggleActive: (m: Member) => {
-      setMemberActive(m.id, m.status !== "active");
+      const activating = m.status !== "active";
+      setMemberActive(m.id, activating);
+      // A deactivated member is out of the distribution pool, so their leads go
+      // back in the queue rather than sitting with someone who cannot work them.
+      // The next visit to Leads deals them out again.
+      if (!activating) releaseMemberLeads(m.id);
       reload();
     },
     onRemove: (m: Member) => setRemoveTarget(m),
@@ -434,10 +456,14 @@ export function UserManagement() {
       <ConfirmDialog
         open={!!removeTarget}
         title={`Remove ${removeTarget?.name ?? "this member"}?`}
-        message={`They lose access to this organization straight away. Their seat goes back to your ${PLAN.name} plan, and you can restore them from Removed Members.`}
+        message={removeMessage(removeTarget, removeLeadCount)}
         confirmLabel="Remove"
         onConfirm={() => {
-          if (removeTarget) removeMember(removeTarget.id);
+          if (removeTarget) {
+            removeMember(removeTarget.id);
+            // Whatever they were holding goes back to the team.
+            releaseMemberLeads(removeTarget.id);
+          }
           setRemoveTarget(null);
           reload();
         }}
