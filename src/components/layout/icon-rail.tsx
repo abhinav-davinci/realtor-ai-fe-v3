@@ -25,9 +25,9 @@ export interface RailItem {
   onClick?: () => void;
 }
 
-/** Routes that belong to no rail section (reached from the account menu), so the
- * Content Studio fallback must not claim them. */
-const OUTSIDE_SECTIONS = ["/account"];
+/** Owned by the secondary Settings item rather than a PRIMARY section, so the
+ * Content Studio fallback must not claim it. */
+const SETTINGS_HREF = "/account";
 
 export const PRIMARY: RailItem[] = [
   { label: "Dashboard", icon: LayoutGrid },
@@ -70,10 +70,9 @@ export function IconRail() {
   const { logout } = useAuth();
 
   // Each section owns its href prefix (/ai-team, /leads, ...); Content Studio
-  // ("/") is the fallback that owns every route not claimed by a section.
-  // Account pages sit outside every section, so no rail item lights up there.
+  // ("/") is the fallback that owns every route no other section claims.
   const sectionHrefs = PRIMARY.map((i) => i.href).filter((h): h is string => !!h && h !== "/");
-  const claimed = [...sectionHrefs, ...OUTSIDE_SECTIONS];
+  const claimed = [...sectionHrefs, SETTINGS_HREF];
   const isActive = (href?: string) => {
     if (!href) return false;
     if (href === "/") return !claimed.some((h) => pathname.startsWith(h));
@@ -86,7 +85,13 @@ export function IconRail() {
   }));
 
   const secondary: RailItem[] = [
-    { label: "Settings", icon: Settings },
+    {
+      label: "Settings",
+      icon: Settings,
+      href: SETTINGS_HREF,
+      active: isActive(SETTINGS_HREF),
+      onClick: () => router.push(SETTINGS_HREF),
+    },
     {
       label: "Logout",
       icon: LogOut,

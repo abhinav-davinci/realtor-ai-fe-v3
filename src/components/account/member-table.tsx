@@ -34,7 +34,8 @@ export interface MemberRowActions {
 }
 
 const ITEM = "text-ink focus:bg-accent-blue/[0.07] focus:text-ink gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium [&_svg]:text-ink-muted";
-const TH = "px-4 py-3 font-medium whitespace-nowrap";
+const TH = "px-3 py-3 font-medium whitespace-nowrap";
+const TD = "px-3 py-2.5";
 
 export function MemberTable({
   members,
@@ -65,7 +66,9 @@ export function MemberTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-black/[0.08] bg-white">
-      <table className="w-full min-w-[1080px] border-collapse text-sm">
+      {/* Access Level restates the Role pill in a sentence, so it is the column
+          that gives way once the Settings sidebar is taking 272px. */}
+      <table className="w-full min-w-[820px] border-collapse text-sm 2xl:min-w-[1080px]">
         <thead>
           <tr className="text-ink-muted border-b border-black/[0.06] bg-black/[0.02] text-left text-xs">
             <th className={TH}>Name</th>
@@ -74,7 +77,7 @@ export function MemberTable({
             <th className={TH}>
               <ColumnFilter label="Role" value={roleFilter} options={roleOptions} onChange={onRoleFilter} />
             </th>
-            <th className={TH}>Access Level</th>
+            <th className={cn(TH, "hidden 2xl:table-cell")}>Access Level</th>
             <th className={TH}>
               <ColumnFilter label="Status" value={statusFilter} options={statusOptions} onChange={onStatusFilter} />
             </th>
@@ -95,18 +98,18 @@ export function MemberTable({
                   highlighted ? "bg-accent-blue/[0.07]" : "hover:bg-black/[0.02]"
                 )}
               >
-                <td className="px-4 py-2.5">
+                <td className={TD}>
                   <div className="flex items-center gap-2.5">
                     <MemberAvatar initials={memberInitials(m)} />
                     <span className="text-ink truncate font-medium">{m.name}</span>
                   </div>
                 </td>
-                <td className="text-ink-muted px-4 py-2.5">
-                  <span className="block max-w-[200px] truncate" title={m.email}>
+                <td className={cn(TD, "text-ink-muted")}>
+                  <span className="block max-w-[150px] truncate 2xl:max-w-[200px]" title={m.email}>
                     {m.email}
                   </span>
                 </td>
-                <td className="text-ink-muted px-4 py-2.5 whitespace-nowrap">
+                <td className={cn(TD, "text-ink-muted whitespace-nowrap")}>
                   {m.phone ? (
                     <span className="inline-flex items-center gap-1.5 tabular-nums">
                       <Phone className="text-ink-muted/60 size-3.5" />
@@ -116,19 +119,19 @@ export function MemberTable({
                     <span className="text-ink-muted/50">Not added</span>
                   )}
                 </td>
-                <td className="px-4 py-2.5">
+                <td className={TD}>
                   <RolePill role={m.role} />
                 </td>
-                <td className="text-ink-muted px-4 py-2.5">
+                <td className={cn(TD, "text-ink-muted hidden 2xl:table-cell")}>
                   <span className="block max-w-[220px] truncate" title={ROLE_META[m.role].access}>
                     {ROLE_META[m.role].access}
                   </span>
                 </td>
-                <td className="px-4 py-2.5">
+                <td className={TD}>
                   <MemberStatusPill status={status} />
                 </td>
-                <td className="text-ink-muted px-4 py-2.5 text-xs whitespace-nowrap">{lastActiveLabel(m, now)}</td>
-                <td className="px-4 py-2.5">
+                <td className={cn(TD, "text-ink-muted text-xs whitespace-nowrap")}>{lastActiveLabel(m, now)}</td>
+                <td className={TD}>
                   <div className="flex items-center justify-end gap-1">
                     {pending ? (
                       <button
@@ -137,7 +140,12 @@ export function MemberTable({
                         className="bg-brand-blue hover:bg-brand-blue-hover inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold whitespace-nowrap text-white outline-none transition-[background-color,transform] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-accent-blue/40 active:scale-[0.97]"
                       >
                         <RotateCw className={cn("size-3.5", m.id === resentId && "motion-safe:animate-spin")} />
-                        {m.id === resentId ? "Invitation sent" : "Resend Invitation"}
+                        {/* One flex child, or the button's gap would open up
+                            between the two words at the wide breakpoint. */}
+                        <span>
+                          {m.id === resentId ? "Invitation sent" : "Resend"}
+                          {m.id !== resentId && <span className="hidden 2xl:inline"> Invitation</span>}
+                        </span>
                       </button>
                     ) : (
                       <button

@@ -1,27 +1,20 @@
 "use client";
 
 /**
- * Context strip above every account page: which workspace you are in, what you
- * are in it, and how much of the plan's seats the team has taken.
+ * Where the plan stands, above every account page. The workspace name and your
+ * role live in the Settings sidebar header, so this strip only answers the one
+ * question the account pages keep raising: how many seats are left.
  */
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  CURRENT_USER,
-  PLAN,
-  TEAM_CHANGED_EVENT,
-  WORKSPACE_NAME,
-  listMembers,
-  seatUsage,
-  type SeatUsage,
-} from "@/lib/team";
+import { PLAN, TEAM_CHANGED_EVENT, listMembers, seatUsage, type SeatUsage } from "@/lib/team";
 
 /** Server and first client render both show the no-members copy, so the seat
  * numbers can never cause a hydration mismatch. */
 const EMPTY: SeatUsage = { used: 0, total: PLAN.seats, remaining: PLAN.seats };
 
-export function AccountBar() {
+export function PlanStrip() {
   const [seats, setSeats] = useState<SeatUsage>(EMPTY);
 
   const reload = useCallback(() => setSeats(seatUsage(listMembers())), []);
@@ -38,14 +31,7 @@ export function AccountBar() {
   const full = seats.remaining === 0 && seats.used > 0;
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-white px-4 py-3 sm:px-6 lg:px-8">
-      <div className="flex items-center gap-2.5">
-        <h2 className="text-ink text-lg font-bold tracking-tight">{WORKSPACE_NAME}</h2>
-        <span className="bg-brand-orange rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white">
-          {CURRENT_USER.role}
-        </span>
-      </div>
-
+    <div className="flex shrink-0 justify-end border-b border-black/[0.06] bg-white px-4 py-2.5 sm:px-6 lg:px-8">
       <div
         className={cn(
           "flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border px-3 py-1.5 text-xs transition-colors duration-200 ease-out",
