@@ -296,41 +296,62 @@
   }
 }
 
-/* Lead distribution: after a calling run, each new lead flies from the agent out
-   to the team member it landed on. --tx/--ty (set inline per dot) are the offset
-   to that person's avatar. The mid-keyframe travels further across than down, so
-   the path bows outward and reads as a fan-out rather than a straight line.
-   Transform/opacity only; gated with motion-safe in the markup. */
-@keyframes lead-fly {
-  0% {
-    transform: translate(0, 0) scale(0.4);
-    opacity: 0;
+/* Lead distribution: a run's batch of leads splits into one share per person.
+   Each share starts stacked at the centre (--dx is the gap space between it and
+   the middle, so they begin touching) and slides out to its place, opening like
+   a fan. Widths carry the counts, so an even split is self-evident without any
+   names or numbers. Transform/opacity only; motion-safe in the markup. */
+/* The row itself widens from a single squeezed block, which is what carries the
+   "one batch becomes many shares" read: the gaps grow out of nothing as it
+   spreads. Scaling a parent scales its children, which is the point here. */
+@keyframes share-spread {
+  from {
+    transform: scaleX(0.18);
   }
-  18% {
-    opacity: 1;
-  }
-  55% {
-    transform: translate(calc(var(--tx) * 0.5), calc(var(--ty) * 0.3)) scale(1);
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate(var(--tx), var(--ty)) scale(0.5);
-    opacity: 0;
+  to {
+    transform: scaleX(1);
   }
 }
 
-/* The nudge an avatar gives as a lead lands on it. Starts and ends at rest, so
-   it reads as a bump rather than an entrance. */
-@keyframes lead-land {
+/* Each share settles into the row as it spreads. */
+@keyframes share-open {
+  0% {
+    transform: translateY(-14px) scaleY(0.5);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(0) scaleY(1.07);
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* The line the shares come to rest on, drawn out from the middle. */
+@keyframes share-line {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* A share brightens as it lands, then settles. Colour only, so it layers over
+   the transform above without fighting it. */
+@keyframes share-settle {
   0%,
   100% {
-    transform: scale(1);
+    opacity: 0;
   }
-  40% {
-    transform: scale(1.14);
+  45% {
+    opacity: 1;
   }
 }
 
@@ -848,12 +869,9 @@
   .launch-celebration {
     animation: none !important;
   }
-  /* The distribution fan-out is movement, so it goes; the avatars and their
-     counts stay, which is where the actual information is. */
+  /* The split is movement, so it goes; the shares and the counts stay, which is
+     where the actual information is. */
   .lead-handout * {
     animation: none !important;
-  }
-  .lead-handout .lead-dot {
-    display: none;
   }
 }
