@@ -301,57 +301,31 @@
    the middle, so they begin touching) and slides out to its place, opening like
    a fan. Widths carry the counts, so an even split is self-evident without any
    names or numbers. Transform/opacity only; motion-safe in the markup. */
-/* The row itself widens from a single squeezed block, which is what carries the
-   "one batch becomes many shares" read: the gaps grow out of nothing as it
-   spreads. Scaling a parent scales its children, which is the point here. */
-@keyframes share-spread {
+/* Lead distribution: a run's batch, drawn as one slim measure that reveals
+   itself already divided into shares. The wipe is the gesture; the message is
+   what stays. clip-path rather than scale so the bar is uncovered at full size
+   instead of stretching into place, and so the gaps between shares arrive with
+   it. */
+@keyframes measure-wipe {
   from {
-    transform: scaleX(0.18);
+    clip-path: inset(0 100% 0 0);
   }
   to {
-    transform: scaleX(1);
+    clip-path: inset(0 0 0 0);
   }
 }
 
-/* Each share settles into the row as it spreads. */
-@keyframes share-open {
-  0% {
-    transform: translateY(-14px) scaleY(0.5);
-    opacity: 0;
-  }
-  35% {
-    opacity: 1;
-  }
-  72% {
-    transform: translateY(0) scaleY(1.07);
-  }
-  100% {
-    transform: translateY(0) scaleY(1);
-    opacity: 1;
-  }
-}
-
-/* The line the shares come to rest on, drawn out from the middle. */
-@keyframes share-line {
+/* The graphic is a moment, not a fixture: once it has been read it lifts away
+   and leaves the confirmation behind, so nothing meaningless is left sitting on
+   the screen. */
+@keyframes measure-clear {
   from {
-    transform: scaleX(0);
-    opacity: 0;
+    opacity: 1;
+    transform: translateY(0);
   }
   to {
-    transform: scaleX(1);
-    opacity: 1;
-  }
-}
-
-/* A share brightens as it lands, then settles. Colour only, so it layers over
-   the transform above without fighting it. */
-@keyframes share-settle {
-  0%,
-  100% {
     opacity: 0;
-  }
-  45% {
-    opacity: 1;
+    transform: translateY(-5px);
   }
 }
 

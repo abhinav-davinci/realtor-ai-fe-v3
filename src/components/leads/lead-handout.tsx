@@ -4,114 +4,98 @@
  * The moment a calling run's new leads are shared out across the team.
  *
  * Distribution is automatic, so without this it happens in silence and the
- * admin has to go and check. The animation exists to EXPLAIN, not to decorate,
- * and the thing worth explaining is not who got what: it is that one batch was
- * split into fair shares with nothing left over. So the batch is a block, the
- * shares are blocks, and their widths carry the counts. An even split is then
- * self-evident at a glance, with no names, no faces, and nothing to look up.
+ * admin has to go and check. What is worth showing is not who got what (that
+ * is the Lead Distribution board's job, and tying a celebration to per-member
+ * identity breaks as the team grows) but that one batch was divided into fair
+ * shares with nothing left over.
+ *
+ * So it is drawn as a single slim measure that wipes in already divided, with
+ * each share's width carrying its count. Then the graphic lifts away. A
+ * celebration that leaves shapes sitting on the screen afterwards is just
+ * clutter, and a row of blocks that outstays the motion reads as a loading
+ * skeleton. What remains is the confirmation line, which is the part with
+ * lasting value.
  *
  * A run finishes a couple of times a day at most, which is the "rare" budget
- * where a little delight is affordable. Everything is transform and opacity on
- * CSS keyframes (off the main thread, and the completion moment is already busy
- * writing to localStorage). Reduced motion keeps the shares and drops the split.
+ * where a little delight is affordable. Transform, opacity and clip-path only,
+ * on CSS keyframes so it runs off the main thread while the completion moment
+ * is busy writing to localStorage. Reduced motion skips the graphic entirely
+ * and shows the confirmation on its own.
  */
 import type { CSSProperties } from "react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DistributionResult } from "@/lib/lead-distribution";
 
-/** Gap between shares, in px. Also how far each one starts collapsed inward. */
-const GAP = 8;
-/** Opening from the middle outward, per step away from centre. */
-const STAGGER = 55;
-const START = 220;
-const OPEN = 520;
 const EASE_OUT = "cubic-bezier(0.23,1,0.32,1)";
-/** Past this many people the bars get too thin to read, so they merge. */
-const MAX_SHARES = 12;
+/** Slim on purpose: a heavy bar reads as a placeholder, a fine one as a measure. */
+const GAP = 3;
+const WIPE = 620;
+const WIPE_AT = 120;
+const TEXT_AT = 460;
+/** Long enough to be read, short enough not to sit there. */
+const CLEAR_AT = 1250;
+/** Past this many people the shares get too fine to read, so they merge. */
+const MAX_SHARES = 14;
 
 export function LeadHandout({ result }: { result: DistributionResult }) {
   const counts = Object.values(result.byMember).sort((a, b) => b - a);
   if (counts.length === 0) return null;
 
-  const shares = counts.length <= MAX_SHARES ? counts : counts.slice(0, MAX_SHARES);
+  const shares = counts.slice(0, MAX_SHARES);
   const total = shares.reduce((sum, n) => sum + n, 0);
-  const mid = (shares.length - 1) / 2;
-  // The last share to arrive sets when the copy is allowed to resolve.
-  const settled = START + Math.ceil(mid) * STAGGER + OPEN;
+  const people = counts.length;
 
   return (
-    <div className="lead-handout border-accent-blue/25 bg-accent-blue/[0.05] overflow-hidden rounded-xl border px-5 pt-5 pb-4">
-      {/* the batch, before it is split */}
-      <div className="flex justify-center">
-        <span
-          className="bg-accent-blue inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm motion-safe:animate-[success-pop_420ms_cubic-bezier(0.23,1,0.32,1)_both]"
-          aria-hidden
-        >
-          <span className="tabular-nums">{result.assigned}</span>
-          {result.assigned === 1 ? "new lead" : "new leads"}
-        </span>
-      </div>
-
-      {/* split into one share per person, width carrying the count */}
-      <div className="relative mt-4">
+    <div className="lead-handout border-accent-blue/20 bg-accent-blue/[0.04] rounded-xl border px-5 py-4">
+      {/* The measure. Fixed height, so when it clears the space it leaves reads
+          as spacing rather than a hole. */}
+      <div className="h-2" aria-hidden>
         <div
-          className="flex origin-center items-end justify-center motion-safe:animate-[share-spread_var(--open)_var(--ease)_var(--delay)_both]"
-          style={
-            {
-              gap: `${GAP}px`,
-              "--open": `${OPEN}ms`,
-              "--ease": EASE_OUT,
-              "--delay": `${START}ms`,
-            } as CSSProperties
-          }
+          className="h-full motion-safe:animate-[measure-clear_380ms_ease-out_var(--clear)_both]"
+          style={{ "--clear": `${CLEAR_AT}ms` } as CSSProperties}
         >
-          {shares.map((count, i) => {
-            const step = Math.abs(i - mid);
-            const delay = START + step * STAGGER;
-            return (
+          <div
+            className="flex h-full motion-safe:animate-[measure-wipe_var(--wipe)_var(--ease)_var(--at)_both]"
+            style={
+              {
+                gap: `${GAP}px`,
+                "--wipe": `${WIPE}ms`,
+                "--ease": EASE_OUT,
+                "--at": `${WIPE_AT}ms`,
+              } as CSSProperties
+            }
+          >
+            {shares.map((count, i) => (
               <span
                 key={i}
-                className="relative block h-9 origin-bottom overflow-hidden rounded-md motion-safe:opacity-0 motion-safe:animate-[share-open_var(--open)_var(--ease)_var(--delay)_both]"
-                style={
-                  {
-                    // Proportional to the share, with a floor so one lead still reads.
-                    flexBasis: `${(count / total) * 100}%`,
-                    minWidth: 26,
-                    "--open": `${OPEN}ms`,
-                    "--ease": EASE_OUT,
-                    "--delay": `${delay}ms`,
-                  } as CSSProperties
-                }
+                className="from-accent-blue to-accent-blue/75 relative block h-full overflow-hidden rounded-full bg-gradient-to-b shadow-[0_1px_4px_rgba(47,107,237,0.28)]"
+                style={{ flexBasis: `${(count / total) * 100}%`, minWidth: 10 }}
               >
-                <span className="bg-accent-blue/85 absolute inset-0 rounded-md" />
-                {/* a brightening as it lands, then it settles back */}
+                {/* a light passing along the measure, share by share */}
                 <span
-                  aria-hidden
-                  className="absolute inset-0 rounded-md bg-white/35 opacity-0 motion-safe:animate-[share-settle_380ms_ease-out_var(--delay)_both]"
-                  style={{ "--delay": `${delay + OPEN * 0.6}ms` } as CSSProperties}
+                  className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/55 to-transparent motion-safe:animate-[shimmer_1.1s_ease-in-out_var(--at)_both]"
+                  style={{ "--at": `${WIPE_AT + 260 + i * 70}ms` } as CSSProperties}
                 />
               </span>
-            );
-          })}
+            ))}
+          </div>
         </div>
-
-        {/* the line they come to rest on */}
-        <span
-          aria-hidden
-          className="bg-accent-blue/25 mt-1.5 block h-px w-full origin-center motion-safe:animate-[share-line_var(--open)_var(--ease)_var(--delay)_both]"
-          style={{ "--open": `${OPEN}ms`, "--ease": EASE_OUT, "--delay": `${START}ms` } as CSSProperties}
-        />
       </div>
 
       <p
-        className="text-ink mt-3.5 text-center text-sm font-bold motion-safe:opacity-0 motion-safe:animate-[fade-in-up_320ms_var(--ease)_var(--delay)_both]"
-        style={{ "--ease": EASE_OUT, "--delay": `${settled - 120}ms` } as CSSProperties}
+        className="text-ink mt-3 flex items-center justify-center gap-1.5 text-center text-sm font-bold motion-safe:opacity-0 motion-safe:animate-[fade-in-up_320ms_var(--ease)_var(--at)_both]"
+        style={{ "--ease": EASE_OUT, "--at": `${TEXT_AT}ms` } as CSSProperties}
       >
-        Shared evenly across {counts.length} {counts.length === 1 ? "person" : "people"}
+        <span className="bg-accent-blue grid size-4 shrink-0 place-items-center rounded-full text-white">
+          <Check className="size-2.5" strokeWidth={3.5} />
+        </span>
+        {result.assigned} {result.assigned === 1 ? "lead" : "leads"} shared evenly across {people}{" "}
+        {people === 1 ? "person" : "people"}
       </p>
       <p
-        className="text-ink-muted mt-0.5 text-center text-xs motion-safe:opacity-0 motion-safe:animate-[fade-in-up_320ms_var(--ease)_var(--delay)_both]"
-        style={{ "--ease": EASE_OUT, "--delay": `${settled - 60}ms` } as CSSProperties}
+        className="text-ink-muted mt-1 text-center text-xs motion-safe:opacity-0 motion-safe:animate-[fade-in-up_320ms_var(--ease)_var(--at)_both]"
+        style={{ "--ease": EASE_OUT, "--at": `${TEXT_AT + 70}ms` } as CSSProperties}
       >
         Every one went to whoever was holding the fewest. They can start calling now.
       </p>
@@ -129,13 +113,9 @@ export function LeadHandoutLine({ result, className }: { result: DistributionRes
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className="flex h-1.5 w-20 shrink-0 items-stretch gap-0.5" aria-hidden>
+      <span className="flex h-1.5 w-20 shrink-0 items-stretch gap-[2px]" aria-hidden>
         {shares.map((count, i) => (
-          <span
-            key={i}
-            className="bg-accent-blue/70 rounded-full"
-            style={{ flexBasis: `${(count / total) * 100}%` }}
-          />
+          <span key={i} className="bg-accent-blue/70 rounded-full" style={{ flexBasis: `${(count / total) * 100}%` }} />
         ))}
       </span>
       <span className="text-ink-muted text-xs">
