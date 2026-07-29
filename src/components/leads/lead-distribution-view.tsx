@@ -112,9 +112,6 @@ export function LeadDistributionView() {
               ))}
             </div>
 
-            <p className="text-ink-muted mt-5 text-xs leading-relaxed">
-              Being assigned does not stop the AI. Agents keep nurturing a lead until someone takes it over.
-            </p>
           </>
         )}
       </div>
