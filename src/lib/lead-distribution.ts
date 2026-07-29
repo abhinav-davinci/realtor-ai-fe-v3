@@ -136,6 +136,38 @@ export function distributeUnassigned(leads: ScoredLead[]): DistributionResult {
 }
 
 /**
+ * Deal the whole board again from scratch. Distribution self-corrects for new
+ * leads but never moves old ones, so somebody who joins today stays behind for
+ * a long time; this is how a manager evens that out in one go.
+ *
+ * Leads someone has already taken over stay with them. Those are being worked
+ * right now, and moving a lead out from under the person on the phone with it
+ * would be worse than an uneven board.
+ */
+export function redistributeAll(leads: ScoredLead[]): DistributionResult {
+  if (typeof window === "undefined") return { assigned: 0, byMember: {} };
+
+  const keep = new Set(leads.filter((l) => l.owner === "human" && l.assigneeId).map((l) => l.id));
+  const current = readAssignments();
+  const next: AssignmentMap = {};
+  for (const [leadId, a] of Object.entries(current)) {
+    if (keep.has(leadId)) next[leadId] = a;
+  }
+  writeAssignments(next);
+
+  // Everything not kept looks unassigned again, so the usual pass deals it out.
+  const cleared = leads.map((l) =>
+    keep.has(l.id) ? l : { ...l, assigneeId: undefined, assignedAt: undefined }
+  );
+  return distributeUnassigned(cleared);
+}
+
+/** How many leads a redistribute would leave where they are. */
+export function heldByPeopleCount(leads: ScoredLead[]): number {
+  return leads.filter((l) => l.owner === "human" && l.assigneeId).length;
+}
+
+/**
  * Hand back everything a member was holding, so it can be dealt out again.
  * Called when someone is removed or deactivated: without this their leads would
  * keep pointing at somebody who can no longer work them.

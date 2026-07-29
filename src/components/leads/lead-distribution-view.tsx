@@ -8,9 +8,17 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Flame, Radar, Repeat2, TriangleAlert, UserRoundCheck, Users } from "lucide-react";
+import { ArrowRight, Flame, Radar, RefreshCw, Repeat2, TriangleAlert, UserRoundCheck, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { distributionSummary, type DistributionSummary } from "@/lib/lead-distribution";
+import { ConfirmDialog } from "@/components/leads/contacts/ui";
+import {
+  distributionSummary,
+  heldByPeopleCount,
+  redistributeAll,
+  type DistributionResult,
+  type DistributionSummary,
+} from "@/lib/lead-distribution";
+import { LeadHandout } from "./lead-handout";
 import { LEADS_CHANGED_EVENT, listDistributedLeads } from "@/lib/lead-promotion";
 import { TEAM_CHANGED_EVENT, initialsOf } from "@/lib/team";
 import type { ScoredLead } from "@/lib/lead-intelligence";
@@ -20,6 +28,9 @@ const EMPTY: DistributionSummary = { pool: [], workloads: [], assigned: 0, unass
 export function LeadDistributionView() {
   const [ready, setReady] = useState(false);
   const [leads, setLeads] = useState<ScoredLead[]>([]);
+  const [confirming, setConfirming] = useState(false);
+  const [replay, setReplay] = useState<DistributionResult | null>(null);
+  const [replayKey, setReplayKey] = useState(0);
 
   const reload = useCallback(() => setLeads(listDistributedLeads()), []);
 
@@ -39,6 +50,17 @@ export function LeadDistributionView() {
 
   const summary = useMemo(() => (leads.length ? distributionSummary(leads) : EMPTY), [leads]);
   const busiest = summary.workloads[0]?.total ?? 0;
+  const held = useMemo(() => heldByPeopleCount(leads), [leads]);
+
+  function redistribute() {
+    const result = redistributeAll(leads);
+    setConfirming(false);
+    setReplay(result.assigned > 0 ? result : null);
+    // Remount the hand-out so its keyframes run again on a repeat click.
+    setReplayKey((k) => k + 1);
+    reload();
+    window.dispatchEvent(new Event(LEADS_CHANGED_EVENT));
+  }
 
   if (!ready) return <div className="h-full" aria-hidden />;
 
@@ -51,13 +73,24 @@ export function LeadDistributionView() {
             Every lead goes to whoever is holding the fewest, the moment it arrives.
           </p>
         </div>
-        <Link
-          href="/leads/intelligence"
-          className="text-accent-blue group inline-flex items-center gap-1 text-sm font-semibold hover:underline"
-        >
-          Open Lead Intelligence
-          <ArrowRight className="size-4 transition-transform duration-150 ease-out motion-safe:group-hover:translate-x-0.5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          {summary.pool.length > 0 && summary.total > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="text-ink inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/15 px-3 text-sm font-semibold outline-none transition-[background-color,transform] duration-150 ease-out hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-accent-blue/40 active:scale-[0.98]"
+            >
+              <RefreshCw className="text-accent-blue size-4" /> Redistribute
+            </button>
+          )}
+          <Link
+            href="/leads/intelligence"
+            className="text-accent-blue group inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+          >
+            Open Lead Intelligence
+            <ArrowRight className="size-4 transition-transform duration-150 ease-out motion-safe:group-hover:translate-x-0.5" />
+          </Link>
+        </div>
       </div>
 
       <div className="mx-auto w-full max-w-5xl px-4 py-5 sm:px-6 lg:px-8">
@@ -65,6 +98,22 @@ export function LeadDistributionView() {
           <EmptyPool />
         ) : (
           <>
+            {/* The hand-out replayed in place, so the reshuffle is something you
+                watch rather than a table that silently rearranges. */}
+            {replay && (
+              <div className="relative mb-5" style={{ animation: "fade-in-up 260ms cubic-bezier(0.23,1,0.32,1) both" }}>
+                <LeadHandout key={replayKey} result={replay} />
+                <button
+                  type="button"
+                  onClick={() => setReplay(null)}
+                  aria-label="Dismiss"
+                  className="text-ink-muted hover:bg-black/[0.06] hover:text-ink absolute top-2.5 right-2.5 grid size-7 place-items-center rounded-lg transition-colors"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+
             {/* Unassigned leads first: that is the only number that means
                 something is going unworked. */}
             <div className="grid gap-3 sm:grid-cols-3">
@@ -115,6 +164,19 @@ export function LeadDistributionView() {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirming}
+        title="Deal every lead again?"
+        message={
+          held > 0
+            ? `The board is shared out from scratch, so most people's lists will change. The ${held} ${held === 1 ? "lead someone has already taken over stays" : "leads someone has already taken over stay"} with them.`
+            : "The board is shared out from scratch, so most people's lists will change. Anyone already working a lead keeps it."
+        }
+        confirmLabel="Redistribute"
+        onConfirm={redistribute}
+        onCancel={() => setConfirming(false)}
+      />
     </div>
   );
 }
