@@ -1,15 +1,12 @@
-import { KanbanSquare } from "lucide-react";
-import { ComingSoon } from "@/components/leads/coming-soon";
+import { KanbanBoard } from "@/components/leads/kanban/kanban-board";
 import { RequireCapability } from "@/components/layout/require-capability";
 
+// The admin's way into the same board the reps work on. One component, scoped by
+// capability: here it shows every lead with the owner named on each card.
 export default function SalesPipelinePage() {
   return (
     <RequireCapability needs="leads.intelligence" title="Sales Pipeline">
-      <ComingSoon
-        title="Sales Pipeline"
-        description="Track every lead through your deal stages, from new enquiry to booking, on one board."
-        icon={KanbanSquare}
-      />
+      <KanbanBoard />
     </RequireCapability>
   );
 }

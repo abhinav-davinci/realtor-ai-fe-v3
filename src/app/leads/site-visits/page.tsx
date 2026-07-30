@@ -1,5 +1,5 @@
-import { SiteVisitsPlaceholder } from "@/components/leads/site-visits-placeholder";
+import { MySiteVisits } from "@/components/leads/site-visits/my-site-visits";
 
 export default function SiteVisitsPage() {
-  return <SiteVisitsPlaceholder />;
+  return <MySiteVisits />;
 }

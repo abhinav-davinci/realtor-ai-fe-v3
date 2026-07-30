@@ -14,7 +14,7 @@ import {
   type LeadSource,
   type ScoredLead,
 } from "@/lib/lead-intelligence";
-import { LEADS_CHANGED_EVENT, listDistributedLeads, takeOverLead } from "@/lib/lead-promotion";
+import { LEADS_CHANGED_EVENT, listDistributedLeads } from "@/lib/lead-promotion";
 import { LeadDetail } from "@/components/conversations/conversation-ui";
 import { KpiStrip, SourcesPanel } from "./lead-sources";
 import { BackToLeadsBar, LeadScoreHeader, ScoredLeadRow } from "./lead-row";
@@ -98,7 +98,7 @@ export function LeadIntelligence() {
         {open ? (
           <div className="space-y-3">
             <BackToLeadsBar onBack={closeLead} />
-            <LeadScoreHeader lead={open} onTakeOver={() => takeOverLead(open.id)} />
+            <LeadScoreHeader lead={open} />
             <LeadDetail lead={open} agentName={open.agentRole} journey={open.journey} />
           </div>
         ) : allLeads.length === 0 ? (

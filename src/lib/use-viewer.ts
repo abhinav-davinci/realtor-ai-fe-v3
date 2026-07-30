@@ -5,7 +5,7 @@
  * server render and the first client render always agree, then settles to the
  * real viewer after mount (impersonation lives in localStorage).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   OWNER_VIEWER,
   TEAM_CHANGED_EVENT,
@@ -37,5 +37,11 @@ export function useViewer(): Viewer & { can: (c: Capability) => boolean; ready: 
     };
   }, [reload]);
 
-  return { ...viewer, ready, can: (c: Capability) => can(viewer, c) };
+  // Memoised deliberately. An unstable object here means every callback and
+  // effect that depends on the viewer is rebuilt on each render, which turns
+  // "reload when the viewer changes" into an infinite loop.
+  return useMemo(
+    () => ({ ...viewer, ready, can: (c: Capability) => can(viewer, c) }),
+    [viewer, ready]
+  );
 }

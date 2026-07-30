@@ -7,14 +7,14 @@
  * intelligence-specific additions are the colour-coded intent score and the
  * origin source chip, both folded into the existing right-hand column.
  */
-import { ArrowLeft, Check, ChevronRight, Headset, PhoneCall, Sparkles, UserRoundCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Check, ChevronRight, Sparkles, UserRoundCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HOT_THRESHOLD, SOURCE_META, TIER_META, type ScoredLead, type Tier } from "@/lib/lead-intelligence";
 import { initialsOf, memberById } from "@/lib/team";
 import { useViewer } from "@/lib/use-viewer";
 import { BothChannelsPill, Highlight, LeadAvatar, OutcomeBadge } from "@/components/conversations/conversation-ui";
 import { SourceChip } from "./source-icons";
+import { SiteVisitModule } from "./site-visits/site-visit-module";
 
 /** Sticky bar that returns from a lead's detail to the full list. It stays pinned
  * to the top while the (long) transcript scrolls, so the way back is always in
@@ -109,8 +109,10 @@ export function ScoredLeadRow({ lead, query, onOpen }: { lead: ScoredLead; query
   );
 }
 
-/** The banner shown above a lead's transcript when it's opened. */
-export function LeadScoreHeader({ lead, onTakeOver }: { lead: ScoredLead; onTakeOver?: () => void }) {
+/** The banner shown above a lead's transcript when it's opened. Booking the
+ * visit is the action here: "Take over" was a leftover from before leads had a
+ * named owner, and "Call lead" never did anything. */
+export function LeadScoreHeader({ lead }: { lead: ScoredLead }) {
   const handedOff = lead.owner === "human";
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-3">
@@ -137,26 +139,14 @@ export function LeadScoreHeader({ lead, onTakeOver }: { lead: ScoredLead; onTake
             <AssigneeChip id={lead.assigneeId} className="text-[11px]" />
           </span>
         )}
-        {handedOff ? (
+        {handedOff && (
           <span className="bg-brand-green/10 text-brand-green inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
             <UserRoundCheck className="size-4" /> You&apos;re handling this
           </span>
-        ) : (
-          onTakeOver && (
-            <Button
-              variant="outline"
-              onClick={onTakeOver}
-              className="text-ink h-9 rounded-lg border-black/15 px-3 text-sm font-semibold"
-            >
-              <Headset className="size-4" /> Take over
-            </Button>
-          )
         )}
-        <Button className="bg-brand-blue hover:bg-brand-blue-hover h-9 rounded-lg px-3 text-sm font-semibold text-white">
-          <PhoneCall className="size-4" /> Call lead
-        </Button>
       </div>
       <ScoreBreakdown lead={lead} />
+      <SiteVisitModule lead={lead} />
     </div>
   );
 }

@@ -29,7 +29,6 @@ import {
   acknowledgePromoted,
   LEADS_CHANGED_EVENT,
   listDistributedLeads,
-  takeOverLead,
   unseenPromotedCount,
 } from "@/lib/lead-promotion";
 import { distributionPool } from "@/lib/lead-distribution";
@@ -115,9 +114,6 @@ export function LeadsTable() {
     acknowledgePromoted();
     setUnseen(0);
   }
-  function onTakeOver(id: string) {
-    takeOverLead(id);
-  }
 
   const visible = useMemo(() => {
     const base = filterLeads(allLeads, {
@@ -172,7 +168,7 @@ export function LeadsTable() {
         {open ? (
           <div className="space-y-3">
             <BackToLeadsBar onBack={closeLead} />
-            <LeadScoreHeader lead={open} onTakeOver={() => onTakeOver(open.id)} />
+            <LeadScoreHeader lead={open} />
             <LeadDetail lead={open} agentName={open.agentRole} journey={open.journey} />
           </div>
         ) : (

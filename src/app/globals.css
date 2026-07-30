@@ -329,6 +329,33 @@
   }
 }
 
+/* Pipeline board: a card settling after it is dropped into a column. Starts
+   slightly lifted, as if it were still falling, and comes to rest. Short,
+   because this happens every time a lead is moved. */
+@keyframes card-land {
+  0% {
+    transform: translateY(-3px) scale(1.02);
+  }
+  60% {
+    transform: translateY(0) scale(0.995);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* The column acknowledges the card it just received. Opacity only, layered over
+   the column's own tint so it reads as a flash rather than a colour change. */
+@keyframes col-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
 /* Voice recorder waveform bars */
 @keyframes voice-wave {
   0%,
@@ -846,6 +873,12 @@
   /* The split is movement, so it goes; the shares and the counts stay, which is
      where the actual information is. */
   .lead-handout * {
+    animation: none !important;
+  }
+  /* Dragging a card still needs to track the pointer, so only the decorative
+     settle and flash are dropped. */
+  .kanban-card,
+  .kanban-flash {
     animation: none !important;
   }
 }

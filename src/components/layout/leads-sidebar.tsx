@@ -26,8 +26,8 @@ const ADMIN_NAV: NavItem[] = [
   { label: "AI Call History", icon: History, href: "/leads/call-history" },
   { label: "Lead Intelligence", icon: Radar, href: "/leads/intelligence" },
   { label: "Lead Distribution", icon: Share2, href: "/leads/distribution" },
-  { label: "Sales Pipeline", icon: KanbanSquare, href: "/leads/pipeline", soon: true },
-  { label: "Site Visits", icon: CalendarCheck, href: "/leads/site-visits", soon: true },
+  { label: "Sales Pipeline", icon: KanbanSquare, href: "/leads/pipeline" },
+  { label: "Site Visits", icon: CalendarCheck, href: "/leads/site-visits" },
   { label: "Conversations", icon: MessagesSquare, href: "/leads/conversations", soon: true },
 ];
 
@@ -35,7 +35,8 @@ const ADMIN_NAV: NavItem[] = [
  * running. Deliberately two items, not a filtered version of the admin list. */
 const USER_NAV: NavItem[] = [
   { label: "My Calling List", icon: PhoneCall, href: "/leads/my-calls" },
-  { label: "My Site Visits", icon: CalendarCheck, href: "/leads/site-visits", soon: true },
+  { label: "Kanban View", icon: KanbanSquare, href: "/leads/board" },
+  { label: "My Site Visits", icon: CalendarCheck, href: "/leads/site-visits" },
 ];
 
 export function LeadsSidebar() {
