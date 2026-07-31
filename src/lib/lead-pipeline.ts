@@ -388,6 +388,25 @@ export function freeSlotCount(date: string, forLeadId?: string): number {
   return Object.values(slotStates(date, forLeadId)).filter((s) => s === "free" || s === "yours").length;
 }
 
+/** How far ahead a visit can be booked. The day strip covers the first two
+ * weeks; the calendar reaches the rest of this window. */
+export const BOOKING_HORIZON_DAYS = 90;
+
+export type DateBlock = "past" | "full" | "beyond" | null;
+
+/**
+ * Why a day cannot be booked, or null if it can. One rule for the strip, the
+ * calendar and the confirm button, so they can never disagree about what is
+ * allowed. Note that a today whose slots have all passed comes back as "full",
+ * which is what it is from here on.
+ */
+export function dateBlock(date: string, forLeadId?: string): DateBlock {
+  const today = todayISO();
+  if (date < today) return "past";
+  if (date > addDaysISO(today, BOOKING_HORIZON_DAYS)) return "beyond";
+  return freeSlotCount(date, forLeadId) === 0 ? "full" : null;
+}
+
 /* --------------------------------- reads ---------------------------------- */
 
 /** Every lead with a live booking, soonest first. Drives My Site Visits. */

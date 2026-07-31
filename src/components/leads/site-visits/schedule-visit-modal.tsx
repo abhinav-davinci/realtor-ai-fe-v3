@@ -4,23 +4,36 @@
  * Booking or moving a site visit. Two decisions, in the order a person makes
  * them: which day, then which time. The day strip carries how many slots are
  * left, so a full day is obvious before it is opened, and every slot states
- * plainly whether it can be had.
+ * plainly whether it can be had. Anything further out than the strip comes from
+ * the calendar beside it.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck, Check, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModalShell } from "@/components/leads/contacts/ui";
 import {
   SLOTS,
   addDaysISO,
+  dateBlock,
   fmtVisitDate,
   freeSlotCount,
   slotStates,
   todayISO,
   type SlotState,
 } from "@/lib/lead-pipeline";
+import { CalendarTrigger, VisitCalendar } from "./visit-calendar";
 
 const DAYS_AHEAD = 14;
+
+/** The first day in the strip that can actually take a booking, so the modal
+ * never opens on a day with nothing left. */
+function firstOpenDay(today: string, leadId: string): string {
+  for (let i = 0; i < DAYS_AHEAD; i++) {
+    const d = addDaysISO(today, i);
+    if (!dateBlock(d, leadId)) return d;
+  }
+  return today;
+}
 
 export function ScheduleVisitModal({
   leadId,
@@ -41,19 +54,43 @@ export function ScheduleVisitModal({
 }) {
   const today = todayISO();
 
-  const days = useMemo(
-    () =>
-      Array.from({ length: DAYS_AHEAD }, (_, i) => {
-        const date = addDaysISO(today, i);
-        return { date, free: freeSlotCount(date, leadId) };
-      }),
-    [today, leadId]
-  );
-
   // Open on the current booking if there is one, otherwise the first day that
   // has anything left.
-  const [date, setDate] = useState(() => current?.date ?? days.find((d) => d.free > 0)?.date ?? today);
+  const [date, setDate] = useState(() => current?.date ?? firstOpenDay(today, leadId));
   const [slot, setSlot] = useState<string | null>(current?.slot ?? null);
+  const [calendarAt, setCalendarAt] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  function closeCalendar() {
+    setCalendarAt(null);
+    // Focus goes back where it came from, so the calendar does not leave the
+    // keyboard stranded at the top of the document.
+    triggerRef.current?.focus();
+  }
+
+  // A day chosen from the calendar can sit well down the strip. Bring it into
+  // view, or the quick picks look like nothing is selected.
+  useEffect(() => {
+    const strip = stripRef.current;
+    const chip = strip?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!strip || !chip) return;
+    strip.scrollTo({
+      left: chip.offsetLeft - strip.clientWidth / 2 + chip.clientWidth / 2,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  }, [date]);
+
+  // The next two weeks, plus whatever was picked from the calendar if it fell
+  // outside them. A chosen day that the strip cannot show would leave the quick
+  // picks looking like nothing is selected.
+  const days = useMemo(() => {
+    const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => addDaysISO(today, i));
+    if (!dates.includes(date)) dates.push(date);
+    return dates
+      .sort()
+      .map((d) => ({ date: d, free: freeSlotCount(d, leadId) }));
+  }, [today, leadId, date]);
 
   const states = useMemo(() => slotStates(date, leadId), [date, leadId]);
   const anyFree = SLOTS.some((s) => states[s.id] === "free" || states[s.id] === "yours");
@@ -109,19 +146,29 @@ export function ScheduleVisitModal({
       </div>
 
       {/* day */}
-      <p className="text-ink mt-5 mb-2 text-sm font-semibold">Pick a day</p>
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1.5">
+      <div className="mt-5 mb-2 flex items-center justify-between gap-3">
+        <p className="text-ink text-sm font-semibold">Pick a day</p>
+        <CalendarTrigger ref={triggerRef} open={!!calendarAt} onOpen={setCalendarAt} />
+      </div>
+      {/* relative so a chip's offsetLeft is measured against this scroller */}
+      <div ref={stripRef} className="relative -mx-1 flex gap-2 overflow-x-auto px-1 pb-1.5">
         {days.map(({ date: d, free }) => {
           const active = d === date;
-          const full = free === 0;
+          // A day already gone reads as "Passed", not "Full". The strip can hold
+          // one when a visit that has been and gone is being moved.
+          const block = dateBlock(d, leadId);
+          const full = block !== null;
           return (
             <button
               key={d}
               type="button"
               disabled={full}
+              data-active={active}
               onClick={() => setDate(d)}
               className={cn(
-                "flex w-[86px] shrink-0 flex-col items-center gap-0.5 rounded-xl border px-2 py-2 text-center outline-none transition-[border-color,background-color,transform] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-accent-blue/40",
+                // Wide enough for the longest label a date can produce, so a day
+                // late in the strip does not wrap onto two lines.
+                "flex w-[94px] shrink-0 flex-col items-center gap-0.5 rounded-xl border px-1.5 py-2 text-center whitespace-nowrap outline-none transition-[border-color,background-color,transform] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-accent-blue/40",
                 full
                   ? "cursor-not-allowed border-black/[0.06] bg-black/[0.02]"
                   : active
@@ -133,7 +180,7 @@ export function ScheduleVisitModal({
                 {fmtVisitDate(d)}
               </span>
               <span className={cn("text-[10px] font-medium", full ? "text-ink-muted/50" : free <= 2 ? "text-brand-orange" : "text-ink-muted")}>
-                {full ? "Full" : `${free} free`}
+                {block === "past" ? "Passed" : block ? "Full" : `${free} free`}
               </span>
             </button>
           );
@@ -180,6 +227,19 @@ export function ScheduleVisitModal({
         <Legend className="bg-ink-muted/30" label="Taken or passed" />
         {current && <Legend className="bg-brand-orange" label="Current booking" />}
       </div>
+
+      {calendarAt && (
+        <VisitCalendar
+          value={date}
+          leadId={leadId}
+          anchor={calendarAt}
+          onPick={(d) => {
+            setDate(d);
+            closeCalendar();
+          }}
+          onClose={closeCalendar}
+        />
+      )}
     </ModalShell>
   );
 }
